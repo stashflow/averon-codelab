@@ -183,11 +183,6 @@ export default function SettingsPage() {
       <main className="max-w-3xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Settings</h1>
-          {profile?.role && (
-            <Link href={`/settings/${profile.role}`}>
-              <Button variant="outline">Role Settings</Button>
-            </Link>
-          )}
         </div>
 
         <Card>
@@ -230,8 +225,8 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Email</CardTitle>
-            <CardDescription>Change email using Supabase Auth. Confirmation may be required.</CardDescription>
+            <CardTitle>Email Address</CardTitle>
+            <CardDescription>Change your email address. A confirmation email will be sent to verify the change.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -246,7 +241,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Password</CardTitle>
-            <CardDescription>Change password for this account.</CardDescription>
+            <CardDescription>Update your account password.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -273,21 +268,21 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Preferences</CardTitle>
-            <CardDescription>Control dashboard behavior and notifications.</CardDescription>
+            <CardTitle>Notifications</CardTitle>
+            <CardDescription>Manage your notification preferences.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between border rounded-md p-3">
               <div>
-                <p className="font-medium">Email Updates</p>
-                <p className="text-sm text-muted-foreground">Receive updates about activity and progress.</p>
+                <p className="font-medium">Email Notifications</p>
+                <p className="text-sm text-muted-foreground">Receive email updates about activity and progress.</p>
               </div>
               <Switch checked={preferences.email_updates} onCheckedChange={(checked) => setPreferences({ ...preferences, email_updates: checked })} />
             </div>
             <div className="flex items-center justify-between border rounded-md p-3">
               <div>
                 <p className="font-medium">Class Reminders</p>
-                <p className="text-sm text-muted-foreground">Show reminder cues in dashboards.</p>
+                <p className="text-sm text-muted-foreground">Show reminders in your dashboard.</p>
               </div>
               <Switch checked={preferences.class_reminders} onCheckedChange={(checked) => setPreferences({ ...preferences, class_reminders: checked })} />
             </div>
@@ -297,12 +292,12 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Supabase Account Info</CardTitle>
-            <CardDescription>Useful account/session metadata from Supabase.</CardDescription>
+            <CardTitle>Account Information</CardTitle>
+            <CardDescription>View your account details and session information.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">User ID</span>
+              <span className="text-muted-foreground">Account ID</span>
               <span className="font-mono text-xs break-all">{authUser?.id}</span>
             </div>
             <div className="flex items-center justify-between">
@@ -310,8 +305,8 @@ export default function SettingsPage() {
               <span>{authUser?.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString() : 'Unknown'}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Provider</span>
-              <Badge variant="secondary">{authUser?.app_metadata?.provider || 'email'}</Badge>
+              <span className="text-muted-foreground">Role</span>
+              <Badge variant="secondary" className="capitalize">{profile?.role?.replace('_', ' ') || 'User'}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Session Expires</span>
