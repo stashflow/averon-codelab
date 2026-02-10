@@ -1,0 +1,281 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
+import Image from 'next/image'
+import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { ArrowLeft, BookOpen, CheckCircle2, Lock, Play, Clock } from 'lucide-react'
+import { Lesson } from '@/types' // Import Lesson type
+
+export const dynamic = 'force-dynamic'
+
+export default function CourseDetailPage() {
+  const [course, setCourse] = useState<any>(null)
+  const [units, setUnits] = useState<any[]>([])
+  const [progress, setProgress] = useState<Map<string, any>>(new Map())
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const params = useParams()
+  const courseId = params.id as string
+
+  useEffect(() => {
+    async function loadData() {
+      const supabase = createClient()
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+          router.push('/auth/login')
+          return
+        }
+
+        // Load course
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('id', courseId)
+          .single()
+
+        if (courseError) throw courseError
+        setCourse(courseData)
+
+        // Load units and lessons
+        const { data: unitsData, error: unitsError } = await supabase
+          .from('units')
+          .select(`
+            *,
+            lessons:lessons(*)
+          `)
+          .eq('course_id', courseId)
+          .order('order_index')
+
+        if (unitsError) throw unitsError
+
+        // Sort lessons within each unit
+        const sortedUnits = (unitsData || []).map((unit: any) => ({
+          ...unit,
+          lessons: (unit.lessons || []).sort((a: Lesson, b: Lesson) => a.order_index - b.order_index),
+        }))
+
+        setUnits(sortedUnits)
+
+        // Load student progress
+        const { data: progressData } = await supabase
+          .from('student_lesson_progress')
+          .select('*')
+          .eq('student_id', user.id)
+
+        const progressMap = new Map()
+        progressData?.forEach((p: any) => {
+          progressMap.set(p.lesson_id, p)
+        })
+        setProgress(progressMap)
+      } catch (err: any) {
+        console.error('[v0] Load course error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [courseId, router])
+
+  const calculateCourseProgress = () => {
+    let total = 0
+    let completed = 0
+
+    units.forEach((unit) => {
+      unit.lessons?.forEach((lesson: any) => {
+        total++
+        const lessonProgress = progress.get(lesson.id)
+        if (lessonProgress?.status === 'completed') {
+          completed++
+        }
+      })
+    })
+
+    return total > 0 ? Math.round((completed / total) * 100) : 0
+  }
+
+  const getLessonStatus = (lessonId: string) => {
+    const lessonProgress = progress.get(lessonId)
+    if (!lessonProgress) return 'not_started'
+    return lessonProgress.status
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle2 className="w-5 h-5 text-green-400" />
+      case 'in_progress':
+        return <Play className="w-5 h-5 text-cyan-400" />
+      default:
+        return <Lock className="w-5 h-5 text-white/50" />
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white/60">Loading course...</div>
+      </div>
+    )
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-white/60 mb-4">Course not found</div>
+          <Link href="/courses">
+            <Button variant="outline" className="border-white/10 text-white/60 hover:text-white hover:bg-white/5 bg-transparent">
+              Back to Courses
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const progressPercent = calculateCourseProgress()
+
+  return (
+    <div className="min-h-screen bg-black">
+      {/* Background effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[128px]" />
+      </div>
+
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-xl">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-3">
+              <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12" />
+              <span className="font-bold text-2xl bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
+                Averon CodeLab
+              </span>
+            </Link>
+            <Link href="/courses">
+              <Button variant="outline" className="border-white/10 text-white/60 hover:text-white hover:bg-white/5 bg-transparent">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                All Courses
+              </Button>
+            </Link>
+          </div>
+        </nav>
+      </header>
+
+      {/* Course Header */}
+      <section className="relative border-b border-white/10 bg-gradient-to-b from-white/5 to-transparent">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative">
+          <div className="flex items-start gap-8">
+            <div className={`w-24 h-24 rounded-3xl bg-gradient-to-r ${course.color || 'from-cyan-500 to-blue-500'} flex items-center justify-center flex-shrink-0`}>
+              <BookOpen className="w-12 h-12 text-white" />
+            </div>
+            <div className="flex-1">
+              <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 border mb-4">
+                {course.difficulty_level}
+              </Badge>
+              <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-white via-cyan-200 to-blue-200 bg-clip-text text-transparent">
+                {course.name}
+              </h1>
+              <p className="text-xl text-white/60 font-light mb-6">{course.description}</p>
+              <div className="flex items-center gap-6 text-sm text-white/50">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  <span>{course.estimated_hours} hours</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  <span>{units.length} units</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {progressPercent > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white/60 text-sm">Your Progress</span>
+                <span className="text-white font-semibold">{progressPercent}%</span>
+              </div>
+              <Progress value={progressPercent} className="h-2" />
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Units and Lessons */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative">
+        <div className="space-y-8">
+          {units.map((unit, unitIndex) => (
+            <Card
+              key={unit.id}
+              className="border-2 border-white/10 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-sm"
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-cyan-400 text-sm font-semibold mb-2">Unit {unitIndex + 1}</div>
+                    <CardTitle className="text-white text-2xl mb-2">{unit.title}</CardTitle>
+                    <CardDescription className="text-white/60">{unit.description}</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {unit.lessons?.map((lesson: any, lessonIndex: number) => {
+                    const status = getLessonStatus(lesson.id)
+                    return (
+                      <Link key={lesson.id} href={`/lesson/${lesson.id}`}>
+                        <div className="flex items-center gap-4 p-4 rounded-xl border border-white/10 hover:border-cyan-500/50 hover:bg-white/5 transition-all cursor-pointer group">
+                          <div className="flex-shrink-0">{getStatusIcon(status)}</div>
+                          <div className="flex-1">
+                            <div className="text-white font-semibold group-hover:text-cyan-300 transition-colors">
+                              {lessonIndex + 1}. {lesson.title}
+                            </div>
+                            {lesson.duration_minutes && (
+                              <div className="text-white/65 text-sm mt-1 font-medium">{lesson.duration_minutes} minutes</div>
+                            )}
+                          </div>
+                          {status === 'completed' && (
+                            <Badge className="bg-green-500/10 text-green-400 border-green-500/20 border">
+                              Completed
+                            </Badge>
+                          )}
+                        </div>
+                      </Link>
+                    )
+                  })}
+
+                  {(!unit.lessons || unit.lessons.length === 0) && (
+                    <div className="text-center py-8 text-white/70 text-base">No lessons available yet</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {units.length === 0 && (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="w-8 h-8 text-white/60" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Course Content Coming Soon</h3>
+              <p className="text-white/60">Units and lessons will be added soon.</p>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}

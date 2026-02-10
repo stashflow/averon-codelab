@@ -1,0 +1,15 @@
+[00:00:00.643] Server  WARN    ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[00:00:00.711] Server  LOG     ✓ Ready in 556ms
+[00:02:49.392] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:03:47.103] Server  LOG     ✓ Compiled in 426ms
+[00:03:54.206] Server  WARN    ⚠ Fast Refresh had to perform a full reload when ./app/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[00:03:54.255] Server  LOG     ✓ Compiled in 42ms
+[00:03:54.378] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:04:32.389] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[06:52:34.732] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[07:01:46.585] Server  WARN    ⚠ Fast Refresh had to perform a full reload when ./app/admin/panel/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[07:01:46.602] Server  LOG     ✓ Compiled in 100ms
+[07:01:47.294] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[07:02:08.602] Server  LOG     ✓ Compiled in 55ms
+[07:03:47.587] Server  LOG     ✓ Compiled in 47ms
+[07:17:16.481] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
