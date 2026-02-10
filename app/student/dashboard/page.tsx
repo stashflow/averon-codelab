@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -179,6 +180,7 @@ export default function StudentDashboard() {
               </div>
             </Link>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Link href="/settings">
                 <Button variant="outline" className="gap-2">
                   <Settings className="w-4 h-4" />

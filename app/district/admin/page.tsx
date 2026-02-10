@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Building2, Users, BookOpen, Plus, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Building2, Users, BookOpen, Plus, Clock, CheckCircle, XCircle, LogOut } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -124,6 +124,12 @@ export default function DistrictAdminPanel() {
     }
   }
 
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -148,9 +154,19 @@ export default function DistrictAdminPanel() {
       <header className="border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">District Admin Panel</h1>
-              <p className="text-sm text-muted-foreground font-medium">{district.name}</p>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleSignOut}
+                variant="outline"
+                size="icon"
+                className="gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">District Admin Panel</h1>
+                <p className="text-sm text-muted-foreground font-medium">{district.name}</p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />

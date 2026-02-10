@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { LogOut, BarChart3, Users, BookOpen, Settings } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -113,10 +114,13 @@ export default function AdminPanel() {
             <h1 className="text-2xl font-bold text-secondary">Admin Panel</h1>
             <p className="text-sm text-muted-foreground">System Administration & Analytics</p>
           </div>
-          <Button onClick={handleSignOut} variant="outline" className="gap-2 bg-transparent">
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button onClick={handleSignOut} variant="outline" className="gap-2 bg-transparent">
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 

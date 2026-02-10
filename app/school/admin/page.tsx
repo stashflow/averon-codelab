@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -170,11 +171,17 @@ export default function SchoolAdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="max-w-6xl mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">School Admin Panel</h1>
-          <p className="text-muted-foreground">{school.name}</p>
+      <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">School Admin Panel</h1>
+            <p className="text-sm text-muted-foreground">{school.name}</p>
+          </div>
+          <ThemeToggle />
         </div>
+      </header>
+      
+      <main className="max-w-6xl mx-auto p-6 space-y-6">
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
