@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users } from 'lucide-react'
+import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users, Bell, AlertCircle } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +36,17 @@ interface ClassroomEnrollment {
   } | null
 }
 
+interface Announcement {
+  id: string
+  message: string
+  priority: string
+  created_at: string
+  teacher: {
+    full_name: string
+  }
+  classroom_id: string
+}
+
 export default function StudentDashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -43,6 +54,7 @@ export default function StudentDashboard() {
   const [classEnrollments, setClassEnrollments] = useState<ClassroomEnrollment[]>([])
   const [badges, setBadges] = useState<any[]>([])
   const [streak, setStreak] = useState<any>(null)
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [joinCode, setJoinCode] = useState('')
   const [joining, setJoining] = useState(false)
@@ -101,6 +113,28 @@ export default function StudentDashboard() {
       setClassEnrollments((classEnrollmentData as any) || [])
       setStreak(streakData || { current_streak: 0, longest_streak: 0 })
       setBadges(badgeData || [])
+
+      // Load announcements for all enrolled classes
+      if (classEnrollmentData && classEnrollmentData.length > 0) {
+        const classroomIds = classEnrollmentData.map((e: any) => e.classroom_id)
+        const { data: announcementsData } = await supabase
+          .from('class_announcements')
+          .select(`
+            id,
+            message,
+            priority,
+            created_at,
+            classroom_id,
+            teacher:teacher_id(full_name)
+          `)
+          .in('classroom_id', classroomIds)
+          .eq('is_active', true)
+          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(5)
+
+        setAnnouncements((announcementsData as any) || [])
+      }
     } catch (err: any) {
       console.error('[v0] student dashboard load error', err)
     } finally {
@@ -201,6 +235,37 @@ export default function StudentDashboard() {
           <h1 className="text-3xl font-bold tracking-tight text-white">Welcome back, {profile?.full_name || 'Student'}</h1>
           <p className="text-slate-400 mt-1">Track your progress, join classes, and keep learning.</p>
         </div>
+
+        {announcements.length > 0 && (
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-xl border border-blue-400/20 shadow-2xl shadow-blue-500/20 p-6">
+            <div className="relative z-10 space-y-3">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-blue-400" />
+                <h3 className="text-lg font-semibold text-white">Class Announcements</h3>
+              </div>
+              <div className="space-y-2">
+                {announcements.map((announcement) => (
+                  <div
+                    key={announcement.id}
+                    className="flex items-start gap-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4"
+                  >
+                    {announcement.priority === 'urgent' && (
+                      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm leading-relaxed">
+                        {announcement.message}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        - {announcement.teacher?.full_name || 'Teacher'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-orange-500/10 p-5">
