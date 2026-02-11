@@ -16,9 +16,9 @@ export async function POST(request: Request) {
 
     // Check if user is full admin
     const { data: userRole } = await supabase
-      .from('user_roles')
+      .from('profiles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single()
 
     if (userRole?.role !== 'full_admin') {

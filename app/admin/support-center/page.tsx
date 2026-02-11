@@ -85,6 +85,8 @@ type Classroom = {
   deleted_at?: string
 }
 
+type SupportTab = 'users' | 'districts' | 'schools' | 'classrooms'
+
 export default function AdminSupportCenter() {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
@@ -93,7 +95,7 @@ export default function AdminSupportCenter() {
   const [districts, setDistricts] = useState<District[]>([])
   const [schools, setSchools] = useState<School[]>([])
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [activeTab, setActiveTab] = useState<SupportTab>('users')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteType, setDeleteType] = useState<'user' | 'district' | 'school' | 'classroom' | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any>(null)
@@ -108,8 +110,43 @@ export default function AdminSupportCenter() {
   })
 
   useEffect(() => {
-    loadStats()
+    verifyAccessAndLoad()
   }, [])
+
+  const verifyAccessAndLoad = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        window.location.href = '/auth/login'
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role !== 'full_admin') {
+        window.location.href = '/protected'
+        return
+      }
+
+      await Promise.all([
+        loadStats(),
+        searchUsers(''),
+        searchDistricts(''),
+        searchSchools(''),
+        searchClassrooms(''),
+      ])
+    } catch (error) {
+      console.error('Error verifying support access:', error)
+      showAlert('error', 'Unable to verify admin access')
+    }
+  }
 
   const loadStats = async () => {
     try {
@@ -132,23 +169,28 @@ export default function AdminSupportCenter() {
     }
   }
 
-  const searchUsers = async () => {
-    if (!searchQuery.trim()) return
+  const searchUsers = async (queryOverride?: string) => {
+    const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let usersQuery = supabase
         .from('profiles')
         .select(`
           id,
           email,
           full_name,
+          role,
           created_at,
-          user_roles (role),
+          deleted_at,
           district_admins (district:districts(name)),
           school_admins (school:schools(name))
         `)
-        .or(`email.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`)
-        .limit(20)
+
+      if (query) {
+        usersQuery = usersQuery.or(`email.ilike.%${query}%,full_name.ilike.%${query}%`)
+      }
+
+      const { data, error } = await usersQuery.limit(query ? 20 : 50)
 
       if (error) throw error
 
@@ -156,9 +198,10 @@ export default function AdminSupportCenter() {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        role: user.user_roles?.[0]?.role || 'student',
+        role: user.role || 'student',
         created_at: user.created_at,
         last_sign_in_at: user.last_sign_in_at,
+        deleted_at: user.deleted_at,
         district_name: user.district_admins?.[0]?.district?.name,
         school_name: user.school_admins?.[0]?.school?.name
       })) || []
@@ -172,11 +215,11 @@ export default function AdminSupportCenter() {
     }
   }
 
-  const searchDistricts = async () => {
-    if (!searchQuery.trim()) return
+  const searchDistricts = async (queryOverride?: string) => {
+    const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let districtsQuery = supabase
         .from('districts')
         .select(`
           id,
@@ -186,8 +229,12 @@ export default function AdminSupportCenter() {
           schools (count),
           district_admins (count)
         `)
-        .ilike('name', `%${searchQuery}%`)
-        .limit(20)
+
+      if (query) {
+        districtsQuery = districtsQuery.ilike('name', `%${query}%`)
+      }
+
+      const { data, error } = await districtsQuery.limit(query ? 20 : 50)
 
       if (error) throw error
 
@@ -209,11 +256,11 @@ export default function AdminSupportCenter() {
     }
   }
 
-  const searchSchools = async () => {
-    if (!searchQuery.trim()) return
+  const searchSchools = async (queryOverride?: string) => {
+    const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let schoolsQuery = supabase
         .from('schools')
         .select(`
           id,
@@ -224,8 +271,12 @@ export default function AdminSupportCenter() {
           classrooms (count),
           school_admins (count)
         `)
-        .ilike('name', `%${searchQuery}%`)
-        .limit(20)
+
+      if (query) {
+        schoolsQuery = schoolsQuery.ilike('name', `%${query}%`)
+      }
+
+      const { data, error } = await schoolsQuery.limit(query ? 20 : 50)
 
       if (error) throw error
 
@@ -248,11 +299,11 @@ export default function AdminSupportCenter() {
     }
   }
 
-  const searchClassrooms = async () => {
-    if (!searchQuery.trim()) return
+  const searchClassrooms = async (queryOverride?: string) => {
+    const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let classroomsQuery = supabase
         .from('classrooms')
         .select(`
           id,
@@ -261,10 +312,14 @@ export default function AdminSupportCenter() {
           deleted_at,
           school:schools(name, district:districts(name)),
           teacher:profiles!classrooms_teacher_id_fkey(full_name),
-          classroom_students (count)
+          enrollments (count)
         `)
-        .ilike('name', `%${searchQuery}%`)
-        .limit(20)
+
+      if (query) {
+        classroomsQuery = classroomsQuery.ilike('name', `%${query}%`)
+      }
+
+      const { data, error } = await classroomsQuery.limit(query ? 20 : 50)
 
       if (error) throw error
 
@@ -274,7 +329,7 @@ export default function AdminSupportCenter() {
         school_name: classroom.school?.name || 'Unknown',
         district_name: classroom.school?.district?.name || 'Unknown',
         teacher_name: classroom.teacher?.full_name || 'Unknown',
-        student_count: classroom.classroom_students?.[0]?.count || 0,
+        student_count: classroom.enrollments?.[0]?.count || 0,
         created_at: classroom.created_at,
         deleted_at: classroom.deleted_at
       })) || []
@@ -286,6 +341,22 @@ export default function AdminSupportCenter() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const runSearchForTab = async (tab: SupportTab) => {
+    if (tab === 'users') {
+      await searchUsers()
+      return
+    }
+    if (tab === 'districts') {
+      await searchDistricts()
+      return
+    }
+    if (tab === 'schools') {
+      await searchSchools()
+      return
+    }
+    await searchClassrooms()
   }
 
   const handleDelete = async () => {
@@ -455,11 +526,11 @@ export default function AdminSupportCenter() {
         {/* Main Content */}
         <Card>
           <CardHeader>
-            <CardTitle>Search & Manage</CardTitle>
-            <CardDescription>Search for users, districts, schools, or classrooms to manage</CardDescription>
+            <CardTitle>Browse & Search</CardTitle>
+            <CardDescription>Data loads automatically. Use search to filter users, districts, schools, or classrooms.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="users">
+            <Tabs defaultValue="users" value={activeTab} onValueChange={(value) => setActiveTab(value as SupportTab)}>
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="users">
                   <Users className="w-4 h-4 mr-2" />
@@ -484,27 +555,19 @@ export default function AdminSupportCenter() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by name or email..."
+                    placeholder="Optional search by name or email..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        const activeTab = document.querySelector('[data-state="active"]')?.getAttribute('value')
-                        if (activeTab === 'users') searchUsers()
-                        else if (activeTab === 'districts') searchDistricts()
-                        else if (activeTab === 'schools') searchSchools()
-                        else if (activeTab === 'classrooms') searchClassrooms()
+                        runSearchForTab(activeTab)
                       }
                     }}
                     className="pl-10"
                   />
                 </div>
                 <Button onClick={() => {
-                  const activeTab = document.querySelector('[data-state="active"]')?.getAttribute('value')
-                  if (activeTab === 'users') searchUsers()
-                  else if (activeTab === 'districts') searchDistricts()
-                  else if (activeTab === 'schools') searchSchools()
-                  else if (activeTab === 'classrooms') searchClassrooms()
+                  runSearchForTab(activeTab)
                 }} disabled={loading}>
                   {loading ? 'Searching...' : 'Search'}
                 </Button>

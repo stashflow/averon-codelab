@@ -468,6 +468,12 @@ export default function AdminPanel() {
     await navigator.clipboard.writeText(code)
   }
 
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -486,14 +492,19 @@ export default function AdminPanel() {
               Full admins can do everything. District and school admins see the same data model scoped to their permissions.
             </p>
           </div>
-          {currentRole === 'full_admin' && (
-            <Button
-              onClick={() => router.push('/admin/support-center')}
-              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-            >
-              Advanced Support Center
+          <div className="flex items-center gap-2">
+            {currentRole === 'full_admin' && (
+              <Button
+                onClick={() => router.push('/admin/support-center')}
+                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+              >
+                Advanced Support Center
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleSignOut}>
+              Sign Out
             </Button>
-          )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">

@@ -16,16 +16,16 @@ export async function POST(request: Request) {
 
     // Check if user is full admin
     const { data: userRole } = await supabase
-      .from('user_roles')
+      .from('profiles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single()
 
     if (userRole?.role !== 'full_admin') {
       return NextResponse.json({ error: 'Forbidden: Full admin access required' }, { status: 403 })
     }
 
-    const { classroom_id } = await request.json()
+    const { classroom_id, reason } = await request.json()
 
     if (!classroom_id) {
       return NextResponse.json({ error: 'Classroom ID is required' }, { status: 400 })
@@ -34,7 +34,8 @@ export async function POST(request: Request) {
     // Call the delete function
     const { data, error } = await supabase.rpc('admin_delete_classroom', {
       p_classroom_id: classroom_id,
-      p_admin_id: user.id
+      p_admin_id: user.id,
+      p_reason: reason || 'Admin deletion'
     })
 
     if (error) {

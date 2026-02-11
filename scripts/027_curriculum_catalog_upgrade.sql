@@ -16,49 +16,49 @@ ALTER TABLE public.lessons
   ADD COLUMN IF NOT EXISTS estimated_minutes INTEGER DEFAULT 30,
   ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS content_body TEXT,
-  ADD COLUMN IF NOT EXISTS content_type TEXT DEFAULT 'coding';
+  ADD COLUMN IF NOT EXISTS content_type TEXT DEFAULT 'interactive';
 
 -- Core catalog courses (do not touch courses outside this list)
 INSERT INTO public.courses (
   id, name, description, language, level, difficulty_level, estimated_hours,
-  is_trial_accessible, icon_name, color, is_active
+  icon_name, color, is_active
 )
 VALUES
   (
     '00000000-0000-0000-0000-000000000001',
     'Python Fundamentals',
     'Structured introduction to programming and computational reasoning with progressive independence, pattern deduction, and applied Python system design.',
-    'python', 'beginner', 'beginner', 30, true, 'Code', 'cyan', true
+    'python', 'beginner', 'beginner', 30, 'Code', 'cyan', true
   ),
   (
     '00000000-0000-0000-0000-000000000002',
     'JavaScript Essentials',
     'Modern browser programming with DOM-driven architecture, event systems, async workflows, and production-style interactive application development.',
-    'javascript', 'beginner', 'beginner', 35, true, 'Code', 'yellow', true
+    'javascript', 'beginner', 'beginner', 35, 'Code', 'yellow', true
   ),
   (
     '00000000-0000-0000-0000-000000000003',
     'Java Programming',
     'Engineering-focused object-oriented Java pathway emphasizing modular design, algorithmic reasoning, maintainable architecture, and refactoring discipline.',
-    'java', 'intermediate', 'intermediate', 50, false, 'Code', 'orange', true
+    'java', 'intermediate', 'intermediate', 50, 'Code', 'orange', true
   ),
   (
     '00000000-0000-0000-0000-000000000004',
     'C++ Mastery',
     'Advanced systems-aware C++ curriculum with memory semantics, pointer rigor, STL depth, recursion, and performance engineering.',
-    'cpp', 'advanced', 'advanced', 60, false, 'Code', 'blue', true
+    'cpp', 'advanced', 'advanced', 60, 'Code', 'blue', true
   ),
   (
     '00000000-0000-0000-0000-000000000005',
     'AP Computer Science A (Java)',
     'College-level AP-aligned Java pathway with exam-style tracing, FRQ simulation, timed reasoning, and written technical justification.',
-    'java', 'advanced', 'advanced', 80, false, 'GraduationCap', 'red', true
+    'java', 'advanced', 'advanced', 80, 'GraduationCap', 'red', true
   ),
   (
     '00000000-0000-0000-0000-000000000006',
     'Intro to Software & Technology',
     'Applied technology literacy covering hardware, systems, networking, cybersecurity, data, and automation in real institutional contexts.',
-    'technology', 'beginner', 'beginner', 40, true, 'Database', 'green', true
+    'technology', 'beginner', 'beginner', 40, 'Database', 'green', true
   )
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
@@ -67,7 +67,6 @@ ON CONFLICT (id) DO UPDATE SET
   level = EXCLUDED.level,
   difficulty_level = EXCLUDED.difficulty_level,
   estimated_hours = EXCLUDED.estimated_hours,
-  is_trial_accessible = EXCLUDED.is_trial_accessible,
   icon_name = EXCLUDED.icon_name,
   color = EXCLUDED.color,
   is_active = EXCLUDED.is_active;
@@ -111,7 +110,7 @@ WHERE course_id IN (
   '00000000-0000-0000-0000-000000000006'
 );
 
-WITH unit_seed(course_id, unit_number, title, description) AS (
+WITH unit_seed_raw(course_id, unit_number, title, description) AS (
   VALUES
   -- Intro to Software & Technology (40h)
   ('00000000-0000-0000-0000-000000000006', 1, 'Computing Systems in Context', 'Foundational systems model, decomposition, and context-aware technology reasoning.'),
@@ -172,6 +171,14 @@ WITH unit_seed(course_id, unit_number, title, description) AS (
   ('00000000-0000-0000-0000-000000000004', 7, 'Profiling and Performance Engineering', 'Measurement-driven optimization and refactoring tradeoffs.'),
   ('00000000-0000-0000-0000-000000000004', 8, 'Command-Line File Analyzer Capstone', 'Systems-style capstone with robust parsing and performance constraints.')
 ),
+unit_seed AS (
+  SELECT
+    course_id::uuid AS course_id,
+    unit_number,
+    title,
+    description
+  FROM unit_seed_raw
+),
 insert_units AS (
   INSERT INTO public.units (
     id, course_id, unit_number, title, description, is_published, order_index
@@ -199,7 +206,7 @@ insert_units AS (
     order_index = EXCLUDED.order_index
   RETURNING id
 ),
-lesson_seed(course_id, unit_number, lesson_number, title, method, minutes, summary, assessment_focus) AS (
+lesson_seed_raw(course_id, unit_number, lesson_number, title, method, minutes, summary, assessment_focus) AS (
   VALUES
   -- Intro to Software & Technology
   ('00000000-0000-0000-0000-000000000006',1,1,'Progressive Reveal: System Thinking Foundations','progressive_reveal',45,'Compute systems as interacting components with clear boundaries and dependencies.','concept_checkpoint'),
@@ -354,6 +361,18 @@ lesson_seed(course_id, unit_number, lesson_number, title, method, minutes, summa
   ('00000000-0000-0000-0000-000000000004',8,2,'Capstone Stage 2: Parsing + Metrics Engine','single_problem_depth',65,'Implement parser, metrics pipeline, and extensible analysis rules.','structured_evaluation'),
   ('00000000-0000-0000-0000-000000000004',8,3,'Capstone Stage 3: Performance Report and Defense','minimalist_ide',60,'Deliver benchmark report, refactor summary, and technical defense.','written_explanation')
 ),
+lesson_seed AS (
+  SELECT
+    course_id::uuid AS course_id,
+    unit_number,
+    lesson_number,
+    title,
+    method,
+    minutes,
+    summary,
+    assessment_focus
+  FROM lesson_seed_raw
+),
 insert_lessons AS (
   INSERT INTO public.lessons (
     id, unit_id, lesson_number, title, description, lesson_type, content_data,
@@ -396,7 +415,7 @@ insert_lessons AS (
     ls.lesson_number,
     'Method: ' || ls.method || E'\n\nObjective: ' || ls.summary || E'\n\nMastery Gate: ' || ls.assessment_focus || E'\n\nDeliverable: Submit executable work product and concise technical rationale.',
     ls.minutes,
-    'coding'
+    'interactive'
   FROM lesson_seed ls
   ON CONFLICT (id) DO UPDATE SET
     title = EXCLUDED.title,
