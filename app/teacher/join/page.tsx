@@ -60,6 +60,17 @@ export default function TeacherJoinPage() {
 
       setUser(authUser)
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .single()
+
+      if (profile?.role !== 'teacher') {
+        router.push('/protected')
+        return
+      }
+
       // Load user's teacher requests
       const { data: requestsData } = await supabase
         .from('teacher_requests')
@@ -88,7 +99,7 @@ export default function TeacherJoinPage() {
   }
 
   async function handleSearchCode() {
-    if (!classCode.trim()) return
+    if (!classCode.trim() || !user) return
 
     setSearching(true)
     setError(null)

@@ -8,6 +8,10 @@ export async function GET(
   try {
     const supabase = await createClient()
     const { id: classroom_id } = await params
+
+    if (!classroom_id) {
+      return NextResponse.json({ error: 'Classroom ID is required' }, { status: 400 })
+    }
     
     const {
       data: { user },
@@ -15,6 +19,20 @@ export async function GET(
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const [{ data: classroom }, { data: enrollment }, { data: profile }] = await Promise.all([
+      supabase.from('classrooms').select('id, teacher_id').eq('id', classroom_id).single(),
+      supabase.from('enrollments').select('id').eq('classroom_id', classroom_id).eq('student_id', user.id).maybeSingle(),
+      supabase.from('profiles').select('role').eq('id', user.id).single(),
+    ])
+
+    const isElevatedRole = ['full_admin', 'district_admin', 'school_admin'].includes(profile?.role || '')
+    const isTeacherForClass = classroom?.teacher_id === user.id
+    const isEnrolledStudent = Boolean(enrollment)
+
+    if (!classroom || (!isElevatedRole && !isTeacherForClass && !isEnrolledStudent)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Get active announcements with teacher info

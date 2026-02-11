@@ -15,7 +15,10 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const type = searchParams.get('type') || 'received' // 'received' or 'sent'
+    const requestedType = searchParams.get('type') || 'received' // 'received' or 'sent'
+    const type = requestedType === 'sent' ? 'sent' : 'received'
+    const requestedLimit = Number(searchParams.get('limit') || '50')
+    const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(100, Math.floor(requestedLimit))) : 50
 
     let query = supabase
       .from('messages')
@@ -25,6 +28,7 @@ export async function GET(request: Request) {
         recipient:recipient_id(id, full_name, email)
       `)
       .order('created_at', { ascending: false })
+      .limit(limit)
 
     if (type === 'received') {
       query = query.eq('recipient_id', user.id)
@@ -44,7 +48,7 @@ export async function GET(request: Request) {
 
     // Decrypt messages
     const decryptedMessages = await Promise.all(
-      messages.map(async (msg) => {
+      (messages || []).map(async (msg) => {
         try {
           const decryptedContent = await decryptMessage(
             msg.encrypted_content,

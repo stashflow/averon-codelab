@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, CheckCircle, PlayCircle, Code, Trophy, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,24 +114,25 @@ export default function LessonViewer() {
     setTestResults(null)
 
     try {
-      // Simulate test execution
-      const testCases = currentCheckpoint.test_cases || []
-      const results = testCases.map((test: any, index: number) => ({
-        id: index,
-        passed: Math.random() > 0.3, // Mock: 70% pass rate
-        input: test.input,
-        expected: test.expected,
-        actual: test.expected, // Mock
-      }))
-
-      const allPassed = results.every((r: any) => r.passed)
-      const score = (results.filter((r: any) => r.passed).length / results.length) * 100
-
-      setTestResults({
-        passed: allPassed,
-        score,
-        results,
+      const response = await fetch('/api/judge/checkpoint', {
+        method: 'POST',
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          checkpointId: currentCheckpoint.id,
+          code,
+          starterCode: currentCheckpoint.starter_code,
+        }),
       })
+      const judged = await response.json()
+      if (!response.ok) {
+        throw new Error(judged?.error || 'Failed to run tests')
+      }
+
+      const allPassed = Boolean(judged.passed)
+      const score = Number(judged.score || 0)
+      const results = Array.isArray(judged.results) ? judged.results : []
+
+      setTestResults({ passed: allPassed, score, results })
 
       // Save submission
       const supabase = createClient()

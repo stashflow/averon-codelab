@@ -5,16 +5,22 @@
 const ALGORITHM = 'AES-GCM'
 const KEY_LENGTH = 256
 
-// Generate or retrieve encryption key (in production, store securely)
+// Generate or retrieve encryption key.
 async function getEncryptionKey(): Promise<CryptoKey> {
-  // For simplicity, we derive a key from a passphrase
-  // In production, use environment variables or secure key management
-  const passphrase = process.env.MESSAGE_ENCRYPTION_KEY || 'averon-codelab-default-key-change-in-production'
+  const passphrase = process.env.MESSAGE_ENCRYPTION_KEY
+  if (!passphrase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('MESSAGE_ENCRYPTION_KEY must be set in production')
+    }
+  }
+
+  const keySource = passphrase || 'averon-codelab-dev-only-key'
+  const saltSource = process.env.MESSAGE_ENCRYPTION_SALT || 'averon-salt-dev'
   
   const encoder = new TextEncoder()
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(passphrase),
+    encoder.encode(keySource),
     { name: 'PBKDF2' },
     false,
     ['deriveBits', 'deriveKey']
@@ -23,7 +29,7 @@ async function getEncryptionKey(): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: encoder.encode('averon-salt'), // Static salt for simplicity
+      salt: encoder.encode(saltSource),
       iterations: 100000,
       hash: 'SHA-256',
     },

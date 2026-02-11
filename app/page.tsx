@@ -166,15 +166,15 @@ export default function Home() {
             <div className="flex flex-wrap items-center justify-center gap-8 pt-12 text-base text-muted-foreground">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Free to start</span>
+                <span>Built for student success</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>No credit card required</span>
+                <span>Learn at your own pace</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Setup in minutes</span>
+                <span>Start coding on day one</span>
               </div>
             </div>
           </div>

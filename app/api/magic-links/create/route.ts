@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createClient } from '@/lib/supabase/server'
+import { ensureValidCsrf } from '@/lib/security/csrf'
 
 type InviteRole = 'full_admin' | 'district_admin' | 'school_admin' | 'teacher' | 'student'
 
@@ -14,6 +15,9 @@ function randomToken() {
 
 export async function POST(request: Request) {
   try {
+    const csrfError = ensureValidCsrf(request)
+    if (csrfError) return csrfError
+
     const supabase = await createClient()
     const {
       data: { user },

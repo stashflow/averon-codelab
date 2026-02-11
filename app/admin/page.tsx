@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LogOut, BarChart3, Users, BookOpen, Settings } from 'lucide-react'
 
@@ -20,7 +20,7 @@ export default function AdminPanel() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState<any>(null)
   const [stats, setStats] = useState({ users: 0, teachers: 0, students: 0, classrooms: 0, assignments: 0 })
   const [activeTab, setActiveTab] = useState('overview')
 
@@ -43,10 +43,10 @@ export default function AdminPanel() {
           return
         }
 
-        // Check if user is admin
+        // Check if user is an admin role
         const { data: profileData } = await supabase.from('profiles').select('role').eq('id', authUser.id).single()
 
-        if (profileData?.role !== 'admin') {
+        if (!['admin', 'full_admin', 'district_admin', 'school_admin'].includes(profileData?.role || '')) {
           router.push('/protected')
           return
         }
@@ -54,22 +54,20 @@ export default function AdminPanel() {
         setProfile(profileData)
 
         // Load statistics
-        const [usersRes, classroomsRes, assignmentsRes] = await Promise.all([
-          supabase.from('profiles').select('id, role'),
-          supabase.from('classrooms').select('id'),
-          supabase.from('assignments').select('id'),
+        const [usersRes, teachersRes, studentsRes, classroomsRes, assignmentsRes] = await Promise.all([
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'teacher'),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student'),
+          supabase.from('classrooms').select('id', { count: 'exact', head: true }),
+          supabase.from('assignments').select('id', { count: 'exact', head: true }),
         ])
 
-        const allUsers = usersRes.data || []
-        const teachers = allUsers.filter((u) => u.role === 'teacher').length
-        const students = allUsers.filter((u) => u.role === 'student').length
-
         setStats({
-          users: allUsers.length,
-          teachers,
-          students,
-          classrooms: classroomsRes.data?.length || 0,
-          assignments: assignmentsRes.data?.length || 0,
+          users: usersRes.count || 0,
+          teachers: teachersRes.count || 0,
+          students: studentsRes.count || 0,
+          classrooms: classroomsRes.count || 0,
+          assignments: assignmentsRes.count || 0,
         })
       } catch (err) {
         console.error('Error:', err)
@@ -97,7 +95,7 @@ export default function AdminPanel() {
     )
   }
 
-  if (!profile || profile.role !== 'admin') {
+  if (!profile || !['admin', 'full_admin', 'district_admin', 'school_admin'].includes(profile.role)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p className="text-destructive">Access denied. Admin access required.</p>

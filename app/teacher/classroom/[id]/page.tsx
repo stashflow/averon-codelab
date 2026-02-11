@@ -28,13 +28,46 @@ export default function TeacherClassroomPage() {
     starterCode: '',
   })
   const [creatingAssignment, setCreatingAssignment] = useState(false)
+  const [userId, setUserId] = useState<string>('')
 
   useEffect(() => {
     async function loadData() {
       const supabase = createClient()
       try {
+        const {
+          data: { user: authUser },
+          error: userError,
+        } = await supabase.auth.getUser()
+
+        if (userError || !authUser) {
+          router.push('/auth/login')
+          return
+        }
+        setUserId(authUser.id)
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .single()
+
+        if (profile?.role !== 'teacher') {
+          router.push('/protected')
+          return
+        }
+
         // Load classroom
-        const { data: classData } = await supabase.from('classrooms').select('*').eq('id', classroomId).single()
+        const { data: classData } = await supabase
+          .from('classrooms')
+          .select('*')
+          .eq('id', classroomId)
+          .eq('teacher_id', authUser.id)
+          .single()
+
+        if (!classData) {
+          router.push('/protected/teacher')
+          return
+        }
 
         setClassroom(classData)
 
@@ -65,6 +98,7 @@ export default function TeacherClassroomPage() {
   }, [classroomId])
 
   async function handleCreateAssignment() {
+    if (!classroom || !userId) return
     setCreatingAssignment(true)
 
     const supabase = createClient()
@@ -72,7 +106,7 @@ export default function TeacherClassroomPage() {
       const { data, error } = await supabase
         .from('assignments')
         .insert({
-          classroom_id: classroomId,
+          classroom_id: classroom.id,
           title: newAssignmentData.title,
           description: newAssignmentData.description,
           starter_code: newAssignmentData.starterCode,

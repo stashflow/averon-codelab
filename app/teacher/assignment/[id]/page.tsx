@@ -28,12 +28,38 @@ export default function TeacherAssignmentPage() {
     async function loadData() {
       const supabase = createClient()
       try {
+        const {
+          data: { user: authUser },
+          error: userError,
+        } = await supabase.auth.getUser()
+
+        if (userError || !authUser) {
+          router.push('/auth/login')
+          return
+        }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .single()
+
+        if (profile?.role !== 'teacher') {
+          router.push('/protected')
+          return
+        }
+
         // Load assignment
         const { data: assignmentData } = await supabase
           .from('assignments')
-          .select('*')
+          .select('*, classroom:classroom_id(teacher_id)')
           .eq('id', assignmentId)
           .single()
+
+        if (!assignmentData || assignmentData.classroom?.teacher_id !== authUser.id) {
+          router.push('/protected/teacher')
+          return
+        }
 
         setAssignment(assignmentData)
 
@@ -68,10 +94,13 @@ export default function TeacherAssignmentPage() {
 
     const supabase = createClient()
     try {
+      const parsedScore = Number(gradeScore)
+      const normalizedScore = Number.isFinite(parsedScore) ? Math.max(0, Math.min(100, Math.round(parsedScore))) : 0
+
       const { error } = await supabase
         .from('submissions')
         .update({
-          score: parseInt(gradeScore) || 0,
+          score: normalizedScore,
           feedback: gradeFeedback,
           status: 'graded',
           graded_at: new Date().toISOString(),
@@ -83,7 +112,7 @@ export default function TeacherAssignmentPage() {
       // Update local state
       setSelectedSubmission({
         ...selectedSubmission,
-        score: parseInt(gradeScore),
+        score: normalizedScore,
         feedback: gradeFeedback,
         status: 'graded',
       })
@@ -94,7 +123,7 @@ export default function TeacherAssignmentPage() {
           s.id === selectedSubmission.id
             ? {
                 ...s,
-                score: parseInt(gradeScore),
+                score: normalizedScore,
                 feedback: gradeFeedback,
                 status: 'graded',
               }

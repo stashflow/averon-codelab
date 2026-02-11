@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { CSRF_COOKIE_NAME, csrfCookieOptions, generateCsrfToken } from '@/lib/security/csrf'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -11,6 +12,9 @@ export async function updateSession(request: NextRequest) {
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey) {
+    if (!request.cookies.get(CSRF_COOKIE_NAME)?.value) {
+      supabaseResponse.cookies.set(CSRF_COOKIE_NAME, generateCsrfToken(), csrfCookieOptions())
+    }
     // Supabase not configured, just pass through
     return supabaseResponse
   }
@@ -59,6 +63,10 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)
+  }
+
+  if (!request.cookies.get(CSRF_COOKIE_NAME)?.value) {
+    supabaseResponse.cookies.set(CSRF_COOKIE_NAME, generateCsrfToken(), csrfCookieOptions())
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.

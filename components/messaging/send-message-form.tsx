@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Send } from 'lucide-react'
+import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 interface Student {
   id: string
@@ -57,7 +58,7 @@ export function SendMessageForm({ classroomId }: { classroomId?: string }) {
     try {
       const response = await fetch('/api/messages/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           recipient_id: selectedStudent,
           subject,

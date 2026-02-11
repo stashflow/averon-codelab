@@ -1,8 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { ensureValidCsrf } from '@/lib/security/csrf'
 
 export async function POST(request: Request) {
   try {
+    const csrfError = ensureValidCsrf(request)
+    if (csrfError) return csrfError
+
     const supabase = await createClient()
     
     const {
@@ -22,6 +26,17 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+
+    const uniqueLessonIds = Array.from(new Set(lesson_ids.map((id: unknown) => String(id).trim()).filter(Boolean)))
+    if (uniqueLessonIds.length === 0) {
+      return NextResponse.json({ error: 'At least one valid lesson ID is required' }, { status: 400 })
+    }
+    if (uniqueLessonIds.length > 50) {
+      return NextResponse.json({ error: 'Cannot assign more than 50 lessons at once' }, { status: 400 })
+    }
+
+    const parsedPoints = Number(points_possible)
+    const safePoints = Number.isFinite(parsedPoints) ? Math.max(1, Math.min(1000, Math.round(parsedPoints))) : 100
 
     // Verify user is teacher/admin of the classroom
     const { data: classroom } = await supabase
@@ -48,13 +63,13 @@ export async function POST(request: Request) {
     }
 
     // Create multiple assignments (one per lesson)
-    const assignments = lesson_ids.map((lesson_id) => ({
+    const assignments = uniqueLessonIds.map((lesson_id) => ({
       classroom_id,
       lesson_id,
       assigned_by: user.id,
       due_date: due_date || null,
-      instructions: instructions || null,
-      points_possible: points_possible || 100,
+      instructions: instructions ? String(instructions).slice(0, 5000) : null,
+      points_possible: safePoints,
       is_required: true,
     }))
 

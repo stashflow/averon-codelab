@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 export default function InviteTokenPage() {
   const params = useParams<{ token: string }>()
@@ -17,7 +18,7 @@ export default function InviteTokenPage() {
 
       const response = await fetch('/api/magic-links/redeem', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ token: params.token }),
       })
 

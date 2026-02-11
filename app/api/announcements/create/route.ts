@@ -1,8 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { ensureValidCsrf } from '@/lib/security/csrf'
 
 export async function POST(request: Request) {
   try {
+    const csrfError = ensureValidCsrf(request)
+    if (csrfError) return csrfError
+
     const supabase = await createClient()
     
     const {
@@ -21,6 +25,15 @@ export async function POST(request: Request) {
         { error: 'Classroom ID and message are required' },
         { status: 400 }
       )
+    }
+
+    const safePriority = ['low', 'normal', 'high', 'urgent'].includes(priority) ? priority : 'normal'
+    const safeMessage = String(message).trim()
+    if (!safeMessage) {
+      return NextResponse.json({ error: 'Message cannot be empty' }, { status: 400 })
+    }
+    if (safeMessage.length > 5000) {
+      return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
     }
 
     // Verify user is teacher/admin of the classroom
@@ -53,8 +66,8 @@ export async function POST(request: Request) {
       .insert({
         classroom_id,
         teacher_id: user.id,
-        message,
-        priority: priority || 'normal',
+        message: safeMessage,
+        priority: safePriority,
         expires_at: expires_at || null,
       })
       .select()

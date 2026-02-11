@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Send, Play, CheckCircle2, XCircle } from 'lucide-react'
+import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,17 @@ export default function AssignmentPage() {
 
         setUser(authUser)
 
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .single()
+
+        if (profile?.role !== 'student') {
+          router.push('/protected')
+          return
+        }
+
         // Load assignment
         const { data: assignmentData, error: assignmentError } = await supabase
           .from('assignments')
@@ -47,6 +59,19 @@ export default function AssignmentPage() {
           .single()
 
         if (assignmentError) throw assignmentError
+
+        const { data: enrollment } = await supabase
+          .from('enrollments')
+          .select('id')
+          .eq('classroom_id', assignmentData.classroom_id)
+          .eq('student_id', authUser.id)
+          .maybeSingle()
+
+        if (!enrollment) {
+          router.push('/student/dashboard')
+          return
+        }
+
         setAssignment(assignmentData)
         setCode(assignmentData.starter_code || '')
 
@@ -80,27 +105,27 @@ export default function AssignmentPage() {
     if (!code.trim()) return
 
     setTestingCode(true)
-
-    // Simulate test execution with mock results
-    setTimeout(() => {
-      const mockTests = [
-        { name: 'Test 1: Basic Input', passed: true, expected: '5', actual: '5' },
-        { name: 'Test 2: Edge Case', passed: true, expected: '0', actual: '0' },
-        { name: 'Test 3: Large Numbers', passed: code.length > 50, expected: '1000', actual: code.length > 50 ? '1000' : '500' },
-      ]
-
-      const passedCount = mockTests.filter((t) => t.passed).length
-      const score = Math.round((passedCount / mockTests.length) * 100)
-
-      setTestResults({
-        tests: mockTests,
-        passed: passedCount,
-        total: mockTests.length,
-        score,
+    try {
+      const response = await fetch('/api/judge/assignment', {
+        method: 'POST',
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          assignmentId,
+          code,
+        }),
       })
 
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to run tests')
+      }
+
+      setTestResults(payload)
+    } catch (err: any) {
+      alert(err?.message || 'Unable to run tests')
+    } finally {
       setTestingCode(false)
-    }, 1500)
+    }
   }
 
   async function handleSubmit() {

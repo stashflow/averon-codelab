@@ -36,6 +36,29 @@ export default function ClassroomPage() {
 
         setUser(authUser)
 
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .single()
+
+        if (profile?.role !== 'student') {
+          router.push('/protected')
+          return
+        }
+
+        const { data: enrollment } = await supabase
+          .from('enrollments')
+          .select('id')
+          .eq('classroom_id', classroomId)
+          .eq('student_id', authUser.id)
+          .maybeSingle()
+
+        if (!enrollment) {
+          router.push('/student/dashboard')
+          return
+        }
+
         // Load classroom
         const { data: classData, error: classError } = await supabase
           .from('classrooms')
@@ -57,13 +80,19 @@ export default function ClassroomPage() {
         setAssignments(assignmentData || [])
 
         // Load submissions
-        const { data: submissionData, error: submissionError } = await supabase
-          .from('submissions')
-          .select('*')
-          .eq('student_id', authUser.id)
+        const assignmentIds = (assignmentData || []).map((a: any) => a.id)
+        if (assignmentIds.length === 0) {
+          setSubmissions([])
+        } else {
+          const { data: submissionData, error: submissionError } = await supabase
+            .from('submissions')
+            .select('*')
+            .eq('student_id', authUser.id)
+            .in('assignment_id', assignmentIds)
 
-        if (submissionError) throw submissionError
-        setSubmissions(submissionData || [])
+          if (submissionError) throw submissionError
+          setSubmissions(submissionData || [])
+        }
       } catch (err: any) {
         console.error('Error loading data:', err)
       } finally {

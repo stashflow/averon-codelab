@@ -10,7 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ArrowLeft, BookOpen, CheckCircle2, Lock, Play, Clock } from 'lucide-react'
-import { Lesson } from '@/types' // Import Lesson type
+
+interface Lesson {
+  order_index: number
+}
 
 export const dynamic = 'force-dynamic'
 

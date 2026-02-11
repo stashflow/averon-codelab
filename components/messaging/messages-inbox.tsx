@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Mail, Send, Reply, Clock } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 interface Message {
   id: string
@@ -63,7 +64,7 @@ export function MessagesInbox() {
     try {
       await fetch('/api/messages/mark-read', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ message_id: messageId }),
       })
       await loadMessages()
@@ -79,7 +80,7 @@ export function MessagesInbox() {
     try {
       await fetch('/api/messages/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           recipient_id: selectedMessage.sender.id,
           subject: `Re: ${selectedMessage.subject || 'No subject'}`,

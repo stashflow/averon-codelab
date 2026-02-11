@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -124,7 +125,7 @@ export default function TeacherOnboarding() {
     try {
       const response = await fetch('/api/magic-links/redeem', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ token: inviteToken.trim() }),
       })
 

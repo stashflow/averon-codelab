@@ -73,8 +73,9 @@ export async function GET(request: Request) {
       .in('lesson_id', lessonIds)
 
     // Merge progress data
+    const progressByLesson = new Map((allProgress || []).map((p) => [p.lesson_id, p]))
     const enrichedAssignments = assignments?.map((assignment) => {
-      const progress = allProgress?.find((p) => p.lesson_id === assignment.lesson_id)
+      const progress = progressByLesson.get(assignment.lesson_id)
       return {
         ...assignment,
         progress: progress || assignment.progress?.[0] || null,

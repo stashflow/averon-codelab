@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Bell } from 'lucide-react'
+import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 export function CreateAnnouncement({ classroomId }: { classroomId: string }) {
   const [message, setMessage] = useState('')
@@ -23,7 +24,7 @@ export function CreateAnnouncement({ classroomId }: { classroomId: string }) {
     try {
       const response = await fetch('/api/announcements/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           classroom_id: classroomId,
           message,
