@@ -1,153 +1,298 @@
-# Averon Codelab
+# Averon CodeLab - Complete Learning Management System
 
-A comprehensive educational platform built with Next.js 16, Supabase, and TypeScript.
+<div align="center">
 
-## 🚀 Features
+**A Professional, Production-Ready Learning Management System**
 
-- **Multi-tenant Architecture**: Support for districts, schools, classrooms, and students
-- **Role-based Access Control**: Full admin, district admin, school admin, teacher, and student roles
-- **Magic Link Invitations**: Secure invitation system for onboarding users
-- **Course Management**: Create and manage courses, lessons, and assignments
-- **Real-time Messaging**: Announcements and direct messaging between users
-- **Progress Tracking**: Student lesson progress and assignment submissions
+Built with Next.js 15 • TypeScript • Supabase • Tailwind CSS
 
-## 🏗 Tech Stack
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation)
 
-- **Framework**: Next.js 16 with App Router
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Styling**: Tailwind CSS + shadcn/ui
-- **Language**: TypeScript
-- **Form Validation**: React Hook Form + Zod
+</div>
 
-## 📋 Prerequisites
+---
 
+## 🌟 Overview
+
+Averon CodeLab is a modern, full-featured learning management system designed specifically for coding education. It provides a comprehensive platform for administrators, teachers, and students with enterprise-grade features and beautiful, customizable themes.
+
+### What Makes This Special
+
+- **4 Beautiful Themes** with light/dark mode variants (8 total combinations)
+- **Multi-Level Admin Hierarchy** (Full Admin → District Admin → School Admin → Teacher)
+- **Comprehensive User Management** with secure delete and audit logging
+- **Course Management System** ready for content
+- **Modern, Accessible UI** following WCAG 2.1 AA standards
+- **Production-Ready** with security, performance, and scalability baked in
+
+---
+
+## ✨ Features
+
+### 🎨 Theme System
+- **4 Professional Color Themes:**
+  - Ocean (Blue/Cyan) - Default professional theme
+  - Forest (Green/Emerald) - Natural, calming design
+  - Sunset (Orange/Amber) - Warm, energetic aesthetic
+  - Rose (Pink/Red) - Elegant, vibrant appearance
+- **Light & Dark Modes** for each theme
+- **Smooth Transitions** between theme changes
+- **Persistent Selection** using localStorage
+- **Accessible Colors** with proper contrast ratios
+
+### 👥 User Management
+- **Role-Based Access Control** (Full Admin, District Admin, School Admin, Teacher, Student)
+- **Magic Link Invitations** with expiration
+- **Password Reset** functionality
+- **User Search & Filtering**
+- **Account Deletion** with audit trails
+- **Class Request System**
+
+### 🏢 Organization Structure
+- **Districts** → Top-level organization units
+- **Schools** → Belong to districts
+- **Classrooms** → Belong to schools, managed by teachers
+- **Hierarchical Permissions** at each level
+- **Flexible Configuration** (max students, max teachers, etc.)
+
+### 📚 Course System
+- **Course Categories** for organization
+- **Course Enrollment** management
+- **Progress Tracking** per student
+- **Payment Integration Ready** (Stripe compatible)
+- **Classroom-Based Access Control**
+- **Multi-Level Difficulty** (Beginner, Intermediate, Advanced)
+
+### 🛡️ Security Features
+- **Row Level Security (RLS)** on all tables
+- **Audit Logging** for sensitive operations
+- **Soft Deletes** for data recovery
+- **SQL Injection Protection** via parameterized queries
+- **XSS Protection** via React sanitization
+- **Role-Based Authorization** on all endpoints
+
+### 🎯 Admin Tools
+- **Comprehensive Admin Panel** at `/admin/panel`
+- **Advanced Support Center** at `/admin/support-center`
+- **System Statistics Dashboard**
+- **Entity Management** (create, read, update, delete)
+- **Real-Time Monitoring**
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
 - Node.js 18+ 
-- A Supabase account and project
-- Git
+- Supabase account
+- Vercel account (for deployment)
 
-## 🛠 Setup
+### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd averon-codelab
+```bash
+# Clone the repository
+git clone https://github.com/stashflow/averon-codelab.git
+
+# Install dependencies
+npm install
+# or
+pnpm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Add your Supabase credentials
+
+# Run database migrations
+# Execute all scripts in /scripts folder in Supabase SQL Editor
+
+# Start development server
+npm run dev
+```
+
+### First-Time Setup
+
+1. **Sign up** for your first account
+2. **Make yourself a Full Admin:**
+   ```sql
+   -- Run in Supabase SQL Editor
+   INSERT INTO user_roles (user_id, role)
+   SELECT id, 'full_admin'
+   FROM auth.users
+   WHERE email = 'your-email@example.com'
+   ON CONFLICT (user_id) DO UPDATE SET role = 'full_admin';
    ```
+3. **Create your organization:**
+   - Go to `/admin/panel`
+   - Create districts, schools, and classrooms
+4. **Invite users:**
+   - Use the Invitations tab to generate magic links
+5. **Set up courses:**
+   - Follow the `COURSE_CONTENT_GUIDE.md`
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+---
 
-3. **Set up environment variables**
-   
-   Create a `.env.local` file:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=your-project-url.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
-   ```
+## 📖 Documentation
 
-4. **Run database migrations**
-   
-   Execute the SQL scripts in the `scripts/` folder in your Supabase SQL Editor, especially:
-   ```
-   scripts/021_fix_recursion_final.sql
-   ```
+### Essential Guides
 
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
+| Document | Purpose | When to Read |
+|----------|---------|--------------|
+| **[ADMIN_QUICK_START.md](./ADMIN_QUICK_START.md)** | Step-by-step admin guide | Before using the platform |
+| **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** | Complete deployment checklist | Before going to production |
+| **[COURSE_CONTENT_GUIDE.md](./COURSE_CONTENT_GUIDE.md)** | How to create course content | Before adding courses |
+| **[IMPROVEMENTS_SUMMARY.md](./IMPROVEMENTS_SUMMARY.md)** | What's new and improved | After setup to understand features |
 
-6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+### Quick Links
+
+- **Admin Panel:** `/admin/panel` - Main management interface
+- **Support Center:** `/admin/support-center` - Advanced user management
+- **Courses:** `/courses` - Student course selection
+- **Login:** `/auth/login` - Authentication
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Next.js 15** - React framework with App Router
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first styling
+- **Radix UI** - Accessible component primitives
+- **Lucide Icons** - Beautiful icon library
+
+### Backend
+- **Supabase** - PostgreSQL database with auth
+- **Next.js API Routes** - Serverless functions
+- **Row Level Security** - Database-level permissions
+
+---
 
 ## 📁 Project Structure
 
 ```
-├── app/                    # Next.js App Router pages
-│   ├── api/               # API routes
-│   ├── admin/             # Admin panel
-│   ├── auth/              # Authentication pages
-│   ├── courses/           # Course pages
-│   ├── classroom/         # Classroom pages
-│   └── ...
-├── components/            # React components
-│   ├── ui/               # shadcn/ui components
-│   └── ...
-├── lib/                   # Utility functions
-│   ├── supabase/         # Supabase client setup
-│   └── ...
-├── scripts/              # Database migration scripts
-└── ...
+averon-codelab/
+├── app/
+│   ├── admin/               # Admin interfaces
+│   │   ├── panel/          # Main admin panel
+│   │   └── support-center/ # User management center
+│   ├── courses/            # Course pages
+│   ├── api/                # API routes
+│   │   └── admin/         # Admin API endpoints
+│   ├── globals.css        # Global styles & themes
+│   └── layout.tsx         # Root layout
+├── components/
+│   ├── ui/                # Shadcn UI components
+│   ├── theme-provider.tsx # Theme context
+│   └── theme-toggle.tsx   # Theme switcher
+├── scripts/               # Database migrations
+├── ADMIN_QUICK_START.md   # Admin guide
+├── COURSE_CONTENT_GUIDE.md # Course creation guide
+└── DEPLOYMENT_GUIDE.md    # Deployment instructions
 ```
-
-## 👥 User Roles
-
-1. **Full Admin**: Complete system access, can create districts and manage all users
-2. **District Admin**: Manage schools within their district
-3. **School Admin**: Manage teachers and students in their school
-4. **Teacher**: Create classrooms, assignments, and manage students
-5. **Student**: Access courses, submit assignments, track progress
-
-## 🔐 Security
-
-- Row Level Security (RLS) policies on all tables
-- Non-recursive RLS policies to prevent infinite loops
-- Secure session management via Supabase
-- Role-based access control at database level
-
-## 🚢 Deployment
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
-
-Quick deploy to Vercel:
-1. Push to GitHub
-2. Connect your repo to Vercel
-3. Add environment variables
-4. Deploy!
-
-## 📝 Recent Fixes
-
-✅ Fixed infinite recursion in RLS policies for `school_admins`, `schools`, `magic_links`, and `classrooms`
-✅ Magic link creation and redemption working correctly
-✅ School and classroom queries no longer return 500 errors
-✅ Admin panel fully functional
-
-## 🐛 Troubleshooting
-
-### Magic Links Not Working
-- Verify environment variables are set
-- Check Supabase RLS policies are applied
-- Ensure user has correct role in database
-
-### 500 Errors on Queries
-- Run latest migration: `scripts/021_fix_recursion_final.sql`
-- Check Supabase logs for details
-
-### Build Failures
-- Clear `.next` folder: `rm -rf .next`
-- Reinstall dependencies: `rm -rf node_modules && npm install`
-- Check TypeScript errors: `npm run build`
-
-## 📚 Documentation
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Supabase Documentation](https://supabase.com/docs)
-- [shadcn/ui Documentation](https://ui.shadcn.com)
-
-## 🤝 Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Test thoroughly
-4. Submit a pull request
-
-## 📄 License
-
-[Your License Here]
 
 ---
 
-Built with ❤️ for education
+## 🔐 Security
+
+### Built-In Security Features
+
+- **Row Level Security (RLS)** - Database-level access control
+- **Role-Based Authorization** - Hierarchical permissions
+- **Audit Logging** - Track all sensitive operations
+- **Soft Deletes** - Preserve data for recovery
+- **Parameterized Queries** - Prevent SQL injection
+- **React Sanitization** - Prevent XSS attacks
+- **Secure Authentication** - Supabase Auth with magic links
+
+---
+
+## 🚀 Deployment
+
+### Recommended: Vercel
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Login
+vercel login
+
+# Deploy
+vercel --prod
+```
+
+### Environment Variables
+
+Required in Vercel:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+See `DEPLOYMENT_GUIDE.md` for complete instructions.
+
+---
+
+## 📊 What's New
+
+### Latest Updates (v1.0.0)
+
+✅ **4 Beautiful Themes** - Ocean, Forest, Sunset, Rose (light + dark)  
+✅ **Advanced Admin Support Center** - Comprehensive user management  
+✅ **Delete Functionality** - Secure soft delete with audit logging  
+✅ **Improved Light Mode** - Much better aesthetics and contrast  
+✅ **Course Content Guide** - Complete guide for creating courses  
+✅ **Deployment Ready** - Full documentation and checklists  
+
+---
+
+## 🎯 Status
+
+**Current Version:** 1.0.0  
+**Status:** ✅ Production Ready  
+**Last Updated:** February 2026
+
+### What's Complete
+
+✅ Multi-level admin system  
+✅ User management with delete  
+✅ Organization structure  
+✅ Course system framework  
+✅ 4 themes × 2 modes = 8 variants  
+✅ Security & audit logging  
+✅ Complete documentation  
+✅ Deployment ready
+
+### What's Next
+
+After launch:
+1. Create course content (follow guide)
+2. Invite beta users
+3. Gather feedback
+4. Iterate and improve
+
+---
+
+## 📞 Support
+
+### Documentation
+- Admin Guide: `ADMIN_QUICK_START.md`
+- Deployment: `DEPLOYMENT_GUIDE.md`
+- Courses: `COURSE_CONTENT_GUIDE.md`
+- Features: `IMPROVEMENTS_SUMMARY.md`
+
+### External Resources
+- Next.js: https://nextjs.org/docs
+- Supabase: https://supabase.com/docs
+- Tailwind: https://tailwindcss.com/docs
+
+---
+
+<div align="center">
+
+**Built with ❤️ for educators and students**
+
+**Ready to help students learn to code! 🚀**
+
+</div>
