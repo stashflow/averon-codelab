@@ -148,23 +148,23 @@ export default function AssignmentPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
+        <p className="text-slate-300">Loading...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card sticky top-0 z-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
+      <header className="border-b border-white/5 bg-slate-950/40 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-slate-200 hover:text-white hover:bg-white/10">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-secondary">{assignment?.title}</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-2xl font-bold text-white">{assignment?.title}</h1>
+              <p className="text-sm text-slate-400">
                 {assignment?.language?.charAt(0).toUpperCase() + assignment?.language?.slice(1)}
                 {assignment?.due_date && ` • Due: ${new Date(assignment.due_date).toLocaleDateString()}`}
               </p>
@@ -172,8 +172,8 @@ export default function AssignmentPage() {
           </div>
           {submission?.status === 'graded' && (
             <div className="text-right">
-              <p className="text-sm text-muted-foreground">Score</p>
-              <p className="text-2xl font-bold text-primary">{submission.score}%</p>
+              <p className="text-sm text-slate-400">Score</p>
+              <p className="text-2xl font-bold text-blue-400">{submission.score}%</p>
             </div>
           )}
         </div>
@@ -183,40 +183,37 @@ export default function AssignmentPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Assignment Details */}
           <div className="lg:col-span-1">
-            <Card className="border-primary/20 sticky top-24">
-              <CardHeader>
-                <CardTitle className="text-primary">Assignment Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6 sticky top-24">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white">Assignment Details</h3>
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Description</p>
-                  <p className="text-sm">{assignment?.description || 'No description provided'}</p>
+                  <p className="text-sm text-slate-400 mb-1">Description</p>
+                  <p className="text-sm text-slate-200">{assignment?.description || 'No description provided'}</p>
                 </div>
 
                 {submission?.feedback && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Teacher Feedback</p>
-                    <p className="text-sm p-2 bg-secondary/5 rounded border border-secondary/20">{submission.feedback}</p>
+                    <p className="text-sm text-slate-400 mb-1">Teacher Feedback</p>
+                    <p className="text-sm p-3 bg-white/5 rounded-lg border border-white/10 text-slate-200">{submission.feedback}</p>
                   </div>
                 )}
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Status</p>
-                  <div className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary">
+                  <p className="text-sm text-slate-400 mb-1">Status</p>
+                  <div className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
                     {submission?.status === 'graded' ? 'Graded' : submission?.status === 'submitted' ? 'Submitted' : 'Not Started'}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
           {/* Code Editor */}
           <div className="lg:col-span-2">
-            <Card className="border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-primary">Code Editor</CardTitle>
-                <CardDescription>Write your solution below</CardDescription>
-              </CardHeader>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white">Code Editor</h3>
+                <p className="text-sm text-slate-400">Write your solution below</p>
               <CardContent className="space-y-4">
                 <textarea
                   value={code}

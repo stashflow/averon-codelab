@@ -76,8 +76,8 @@ export default function ClassroomPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
+        <p className="text-slate-300">Loading...</p>
       </div>
     )
   }
@@ -87,65 +87,61 @@ export default function ClassroomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card sticky top-0">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
+      <header className="border-b border-white/5 bg-slate-950/40 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-slate-200 hover:text-white hover:bg-white/10">
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-secondary">{classroom?.name}</h1>
-            <p className="text-sm text-muted-foreground">{classroom?.description}</p>
+            <h1 className="text-2xl font-bold text-white">{classroom?.name}</h1>
+            <p className="text-sm text-slate-400">{classroom?.description}</p>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-xl font-semibold text-secondary mb-4">Assignments</h2>
+        <h2 className="text-xl font-semibold text-white mb-4">Assignments</h2>
 
         {assignments.length === 0 ? (
-          <Card className="border-dashed border-2 border-muted">
-            <CardContent className="flex items-center justify-center py-12">
-              <p className="text-muted-foreground">No assignments yet. Check back later!</p>
-            </CardContent>
-          </Card>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-dashed border-white/20 shadow-2xl p-12">
+            <p className="text-slate-300 text-center">No assignments yet. Check back later!</p>
+          </div>
         ) : (
           <div className="space-y-3">
             {assignments.map((assignment) => {
               const submission = getSubmissionStatus(assignment.id)
               return (
-                <Card
+                <div
                   key={assignment.id}
-                  className="hover:border-primary/30 transition-colors cursor-pointer"
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6 hover:border-blue-400/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/assignment/${assignment.id}`)}
                 >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-secondary">{assignment.title}</CardTitle>
-                          {submission?.status === 'graded' && (
-                            <CheckCircle2 className="w-5 h-5 text-green-500" />
-                          )}
-                          {submission?.status === 'submitted' && (
-                            <Clock className="w-5 h-5 text-yellow-500" />
-                          )}
-                        </div>
-                        <CardDescription>{assignment.description}</CardDescription>
-                      </div>
-                      <div className="text-right">
-                        {assignment.due_date && (
-                          <p className="text-sm text-muted-foreground">
-                            Due: {new Date(assignment.due_date).toLocaleDateString()}
-                          </p>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-white">{assignment.title}</h3>
+                        {submission?.status === 'graded' && (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                         )}
-                        {submission?.score !== undefined && (
-                          <p className="text-lg font-semibold text-primary">{submission.score}%</p>
+                        {submission?.status === 'submitted' && (
+                          <Clock className="w-5 h-5 text-yellow-400" />
                         )}
                       </div>
+                      <p className="text-sm text-slate-400 mt-1">{assignment.description}</p>
                     </div>
-                  </CardHeader>
-                </Card>
+                    <div className="text-right">
+                      {assignment.due_date && (
+                        <p className="text-sm text-slate-400">
+                          Due: {new Date(assignment.due_date).toLocaleDateString()}
+                        </p>
+                      )}
+                      {submission?.score !== undefined && (
+                        <p className="text-lg font-semibold text-blue-400">{submission.score}%</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )
             })}
           </div>
