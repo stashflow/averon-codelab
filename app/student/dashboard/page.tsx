@@ -12,6 +12,13 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { LearnAveronCodeLab } from '@/components/learn-averon-codelab'
+import {
+  defaultUserFeaturePreferences,
+  getUserPreferencesStorageKey,
+  mergePreferences,
+  type UserFeaturePreferences,
+} from '@/lib/user-preferences'
 import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users, Bell, AlertCircle } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -60,6 +67,8 @@ export default function StudentDashboard() {
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState<string | null>(null)
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null)
+  const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
+  const [savingPreferences, setSavingPreferences] = useState(false)
   const router = useRouter()
 
   const overallCourseProgress = useMemo(() => {
@@ -67,10 +76,39 @@ export default function StudentDashboard() {
     return Math.min(100, Math.round((badges.length / Math.max(1, enrolledCourses.length * 2)) * 100))
   }, [badges.length, enrolledCourses.length])
 
+  const prefsStorageKey = useMemo(() => (profile?.id ? getUserPreferencesStorageKey(profile.id) : ''), [profile])
+  const joinDraftKey = useMemo(() => (profile?.id ? `acl:join-code-draft:${profile.id}` : ''), [profile])
+
   useEffect(() => {
     loadDashboardData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!preferences.keyboard_shortcuts) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key.toLowerCase() === 'c') router.push('/courses')
+      if (event.key.toLowerCase() === 's') router.push('/settings')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [preferences.keyboard_shortcuts, router])
+
+  useEffect(() => {
+    if (!preferences.draft_autosave || !joinDraftKey) return
+    const raw = localStorage.getItem(joinDraftKey)
+    if (raw) setJoinCode(raw)
+  }, [preferences.draft_autosave, joinDraftKey])
+
+  useEffect(() => {
+    if (!joinDraftKey) return
+    if (!preferences.draft_autosave) {
+      localStorage.removeItem(joinDraftKey)
+      return
+    }
+    localStorage.setItem(joinDraftKey, joinCode)
+  }, [joinCode, joinDraftKey, preferences.draft_autosave])
 
   async function loadDashboardData() {
     const supabase = createClient()
@@ -135,6 +173,18 @@ export default function StudentDashboard() {
 
         setAnnouncements((announcementsData as any) || [])
       }
+
+      const key = getUserPreferencesStorageKey(authUser.id)
+      const rawPrefs = localStorage.getItem(key)
+      if (rawPrefs) {
+        try {
+          setPreferences(mergePreferences(JSON.parse(rawPrefs)))
+        } catch {
+          setPreferences(defaultUserFeaturePreferences)
+        }
+      } else {
+        setPreferences(defaultUserFeaturePreferences)
+      }
     } catch (err: any) {
       console.error('[v0] student dashboard load error', err)
     } finally {
@@ -193,6 +243,17 @@ export default function StudentDashboard() {
     router.push('/')
   }
 
+  function setFeaturePreference(key: keyof UserFeaturePreferences, value: boolean) {
+    setPreferences((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function saveFeaturePreferences() {
+    if (!prefsStorageKey) return
+    setSavingPreferences(true)
+    localStorage.setItem(prefsStorageKey, JSON.stringify(preferences))
+    setSavingPreferences(false)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center">
@@ -234,7 +295,30 @@ export default function StudentDashboard() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">Welcome back, {profile?.full_name || 'Student'}</h1>
           <p className="text-slate-400 mt-1">Track your progress, join classes, and keep learning.</p>
+          {preferences.keyboard_shortcuts && (
+            <p className="text-xs text-cyan-300 mt-2">Keyboard shortcuts: press <span className="font-mono">C</span> for courses, <span className="font-mono">S</span> for settings.</p>
+          )}
         </div>
+
+        {preferences.quick_actions_bar && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Link href="/courses">
+              <Button className="w-full justify-start gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white">
+                <BookOpen className="w-4 h-4 text-cyan-300" /> Explore Courses
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button className="w-full justify-start gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white">
+                <Settings className="w-4 h-4 text-cyan-300" /> Update Preferences
+              </Button>
+            </Link>
+            <Link href="/student/dashboard">
+              <Button className="w-full justify-start gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white">
+                <Users className="w-4 h-4 text-cyan-300" /> Review Progress
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {announcements.length > 0 && (
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-xl border border-blue-400/20 shadow-2xl shadow-blue-500/20 p-6">
@@ -316,6 +400,23 @@ export default function StudentDashboard() {
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent" />
           </div>
         </div>
+
+        {preferences.activity_timeline_widgets && (
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 backdrop-blur-xl border border-indigo-400/20 shadow-2xl p-6">
+            <h3 className="text-xl font-semibold text-white mb-4">Activity Timeline</h3>
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
+                Joined <span className="text-cyan-300 font-medium">{classEnrollments.length}</span> active classroom(s).
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
+                Earned <span className="text-cyan-300 font-medium">{badges.length}</span> recent badge(s).
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
+                Current streak: <span className="text-cyan-300 font-medium">{streak?.current_streak || 0}</span> day(s).
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
@@ -439,6 +540,15 @@ export default function StudentDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 pt-2">
+          <LearnAveronCodeLab preferences={preferences} onPreferenceChange={setFeaturePreference} />
+          <div className="flex justify-end">
+            <Button onClick={saveFeaturePreferences} disabled={savingPreferences} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600">
+              {savingPreferences ? 'Saving...' : 'Save Learn Averon Code Lab Preferences'}
+            </Button>
           </div>
         </div>
       </main>

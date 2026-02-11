@@ -11,6 +11,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { LearnAveronCodeLab } from '@/components/learn-averon-codelab'
+import {
+  defaultUserFeaturePreferences,
+  getUserPreferencesStorageKey,
+  mergePreferences,
+  type UserFeaturePreferences,
+} from '@/lib/user-preferences'
 import { Plus, LogOut, BookOpen, Settings, Users, GraduationCap } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +32,10 @@ export default function TeacherDashboard() {
   const [newClassDesc, setNewClassDesc] = useState('')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
+  const [savingPreferences, setSavingPreferences] = useState(false)
+  const [classroomSearch, setClassroomSearch] = useState('')
+  const [classroomSort, setClassroomSort] = useState<'newest' | 'name'>('newest')
   const router = useRouter()
 
   const studentsByClass = useMemo(() => {
@@ -36,11 +47,64 @@ export default function TeacherDashboard() {
   }, [enrollments])
 
   const totalStudents = useMemo(() => Object.values(studentsByClass).reduce((sum, c) => sum + c, 0), [studentsByClass])
+  const prefsStorageKey = useMemo(() => (profile?.id ? getUserPreferencesStorageKey(profile.id) : ''), [profile])
+  const classDraftKey = useMemo(() => (profile?.id ? `acl:teacher-class-draft:${profile.id}` : ''), [profile])
+  const classViewKey = useMemo(() => (profile?.id ? `acl:teacher-class-view:${profile.id}` : ''), [profile])
+
+  const displayedClassrooms = useMemo(() => {
+    const filtered = classrooms.filter((c) => c.name.toLowerCase().includes(classroomSearch.toLowerCase()))
+    if (classroomSort === 'name') {
+      return [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+    }
+    return filtered
+  }, [classroomSearch, classroomSort, classrooms])
 
   useEffect(() => {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!preferences.keyboard_shortcuts) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key.toLowerCase() === 'n') setShowNewClass(true)
+      if (event.key.toLowerCase() === 's') router.push('/settings')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [preferences.keyboard_shortcuts, router])
+
+  useEffect(() => {
+    if (!classDraftKey || !preferences.draft_autosave) return
+    const raw = localStorage.getItem(classDraftKey)
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      setNewClassName(parsed.name || '')
+      setNewClassDesc(parsed.description || '')
+    } catch {
+      // ignore invalid data
+    }
+  }, [classDraftKey, preferences.draft_autosave])
+
+  useEffect(() => {
+    if (!classDraftKey) return
+    if (!preferences.draft_autosave) {
+      localStorage.removeItem(classDraftKey)
+      return
+    }
+    localStorage.setItem(classDraftKey, JSON.stringify({ name: newClassName, description: newClassDesc }))
+  }, [classDraftKey, preferences.draft_autosave, newClassName, newClassDesc])
+
+  useEffect(() => {
+    if (!classViewKey) return
+    if (!preferences.saved_filters_and_sort) {
+      localStorage.removeItem(classViewKey)
+      return
+    }
+    localStorage.setItem(classViewKey, JSON.stringify({ classroomSearch, classroomSort }))
+  }, [classViewKey, preferences.saved_filters_and_sort, classroomSearch, classroomSort])
 
   async function loadData() {
     const supabase = createClient()
@@ -91,6 +155,29 @@ export default function TeacherDashboard() {
       } else {
         setEnrollments([])
       }
+
+      const key = getUserPreferencesStorageKey(authUser.id)
+      const rawPrefs = localStorage.getItem(key)
+      if (rawPrefs) {
+        try {
+          const mergedPrefs = mergePreferences(JSON.parse(rawPrefs))
+          setPreferences(mergedPrefs)
+          if (mergedPrefs.saved_filters_and_sort) {
+            const rawView = localStorage.getItem(`acl:teacher-class-view:${authUser.id}`)
+            if (rawView) {
+              try {
+                const parsedView = JSON.parse(rawView)
+                setClassroomSearch(parsedView.classroomSearch || '')
+                setClassroomSort(parsedView.classroomSort === 'name' ? 'name' : 'newest')
+              } catch {
+                // ignore invalid data
+              }
+            }
+          }
+        } catch {
+          setPreferences(defaultUserFeaturePreferences)
+        }
+      }
     } catch (err: any) {
       console.error('[v0] teacher dashboard load error:', err)
     } finally {
@@ -133,6 +220,17 @@ export default function TeacherDashboard() {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/auth/login')
+  }
+
+  function setFeaturePreference(key: keyof UserFeaturePreferences, value: boolean) {
+    setPreferences((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function saveFeaturePreferences() {
+    if (!prefsStorageKey) return
+    setSavingPreferences(true)
+    localStorage.setItem(prefsStorageKey, JSON.stringify(preferences))
+    setSavingPreferences(false)
   }
 
   if (loading) {
@@ -181,12 +279,54 @@ export default function TeacherDashboard() {
           <div>
             <h2 className="text-2xl font-semibold text-foreground">Your Classes</h2>
             <p className="text-sm text-muted-foreground">Manage classrooms, enrollment, and student access.</p>
+            {preferences.keyboard_shortcuts && (
+              <p className="text-xs text-primary mt-1">Keyboard shortcuts: press <span className="font-mono">N</span> for new class, <span className="font-mono">S</span> for settings.</p>
+            )}
           </div>
           <Button onClick={() => setShowNewClass(!showNewClass)} className="gap-2">
             <Plus className="w-4 h-4" />
             {showNewClass ? 'Cancel' : 'New Class'}
           </Button>
         </div>
+
+        <Card>
+          <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Input
+              placeholder="Filter classes by name..."
+              value={classroomSearch}
+              onChange={(e) => setClassroomSearch(e.target.value)}
+            />
+            <select
+              value={classroomSort}
+              onChange={(e) => setClassroomSort((e.target.value === 'name' ? 'name' : 'newest') as 'newest' | 'name')}
+              className="h-10 rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="newest">Sort: Newest</option>
+              <option value="name">Sort: Name</option>
+            </select>
+            <Button variant="outline" onClick={() => { setClassroomSearch(''); setClassroomSort('newest') }}>
+              Reset View
+            </Button>
+          </CardContent>
+        </Card>
+
+        {preferences.quick_actions_bar && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Button onClick={() => setShowNewClass(true)} className="justify-start gap-2 bg-background border">
+              <Plus className="w-4 h-4 text-primary" /> Create Classroom
+            </Button>
+            <Button asChild className="justify-start gap-2 bg-background border">
+              <Link href="/teacher/join">
+                <BookOpen className="w-4 h-4 text-primary" /> Join Existing Class
+              </Link>
+            </Button>
+            <Button asChild className="justify-start gap-2 bg-background border">
+              <Link href="/settings">
+                <Settings className="w-4 h-4 text-primary" /> Teacher Preferences
+              </Link>
+            </Button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
@@ -218,6 +358,29 @@ export default function TeacherDashboard() {
           </Card>
         </div>
 
+        {preferences.activity_timeline_widgets && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity Timeline</CardTitle>
+              <CardDescription>Snapshot of current teaching workload and class momentum.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-lg border p-3 bg-muted/20">
+                <p className="text-muted-foreground">Active classrooms</p>
+                <p className="text-2xl font-semibold">{classrooms.length}</p>
+              </div>
+              <div className="rounded-lg border p-3 bg-muted/20">
+                <p className="text-muted-foreground">Total students</p>
+                <p className="text-2xl font-semibold">{totalStudents}</p>
+              </div>
+              <div className="rounded-lg border p-3 bg-muted/20">
+                <p className="text-muted-foreground">Last refresh</p>
+                <p className="text-sm font-medium">{new Date().toLocaleTimeString()}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {showNewClass && (
           <Card>
             <CardHeader>
@@ -246,11 +409,11 @@ export default function TeacherDashboard() {
             <CardDescription>Open a classroom to manage students and assignments.</CardDescription>
           </CardHeader>
           <CardContent>
-            {classrooms.length === 0 ? (
+            {displayedClassrooms.length === 0 ? (
               <p className="text-sm text-muted-foreground">No classes yet. Create your first class.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {classrooms.map((classroom) => (
+                {displayedClassrooms.map((classroom) => (
                   <Card key={classroom.id} className="border">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-3">
@@ -273,6 +436,15 @@ export default function TeacherDashboard() {
             )}
           </CardContent>
         </Card>
+
+        <div className="space-y-4">
+          <LearnAveronCodeLab preferences={preferences} onPreferenceChange={setFeaturePreference} />
+          <div className="flex justify-end">
+            <Button onClick={saveFeaturePreferences} disabled={savingPreferences}>
+              {savingPreferences ? 'Saving...' : 'Save Learn Averon Code Lab Preferences'}
+            </Button>
+          </div>
+        </div>
       </main>
     </div>
   )

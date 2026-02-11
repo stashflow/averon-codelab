@@ -11,13 +11,17 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { LearnAveronCodeLab } from '@/components/learn-averon-codelab'
+import {
+  defaultUserFeaturePreferences,
+  getUserPreferencesStorageKey,
+  mergePreferences,
+  type UserFeaturePreferences,
+} from '@/lib/user-preferences'
+import { CheckCircle2, KeyRound, LogOut, Mail, Save, Settings2, Shield, UserCircle2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
-
-interface Preferences {
-  email_updates: boolean
-  class_reminders: boolean
-}
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<any>(null)
@@ -28,15 +32,27 @@ export default function SettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false)
   const [savingPrefs, setSavingPrefs] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [form, setForm] = useState({ full_name: '', email: '' })
   const [newEmail, setNewEmail] = useState('')
   const [emailStatus, setEmailStatus] = useState<string | null>(null)
   const [passwords, setPasswords] = useState({ newPassword: '', confirmPassword: '' })
-  const [preferences, setPreferences] = useState<Preferences>({ email_updates: true, class_reminders: true })
+  const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
   const router = useRouter()
   const { theme, setTheme } = useTheme()
 
-  const prefsStorageKey = useMemo(() => (profile ? `acl:preferences:${profile.id}` : ''), [profile])
+  const prefsStorageKey = useMemo(() => {
+    return profile?.id ? getUserPreferencesStorageKey(profile.id) : ''
+  }, [profile])
+
+  const dashboardLink = useMemo(() => {
+    if (!profile?.role) return '/protected'
+    if (profile.role === 'teacher') return '/protected/teacher'
+    if (profile.role === 'full_admin') return '/admin/panel'
+    if (profile.role === 'district_admin') return '/district/admin'
+    if (profile.role === 'school_admin') return '/school/admin'
+    return '/student/dashboard'
+  }, [profile])
 
   useEffect(() => {
     async function load() {
@@ -77,16 +93,17 @@ export default function SettingsPage() {
     if (!prefsStorageKey) return
     const raw = localStorage.getItem(prefsStorageKey)
     if (!raw) return
+
     try {
-      const parsed = JSON.parse(raw)
-      setPreferences({
-        email_updates: parsed.email_updates ?? true,
-        class_reminders: parsed.class_reminders ?? true,
-      })
+      setPreferences(mergePreferences(JSON.parse(raw)))
     } catch {
-      // ignore malformed local preference payload
+      setPreferences(defaultUserFeaturePreferences)
     }
   }, [prefsStorageKey])
+
+  function setFeaturePreference(key: keyof UserFeaturePreferences, value: boolean) {
+    setPreferences((prev) => ({ ...prev, [key]: value }))
+  }
 
   async function saveProfile() {
     if (!profile) return
@@ -100,6 +117,8 @@ export default function SettingsPage() {
 
     if (error) {
       alert(error.message)
+    } else {
+      setStatusMessage('Profile updated.')
     }
 
     setSavingProfile(false)
@@ -157,7 +176,7 @@ export default function SettingsPage() {
       alert(error.message)
     } else {
       setPasswords({ newPassword: '', confirmPassword: '' })
-      alert('Password updated successfully.')
+      setStatusMessage('Password updated successfully.')
     }
 
     setSavingPassword(false)
@@ -168,152 +187,207 @@ export default function SettingsPage() {
     setSavingPrefs(true)
     localStorage.setItem(prefsStorageKey, JSON.stringify(preferences))
     setSavingPrefs(false)
+    setStatusMessage('Preferences saved.')
+  }
+
+  async function signOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth/login')
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading settings...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
+        <p className="text-slate-300">Loading settings...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="max-w-3xl mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Settings</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 text-white">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/60 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold flex items-center gap-2"><Settings2 className="w-5 h-5 text-cyan-300" /> Settings</h1>
+            <p className="text-sm text-slate-400">Control your account, security, and classroom experience.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button asChild variant="outline" className="border-white/15 bg-white/5 text-slate-200 hover:bg-white/10">
+              <Link href={dashboardLink}>Back to Dashboard</Link>
+            </Button>
+            <Button onClick={signOut} variant="outline" className="border-white/15 bg-white/5 text-slate-200 hover:bg-white/10 gap-2">
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+        {statusMessage && (
+          <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-emerald-200 text-sm flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            {statusMessage}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="border-white/10 bg-slate-900/60">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2"><UserCircle2 className="w-5 h-5 text-cyan-300" /> Profile</CardTitle>
+                <CardDescription className="text-slate-400">Update your name and theme preferences.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-slate-200">Full Name</Label>
+                  <Input
+                    id="name"
+                    value={form.full_name}
+                    onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                    className="bg-white/5 border-white/15"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-slate-200">Current Email</Label>
+                  <Input id="email" value={form.email} disabled className="bg-white/5 border-white/15" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="theme-select" className="text-slate-200">Theme</Label>
+                  <select
+                    id="theme-select"
+                    value={theme || 'dark'}
+                    onChange={(e) => setTheme(e.target.value)}
+                    className="h-10 w-full rounded-md border border-white/15 bg-white/5 px-3 text-sm text-white"
+                  >
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="system">System</option>
+                  </select>
+                </div>
+                <Button onClick={saveProfile} disabled={savingProfile} className="gap-2">
+                  <Save className="w-4 h-4" />
+                  {savingProfile ? 'Saving...' : 'Save Profile'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/10 bg-slate-900/60">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2"><Mail className="w-5 h-5 text-cyan-300" /> Email Address</CardTitle>
+                <CardDescription className="text-slate-400">Change your email and confirm via inbox.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newEmail" className="text-slate-200">New Email</Label>
+                  <Input
+                    id="newEmail"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="bg-white/5 border-white/15"
+                  />
+                </div>
+                <Button onClick={changeEmail} disabled={savingEmail || !newEmail.trim()}>{savingEmail ? 'Updating...' : 'Change Email'}</Button>
+                {emailStatus && <p className="text-sm text-slate-300">{emailStatus}</p>}
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/10 bg-slate-900/60">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2"><KeyRound className="w-5 h-5 text-cyan-300" /> Security</CardTitle>
+                <CardDescription className="text-slate-400">Update your account password.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword" className="text-slate-200">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={passwords.newPassword}
+                    onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                    className="bg-white/5 border-white/15"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-slate-200">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={passwords.confirmPassword}
+                    onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
+                    className="bg-white/5 border-white/15"
+                  />
+                </div>
+                <Button onClick={updatePassword} disabled={savingPassword}>{savingPassword ? 'Updating...' : 'Update Password'}</Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card className="border-white/10 bg-slate-900/60">
+              <CardHeader>
+                <CardTitle className="text-white">Notifications</CardTitle>
+                <CardDescription className="text-slate-400">Control update and reminder behavior.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">Email Updates</p>
+                    <p className="text-xs text-slate-400">Product and class activity notifications.</p>
+                  </div>
+                  <Switch checked={preferences.email_updates} onCheckedChange={(checked) => setFeaturePreference('email_updates', checked)} />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">Class Reminders</p>
+                    <p className="text-xs text-slate-400">Upcoming class and assignment reminders.</p>
+                  </div>
+                  <Switch checked={preferences.class_reminders} onCheckedChange={(checked) => setFeaturePreference('class_reminders', checked)} />
+                </div>
+                <Button onClick={savePreferences} disabled={savingPrefs} className="w-full">{savingPrefs ? 'Saving...' : 'Save Preferences'}</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-white/10 bg-slate-900/60">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2"><Shield className="w-5 h-5 text-cyan-300" /> Account Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-400">Role</span>
+                  <Badge variant="secondary" className="capitalize">{profile?.role?.replace('_', ' ') || 'User'}</Badge>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-400">Account ID</span>
+                  <span className="font-mono text-xs text-slate-200 break-all text-right">{authUser?.id}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-400">Last Sign In</span>
+                  <span className="text-right">{authUser?.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString() : 'Unknown'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-400">Session Expires</span>
+                  <span className="text-right">{sessionInfo?.expires_at ? new Date(sessionInfo.expires_at * 1000).toLocaleString() : 'Unknown'}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Appearance</CardTitle>
-            <CardDescription>Choose how the interface looks.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Label htmlFor="theme-select">Theme</Label>
-            <select
-              id="theme-select"
-              value={theme || 'light'}
-              onChange={(e) => setTheme(e.target.value)}
-              className="h-10 w-full rounded-md border bg-background px-3"
-            >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="system">System</option>
-            </select>
-          </CardContent>
-        </Card>
+        <LearnAveronCodeLab
+          preferences={preferences}
+          onPreferenceChange={setFeaturePreference}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile</CardTitle>
-            <CardDescription>Update your account profile.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Current Email</Label>
-              <Input id="email" value={form.email} disabled />
-            </div>
-            <Button onClick={saveProfile} disabled={savingProfile}>{savingProfile ? 'Saving...' : 'Save Profile'}</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Email Address</CardTitle>
-            <CardDescription>Change your email address. A confirmation email will be sent to verify the change.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="newEmail">New Email</Label>
-              <Input id="newEmail" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
-            </div>
-            <Button onClick={changeEmail} disabled={savingEmail || !newEmail.trim()}>{savingEmail ? 'Updating...' : 'Change Email'}</Button>
-            {emailStatus && <p className="text-sm text-muted-foreground">{emailStatus}</p>}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Password</CardTitle>
-            <CardDescription>Update your account password.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={passwords.newPassword}
-                onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={passwords.confirmPassword}
-                onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
-              />
-            </div>
-            <Button onClick={updatePassword} disabled={savingPassword}>{savingPassword ? 'Updating...' : 'Update Password'}</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>Manage your notification preferences.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between border rounded-md p-3">
-              <div>
-                <p className="font-medium">Email Notifications</p>
-                <p className="text-sm text-muted-foreground">Receive email updates about activity and progress.</p>
-              </div>
-              <Switch checked={preferences.email_updates} onCheckedChange={(checked) => setPreferences({ ...preferences, email_updates: checked })} />
-            </div>
-            <div className="flex items-center justify-between border rounded-md p-3">
-              <div>
-                <p className="font-medium">Class Reminders</p>
-                <p className="text-sm text-muted-foreground">Show reminders in your dashboard.</p>
-              </div>
-              <Switch checked={preferences.class_reminders} onCheckedChange={(checked) => setPreferences({ ...preferences, class_reminders: checked })} />
-            </div>
-            <Button onClick={savePreferences} disabled={savingPrefs}>{savingPrefs ? 'Saving...' : 'Save Preferences'}</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Information</CardTitle>
-            <CardDescription>View your account details and session information.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Account ID</span>
-              <span className="font-mono text-xs break-all">{authUser?.id}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Last Sign In</span>
-              <span>{authUser?.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString() : 'Unknown'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Role</span>
-              <Badge variant="secondary" className="capitalize">{profile?.role?.replace('_', ' ') || 'User'}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Session Expires</span>
-              <span>{sessionInfo?.expires_at ? new Date(sessionInfo.expires_at * 1000).toLocaleString() : 'Unknown'}</span>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex justify-end">
+          <Button onClick={savePreferences} disabled={savingPrefs} className="gap-2">
+            <Save className="w-4 h-4" />
+            {savingPrefs ? 'Saving...' : 'Save Learn Feature Settings'}
+          </Button>
+        </div>
       </main>
     </div>
   )
