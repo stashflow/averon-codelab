@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
+import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -88,7 +88,6 @@ type Classroom = {
 type SupportTab = 'users' | 'districts' | 'schools' | 'classrooms'
 
 export default function AdminSupportCenter() {
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [users, setUsers] = useState<User[]>([])
@@ -115,28 +114,22 @@ export default function AdminSupportCenter() {
 
   const verifyAccessAndLoad = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
+      const statsResponse = await fetch('/api/admin/support/stats')
+      if (statsResponse.status === 401) {
         window.location.href = '/auth/login'
         return
       }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile?.role !== 'full_admin') {
+      if (statsResponse.status === 403) {
         window.location.href = '/protected'
         return
       }
+      if (!statsResponse.ok) {
+        const payload = await statsResponse.json().catch(() => null)
+        throw new Error(payload?.error || 'Unable to load support center')
+      }
 
       await Promise.all([
-        loadStats(),
+        loadStats(statsResponse),
         searchUsers(''),
         searchDistricts(''),
         searchSchools(''),
@@ -148,21 +141,21 @@ export default function AdminSupportCenter() {
     }
   }
 
-  const loadStats = async () => {
+  const loadStats = async (prefetchedResponse?: Response) => {
     try {
-      const [usersRes, districtsRes, schoolsRes, classroomsRes] = await Promise.all([
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('districts').select('id', { count: 'exact', head: true }),
-        supabase.from('schools').select('id', { count: 'exact', head: true }),
-        supabase.from('classrooms').select('id', { count: 'exact', head: true })
-      ])
+      const response = prefetchedResponse || (await fetch('/api/admin/support/stats'))
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.error || 'Failed to load stats')
+      }
+      const statsPayload = await response.json()
 
       setStats({
-        totalUsers: usersRes.count || 0,
-        totalDistricts: districtsRes.count || 0,
-        totalSchools: schoolsRes.count || 0,
-        totalClassrooms: classroomsRes.count || 0,
-        activeUsers24h: 0 // Can be enhanced with activity tracking
+        totalUsers: statsPayload.totalUsers || 0,
+        totalDistricts: statsPayload.totalDistricts || 0,
+        totalSchools: statsPayload.totalSchools || 0,
+        totalClassrooms: statsPayload.totalClassrooms || 0,
+        activeUsers24h: statsPayload.activeUsers24h || 0,
       })
     } catch (error) {
       console.error('Error loading stats:', error)
@@ -173,28 +166,11 @@ export default function AdminSupportCenter() {
     const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      let usersQuery = supabase
-        .from('profiles')
-        .select(`
-          id,
-          email,
-          full_name,
-          role,
-          created_at,
-          deleted_at,
-          district_admins (district:districts(name)),
-          school_admins (school:schools(name))
-        `)
+      const response = await fetch(`/api/admin/support/search?type=users&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || 'Failed to search users')
 
-      if (query) {
-        usersQuery = usersQuery.or(`email.ilike.%${query}%,full_name.ilike.%${query}%`)
-      }
-
-      const { data, error } = await usersQuery.limit(query ? 20 : 50)
-
-      if (error) throw error
-
-      const formattedUsers = data?.map((user: any) => ({
+      const formattedUsers = (payload.items || []).map((user: any) => ({
         id: user.id,
         email: user.email,
         full_name: user.full_name,
@@ -202,9 +178,9 @@ export default function AdminSupportCenter() {
         created_at: user.created_at,
         last_sign_in_at: user.last_sign_in_at,
         deleted_at: user.deleted_at,
-        district_name: user.district_admins?.[0]?.district?.name,
-        school_name: user.school_admins?.[0]?.school?.name
-      })) || []
+        district_name: user.district_name,
+        school_name: user.school_name
+      }))
 
       setUsers(formattedUsers)
     } catch (error) {
@@ -219,35 +195,10 @@ export default function AdminSupportCenter() {
     const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      let districtsQuery = supabase
-        .from('districts')
-        .select(`
-          id,
-          name,
-          created_at,
-          deleted_at,
-          schools (count),
-          district_admins (count)
-        `)
-
-      if (query) {
-        districtsQuery = districtsQuery.ilike('name', `%${query}%`)
-      }
-
-      const { data, error } = await districtsQuery.limit(query ? 20 : 50)
-
-      if (error) throw error
-
-      const formattedDistricts = data?.map((district: any) => ({
-        id: district.id,
-        name: district.name,
-        created_at: district.created_at,
-        deleted_at: district.deleted_at,
-        school_count: district.schools?.[0]?.count || 0,
-        user_count: district.district_admins?.[0]?.count || 0
-      })) || []
-
-      setDistricts(formattedDistricts)
+      const response = await fetch(`/api/admin/support/search?type=districts&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || 'Failed to search districts')
+      setDistricts(payload.items || [])
     } catch (error) {
       console.error('Error searching districts:', error)
       showAlert('error', 'Failed to search districts')
@@ -260,37 +211,10 @@ export default function AdminSupportCenter() {
     const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      let schoolsQuery = supabase
-        .from('schools')
-        .select(`
-          id,
-          name,
-          created_at,
-          deleted_at,
-          district:districts(name),
-          classrooms (count),
-          school_admins (count)
-        `)
-
-      if (query) {
-        schoolsQuery = schoolsQuery.ilike('name', `%${query}%`)
-      }
-
-      const { data, error } = await schoolsQuery.limit(query ? 20 : 50)
-
-      if (error) throw error
-
-      const formattedSchools = data?.map((school: any) => ({
-        id: school.id,
-        name: school.name,
-        district_name: school.district?.name || 'Unknown',
-        created_at: school.created_at,
-        deleted_at: school.deleted_at,
-        classroom_count: school.classrooms?.[0]?.count || 0,
-        user_count: school.school_admins?.[0]?.count || 0
-      })) || []
-
-      setSchools(formattedSchools)
+      const response = await fetch(`/api/admin/support/search?type=schools&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || 'Failed to search schools')
+      setSchools(payload.items || [])
     } catch (error) {
       console.error('Error searching schools:', error)
       showAlert('error', 'Failed to search schools')
@@ -303,38 +227,10 @@ export default function AdminSupportCenter() {
     const query = (queryOverride ?? searchQuery).trim()
     setLoading(true)
     try {
-      let classroomsQuery = supabase
-        .from('classrooms')
-        .select(`
-          id,
-          name,
-          created_at,
-          deleted_at,
-          school:schools(name, district:districts(name)),
-          teacher:profiles!classrooms_teacher_id_fkey(full_name),
-          enrollments (count)
-        `)
-
-      if (query) {
-        classroomsQuery = classroomsQuery.ilike('name', `%${query}%`)
-      }
-
-      const { data, error } = await classroomsQuery.limit(query ? 20 : 50)
-
-      if (error) throw error
-
-      const formattedClassrooms = data?.map((classroom: any) => ({
-        id: classroom.id,
-        name: classroom.name,
-        school_name: classroom.school?.name || 'Unknown',
-        district_name: classroom.school?.district?.name || 'Unknown',
-        teacher_name: classroom.teacher?.full_name || 'Unknown',
-        student_count: classroom.enrollments?.[0]?.count || 0,
-        created_at: classroom.created_at,
-        deleted_at: classroom.deleted_at
-      })) || []
-
-      setClassrooms(formattedClassrooms)
+      const response = await fetch(`/api/admin/support/search?type=classrooms&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || 'Failed to search classrooms')
+      setClassrooms(payload.items || [])
     } catch (error) {
       console.error('Error searching classrooms:', error)
       showAlert('error', 'Failed to search classrooms')
@@ -424,6 +320,7 @@ export default function AdminSupportCenter() {
 
   const resetPassword = async (userId: string, email: string) => {
     try {
+      const supabase = createClient()
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
       })
