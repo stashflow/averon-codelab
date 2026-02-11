@@ -108,6 +108,8 @@ export default function AssignmentPage() {
 
     setSubmitting(true)
 
+    const supabase = createClient()
+
     try {
       if (submission) {
         // Update existing submission
@@ -211,22 +213,18 @@ export default function AssignmentPage() {
           {/* Code Editor */}
           <div className="lg:col-span-2">
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white">Code Editor</h3>
-                <p className="text-sm text-slate-400">Write your solution below</p>
-              <CardContent className="space-y-4">
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="// Write your code here..."
-                  className="w-full h-96 p-4 bg-secondary/5 border border-primary/20 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full h-96 p-4 bg-slate-950/50 border border-white/20 rounded-lg font-mono text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
                 />
 
                 <div className="flex gap-2">
                   <Button
                     onClick={handleRunTests}
                     variant="outline"
-                    className="gap-2 bg-transparent"
+                    className="gap-2 bg-white/5 border-white/10 text-slate-200 hover:bg-white/10 hover:text-white backdrop-blur-sm"
                     disabled={testingCode || !code.trim()}
                   >
                     <Play className="w-4 h-4" />
@@ -234,7 +232,7 @@ export default function AssignmentPage() {
                   </Button>
                   <Button
                     onClick={handleSubmit}
-                    className="bg-primary hover:bg-primary/90 gap-2"
+                    className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0 gap-2"
                     disabled={submitting || !code.trim()}
                   >
                     <Send className="w-4 h-4" />
@@ -243,52 +241,52 @@ export default function AssignmentPage() {
                 </div>
 
                 {testResults && (
-                  <Card className="bg-background border-primary/20">
-                    <CardHeader>
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6 mt-4">
+                    <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-primary">Test Results</CardTitle>
+                        <h4 className="text-lg font-semibold text-white">Test Results</h4>
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Score</p>
-                          <p className="text-2xl font-bold text-primary">{testResults.score}%</p>
+                          <p className="text-sm text-slate-400">Score</p>
+                          <p className="text-2xl font-bold text-blue-400">{testResults.score}%</p>
                         </div>
                       </div>
-                      <CardDescription>
+                      <p className="text-sm text-slate-400">
                         {testResults.passed} of {testResults.total} tests passed
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {testResults.tests.map((test: any, idx: number) => (
-                        <div key={idx} className="flex items-start gap-3 p-3 bg-secondary/5 rounded border border-secondary/10">
-                          <div className="mt-0.5">
-                            {test.passed ? (
-                              <CheckCircle2 className="w-5 h-5 text-green-500" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-destructive" />
-                            )}
+                      </p>
+                      <div className="space-y-2">
+                        {testResults.tests.map((test: any, idx: number) => (
+                          <div key={idx} className="flex items-start gap-3 p-3 bg-white/5 rounded-lg border border-white/10">
+                            <div className="mt-0.5">
+                              {test.passed ? (
+                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                              ) : (
+                                <XCircle className="w-5 h-5 text-red-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white">{test.name}</p>
+                              {!test.passed && (
+                                <p className="text-xs text-slate-400 mt-1">
+                                  Expected: <span className="font-mono text-slate-300">{test.expected}</span>, Got:{' '}
+                                  <span className="font-mono text-slate-300">{test.actual}</span>
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground">{test.name}</p>
-                            {!test.passed && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Expected: <span className="font-mono">{test.expected}</span>, Got:{' '}
-                                <span className="font-mono">{test.actual}</span>
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {submission?.status === 'graded' && (
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-green-900 font-medium">Submission Graded</p>
-                    <p className="text-sm text-green-800 mt-1">Your score: {submission.score}%</p>
+                  <div className="p-4 bg-emerald-500/20 border border-emerald-500/40 rounded-lg backdrop-blur-sm">
+                    <p className="text-emerald-300 font-medium">Submission Graded</p>
+                    <p className="text-sm text-emerald-200 mt-1">Your score: {submission.score}%</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </main>
