@@ -478,11 +478,21 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">{roleLabels[(currentRole || 'full_admin') as InviteRole]} Panel</h1>
-          <p className="text-muted-foreground">
-            Full admins can do everything. District and school admins see the same data model scoped to their permissions.
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">{roleLabels[(currentRole || 'full_admin') as InviteRole]} Panel</h1>
+            <p className="text-muted-foreground">
+              Full admins can do everything. District and school admins see the same data model scoped to their permissions.
+            </p>
+          </div>
+          {currentRole === 'full_admin' && (
+            <Button
+              onClick={() => router.push('/admin/support-center')}
+              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+            >
+              Advanced Support Center
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
