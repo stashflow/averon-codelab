@@ -143,93 +143,97 @@ export default function TeacherOnboarding() {
 
   if (loadingData) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <p className="text-white/70">Loading onboarding...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center">
+        <p className="text-slate-300">Loading onboarding...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center p-4">
       <div className="max-w-3xl w-full grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-white/10 bg-white/5">
-          <CardHeader>
-            <CardTitle className="text-white">Join With Invitation</CardTitle>
-            <CardDescription className="text-white/70">Use the secure magic link token from your administrator.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="inviteToken" className="text-white">Invite Token</Label>
-              <Input
-                id="inviteToken"
-                value={inviteToken}
-                onChange={(e) => setInviteToken(e.target.value)}
-                placeholder="Paste token"
-                className="bg-black border-white/10 text-white"
-              />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-xl font-semibold text-white">Join With Invitation</h3>
+              <p className="text-sm text-slate-400 mt-1">Use the secure magic link token from your administrator.</p>
             </div>
-            <Button
-              onClick={handleInviteRedeem}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
-            >
-              {loading ? 'Redeeming...' : 'Redeem Invitation'}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/10 bg-white/5">
-          <CardHeader>
-            <CardTitle className="text-white">Manual School Assignment</CardTitle>
-            <CardDescription className="text-white/70">Select your district and school. School is required.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="districtId" className="text-white">District</Label>
-              <select
-                id="districtId"
-                value={districtId}
-                onChange={(e) => {
-                  setDistrictId(e.target.value)
-                  setSchoolId('')
-                }}
-                className="w-full h-10 rounded-md border border-white/10 bg-black text-white px-3"
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="inviteToken" className="text-slate-300">Invite Token</Label>
+                <Input
+                  id="inviteToken"
+                  value={inviteToken}
+                  onChange={(e) => setInviteToken(e.target.value)}
+                  placeholder="Paste token"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
+                />
+              </div>
+              <Button
+                onClick={handleInviteRedeem}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25 border-0"
               >
-                <option value="">Select district</option>
-                {districts.map((district) => (
-                  <option key={district.id} value={district.id}>{district.name}</option>
-                ))}
-              </select>
+                {loading ? 'Redeeming...' : 'Redeem Invitation'}
+              </Button>
             </div>
+          </div>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="schoolId" className="text-white">School *</Label>
-              <select
-                id="schoolId"
-                value={schoolId}
-                onChange={(e) => setSchoolId(e.target.value)}
-                className="w-full h-10 rounded-md border border-white/10 bg-black text-white px-3"
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-xl font-semibold text-white">Manual School Assignment</h3>
+              <p className="text-sm text-slate-400 mt-1">Select your district and school. School is required.</p>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="districtId" className="text-slate-300">District</Label>
+                <select
+                  id="districtId"
+                  value={districtId}
+                  onChange={(e) => {
+                    setDistrictId(e.target.value)
+                    setSchoolId('')
+                  }}
+                  className="w-full h-10 rounded-md border border-white/10 bg-white/5 text-white px-3 focus:border-blue-400/50 focus:ring-blue-400/20"
+                >
+                  <option value="">Select district</option>
+                  {districts.map((district) => (
+                    <option key={district.id} value={district.id}>{district.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="schoolId" className="text-slate-300">School *</Label>
+                <select
+                  id="schoolId"
+                  value={schoolId}
+                  onChange={(e) => setSchoolId(e.target.value)}
+                  className="w-full h-10 rounded-md border border-white/10 bg-white/5 text-white px-3 focus:border-blue-400/50 focus:ring-blue-400/20"
+                >
+                  <option value="">Select school</option>
+                  {filteredSchools.map((school) => (
+                    <option key={school.id} value={school.id}>{school.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <Button
+                onClick={handleManualSubmit}
+                disabled={loading || !schoolId}
+                className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg shadow-indigo-500/25 border-0"
               >
-                <option value="">Select school</option>
-                {filteredSchools.map((school) => (
-                  <option key={school.id} value={school.id}>{school.name}</option>
-                ))}
-              </select>
+                {loading ? 'Saving...' : 'Complete Onboarding'}
+              </Button>
             </div>
-
-            <Button
-              onClick={handleManualSubmit}
-              disabled={loading || !schoolId}
-              className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
-            >
-              {loading ? 'Saving...' : 'Complete Onboarding'}
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {error && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-500/20 border border-red-500/40 text-red-200 rounded-md">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/20 border border-red-500/40 text-red-200 rounded-xl backdrop-blur-sm shadow-lg">
           {error}
         </div>
       )}
