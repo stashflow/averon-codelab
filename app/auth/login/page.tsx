@@ -65,7 +65,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex">
       {/* Left Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
@@ -75,16 +75,16 @@ export default function Login() {
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Welcome Back</h1>
-              <p className="text-muted-foreground mt-2">Sign in to continue your learning journey</p>
+              <h1 className="text-3xl font-bold tracking-tight text-white">Welcome Back</h1>
+              <p className="text-slate-400 mt-2">Sign in to continue your learning journey</p>
             </div>
           </div>
 
-          <Card className="border-2">
-            <CardContent className="pt-6">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+            <div className="space-y-5">
               <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-300">
                     Email Address
                   </Label>
                   <Input
@@ -95,16 +95,16 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11"
+                    className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-sm font-medium">
+                    <Label htmlFor="password" className="text-sm font-medium text-slate-300">
                       Password
                     </Label>
-                    <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
+                    <Link href="/auth/forgot-password" className="text-xs text-blue-400 hover:underline">
                       Forgot password?
                     </Link>
                   </div>
@@ -116,19 +116,19 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11"
+                    className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
                   />
                 </div>
 
                 {error && (
-                  <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-lg text-sm">
+                  <div className="bg-red-500/20 border border-red-500/40 text-red-300 p-3 rounded-lg text-sm backdrop-blur-sm">
                     {error}
                   </div>
                 )}
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
+                  className="w-full h-11 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0"
                   disabled={loading}
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
@@ -136,10 +136,10 @@ export default function Login() {
 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border" />
+                    <div className="w-full border-t border-white/10" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                    <span className="bg-slate-950 px-2 text-slate-400">Or continue with</span>
                   </div>
                 </div>
 
@@ -148,7 +148,7 @@ export default function Login() {
                   variant="outline"
                   onClick={() => handleOAuthLogin('google')}
                   disabled={loading}
-                  className="w-full h-11"
+                  className="w-full h-11 bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm"
                 >
                   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path
@@ -171,12 +171,12 @@ export default function Login() {
                   Google
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <p className="text-sm text-center text-muted-foreground">
+          <p className="text-sm text-center text-slate-400">
             Don't have an account?{' '}
-            <Link href="/auth/sign-up" className="text-primary hover:underline font-semibold">
+            <Link href="/auth/sign-up" className="text-blue-400 hover:underline font-semibold">
               Create account
             </Link>
           </p>
@@ -184,15 +184,15 @@ export default function Login() {
       </div>
 
       {/* Right Side - Visual */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary/10 via-primary/5 to-background items-center justify-center p-12">
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-slate-950 items-center justify-center p-12">
         <div className="max-w-md space-y-6">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 Code. Learn. Excel.
               </span>
             </h2>
-            <p className="text-lg text-muted-foreground leading-relaxed">
+            <p className="text-lg text-slate-300 leading-relaxed">
               Join thousands of students and teachers using Averon CodeLab to master programming skills and achieve
               their goals.
             </p>
@@ -200,10 +200,10 @@ export default function Login() {
           <div className="space-y-3 pt-4">
             {['Interactive coding environment', 'Real-time feedback', 'Track your progress'].map((item, idx) => (
               <div key={idx} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
+                <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-blue-400" />
                 </div>
-                <span className="text-sm text-muted-foreground">{item}</span>
+                <span className="text-sm text-slate-400">{item}</span>
               </div>
             ))}
           </div>

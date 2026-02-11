@@ -213,6 +213,8 @@ export default function AssignmentPage() {
           {/* Code Editor */}
           <div className="lg:col-span-2">
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white">Code Editor</h3>
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
