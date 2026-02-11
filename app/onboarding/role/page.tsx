@@ -83,41 +83,41 @@ export default function RoleOnboardingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading role setup...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center">
+        <p className="text-slate-300">Loading role setup...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="max-w-lg w-full">
-        <CardHeader>
-          <CardTitle>Confirm Your Role</CardTitle>
-          <CardDescription>Select your primary role to continue.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center p-4">
+      <div className="max-w-lg w-full relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Confirm Your Role</h2>
+            <p className="text-slate-400 mt-1">Select your primary role to continue.</p>
+          </div>
           <RadioGroup value={role} onValueChange={(value) => setRole(value as 'student' | 'teacher')}>
-            <div className="flex items-center space-x-2 border rounded-md p-3">
+            <div className="flex items-center space-x-3 border border-white/10 rounded-lg p-4 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
               <RadioGroupItem value="student" id="student" />
-              <Label htmlFor="student">Student: I join classes and complete assignments.</Label>
+              <Label htmlFor="student" className="text-white cursor-pointer flex-1">Student: I join classes and complete assignments.</Label>
             </div>
-            <div className="flex items-center space-x-2 border rounded-md p-3">
+            <div className="flex items-center space-x-3 border border-white/10 rounded-lg p-4 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
               <RadioGroupItem value="teacher" id="teacher" />
-              <Label htmlFor="teacher">Teacher: I create classes and manage students.</Label>
+              <Label htmlFor="teacher" className="text-white cursor-pointer flex-1">Teacher: I create classes and manage students.</Label>
             </div>
           </RadioGroup>
 
-          <div className="flex items-start gap-3">
-            <Checkbox id="confirm-role" checked={confirmed} onCheckedChange={(checked) => setConfirmed(checked === true)} />
-            <Label htmlFor="confirm-role">I confirm this role selection is correct.</Label>
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-white/5 border border-white/10">
+            <Checkbox id="confirm-role" checked={confirmed} onCheckedChange={(checked) => setConfirmed(checked === true)} className="mt-0.5" />
+            <Label htmlFor="confirm-role" className="text-slate-300 cursor-pointer">I confirm this role selection is correct.</Label>
           </div>
 
-          <Button onClick={saveRole} disabled={saving || !confirmed} className="w-full">
+          <Button onClick={saveRole} disabled={saving || !confirmed} className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0">
             {saving ? 'Saving...' : 'Confirm Role'}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
