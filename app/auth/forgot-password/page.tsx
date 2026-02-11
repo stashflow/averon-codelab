@@ -88,7 +88,7 @@ export default function ForgotPassword() {
 
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12" />
+            <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
             <span className="font-bold text-2xl text-white">Averon CodeLab</span>
           </div>
           <div>

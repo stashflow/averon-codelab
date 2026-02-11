@@ -268,7 +268,7 @@ export default function StudentDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-3">
-              <Image src="/ACL.png" alt="ACL Logo" width={40} height={40} className="w-10 h-10" />
+              <Image src="/ACL.png" alt="ACL Logo" width={40} height={40} className="w-10 h-10 logo-theme-filter" />
               <div className="hidden sm:block">
                 <h1 className="text-sm font-bold text-white leading-tight">Averon CodeLab</h1>
                 <p className="text-xs text-slate-400">Student Dashboard</p>

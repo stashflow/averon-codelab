@@ -246,7 +246,7 @@ export default function TeacherDashboard() {
       <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between h-16">
           <Link href="/protected/teacher" className="flex items-center gap-3">
-            <Image src="/ACL.png" alt="ACL Logo" width={40} height={40} className="w-10 h-10" />
+            <Image src="/ACL.png" alt="ACL Logo" width={40} height={40} className="w-10 h-10 logo-theme-filter" />
             <div className="hidden sm:block">
               <h1 className="text-sm font-bold text-foreground leading-tight">ACL Teacher</h1>
               <p className="text-xs text-muted-foreground font-medium">Dashboard</p>

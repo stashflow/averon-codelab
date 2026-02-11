@@ -138,7 +138,7 @@ export default function SignUp() {
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-3">
             <Link href="/" className="inline-flex items-center gap-2 group">
-              <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12" />
+              <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
             <div>

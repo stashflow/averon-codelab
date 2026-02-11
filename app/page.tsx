@@ -97,7 +97,7 @@ export default function Home() {
                 width={48}
                 height={48}
                 priority
-                className="w-12 h-12"
+                className="w-12 h-12 logo-theme-filter"
               />
               <span className="hidden sm:block font-bold text-xl bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent group-hover:opacity-90 transition-all">
                 Averon CodeLab
@@ -338,7 +338,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12" />
+              <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
               <span className="font-bold text-lg text-foreground">Averon CodeLab</span>
             </div>
             <p className="text-sm text-muted-foreground">
