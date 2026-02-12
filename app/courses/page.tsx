@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Code, BookOpen, Clock, Users, ArrowRight, LogOut, Lock, GraduationCap, Database, AlertCircle } from 'lucide-react'
+import { Code, BookOpen, Clock, Users, ArrowRight, LogOut, GraduationCap, Database, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export const dynamic = 'force-dynamic'
@@ -193,15 +193,24 @@ export default function CoursesPage() {
     try {
       const supabase = createClient()
 
-      const { error } = await supabase.from('course_enrollments').insert({
+      const modernPayload = {
         student_id: user.id,
         course_id: courseId,
         is_active: true,
-        payment_status: 'paid', // In production: 'pending' until payment
+        payment_status: 'paid',
         status: 'active',
-        enrollment_source: 'direct',
-        started_at: new Date().toISOString(),
-      })
+      }
+
+      let { error } = await supabase.from('course_enrollments').insert(modernPayload)
+      if (error && error.message?.toLowerCase().includes('column')) {
+        const fallbackPayload = {
+          student_id: user.id,
+          course_id: courseId,
+          is_active: true,
+        }
+        const fallback = await supabase.from('course_enrollments').insert(fallbackPayload)
+        error = fallback.error
+      }
 
       if (error) throw error
 
@@ -418,12 +427,7 @@ export default function CoursesPage() {
                               disabled={enrolling === course.id || !hasClassroomEnrollment || !isAvailableToStudent}
                               className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {enrolling === course.id ? 'Enrolling...' : (
-                                <>
-                                  <Lock className="w-4 h-4 mr-2" />
-                                  Enroll Now (Payment Required)
-                                </>
-                              )}
+                              {enrolling === course.id ? 'Enrolling...' : 'Enroll Now'}
                             </Button>
                           ) : (
                             <Button
