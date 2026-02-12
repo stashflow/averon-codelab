@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -106,8 +106,12 @@ export default function CoursesPage() {
           .eq('is_active', true)
           .order('order_index')
 
-        if (categoriesError) throw categoriesError
-        setCategories(categoriesData || [])
+        if (categoriesError) {
+          console.warn('[v0] course categories unavailable; falling back to uncategorized rendering', categoriesError)
+          setCategories([])
+        } else {
+          setCategories(categoriesData || [])
+        }
 
         // Load all courses with category info
         const { data: coursesData, error: coursesError } = await supabase
@@ -152,6 +156,25 @@ export default function CoursesPage() {
   }, [router])
 
   const isCourseAvailableToStudent = (courseId: string) => allowNonRelatedCourses || offeredCourseIds.has(courseId)
+  const displayCategories = useMemo(() => {
+    const categoryMap = new Map(categories.map((category) => [category.id, category]))
+    const unknownCategoryIds = Object.keys(coursesByCategory).filter((id) => !categoryMap.has(id))
+
+    const fallbackCategories: CourseCategory[] = unknownCategoryIds.map((id, idx) => ({
+      id,
+      name: id === 'uncategorized' ? 'Courses' : 'Other Courses',
+      slug: id,
+      description: 'Available courses',
+      category_type: 'self_paced',
+      icon_name: 'BookOpen',
+      color: 'cyan',
+      order_index: 1000 + idx,
+    }))
+
+    return [...categories, ...fallbackCategories]
+      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+      .filter((category) => (coursesByCategory[category.id] || []).length > 0)
+  }, [categories, coursesByCategory])
 
   async function handleEnroll(courseId: string) {
     if (!user) return
@@ -316,7 +339,7 @@ export default function CoursesPage() {
           </Alert>
         )}
 
-        {categories.map((category) => {
+        {displayCategories.map((category) => {
           const categoryCourses = coursesByCategory[category.id] || []
           if (categoryCourses.length === 0) return null
 
@@ -427,7 +450,7 @@ export default function CoursesPage() {
           )
         })}
 
-        {categories.length === 0 && (
+        {displayCategories.length === 0 && (
           <div className="text-center py-16">
             <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
               <BookOpen className="w-8 h-8 text-white/60" />

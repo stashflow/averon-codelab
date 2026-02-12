@@ -292,7 +292,7 @@ export default function TeacherDashboard() {
             <Image src="/ACL.png" alt="ACL Logo" width={40} height={40} className="w-10 h-10 logo-theme-filter" />
             <div className="hidden sm:block">
               <h1 className="text-sm font-bold text-foreground leading-tight">ACL Teacher</h1>
-              <p className="text-xs text-muted-foreground font-medium">Dashboard</p>
+              <p className="text-xs text-foreground/80 font-medium">Dashboard</p>
             </div>
           </Link>
           <div className="flex items-center gap-2">
@@ -321,7 +321,7 @@ export default function TeacherDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-foreground">Your Classes</h2>
-            <p className="text-sm text-muted-foreground">Manage classrooms, enrollment, and student access.</p>
+            <p className="text-sm text-foreground/80">Manage classrooms, enrollment, and student access.</p>
             {preferences.keyboard_shortcuts && (
               <p className="text-xs text-primary mt-1">Keyboard shortcuts: press <span className="font-mono">N</span> for new class, <span className="font-mono">S</span> for settings.</p>
             )}
@@ -396,7 +396,7 @@ export default function TeacherDashboard() {
               <Badge variant={profile?.school_id ? 'default' : 'destructive'}>{profile?.school_id ? 'Yes' : 'No'}</Badge>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">All teacher features require school assignment.</p>
+              <p className="text-sm text-foreground/80">All teacher features require school assignment.</p>
             </CardContent>
           </Card>
         </div>
@@ -409,15 +409,15 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
               <div className="rounded-lg border p-3 bg-muted/20">
-                <p className="text-muted-foreground">Active classrooms</p>
+                <p className="text-foreground/80">Active classrooms</p>
                 <p className="text-2xl font-semibold">{classrooms.length}</p>
               </div>
               <div className="rounded-lg border p-3 bg-muted/20">
-                <p className="text-muted-foreground">Total students</p>
+                <p className="text-foreground/80">Total students</p>
                 <p className="text-2xl font-semibold">{totalStudents}</p>
               </div>
               <div className="rounded-lg border p-3 bg-muted/20">
-                <p className="text-muted-foreground">Last refresh</p>
+                <p className="text-foreground/80">Last refresh</p>
                 <p className="text-sm font-medium">{new Date().toLocaleTimeString()}</p>
               </div>
             </CardContent>
@@ -453,7 +453,7 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             {displayedClassrooms.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No classes yet. Create your first class.</p>
+              <p className="text-sm text-foreground/80">No classes yet. Create your first class.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {displayedClassrooms.map((classroom) => (
@@ -468,7 +468,7 @@ export default function TeacherDashboard() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <p className="text-sm text-muted-foreground">Students: {studentsByClass[classroom.id] || 0}</p>
+                      <p className="text-sm text-foreground/80">Students: {studentsByClass[classroom.id] || 0}</p>
                       <div className="grid grid-cols-2 gap-2">
                         <Button asChild>
                           <Link href={`/teacher/classroom/${classroom.id}`}>Manage Class</Link>

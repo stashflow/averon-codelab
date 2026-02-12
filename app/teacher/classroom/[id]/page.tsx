@@ -53,6 +53,8 @@ export default function TeacherClassroomPage() {
   const [portionDueDate, setPortionDueDate] = useState('')
   const [portionInstructions, setPortionInstructions] = useState('')
   const [assigningPortion, setAssigningPortion] = useState(false)
+  const [portionAssignments, setPortionAssignments] = useState<any[]>([])
+  const [removingPortionId, setRemovingPortionId] = useState<string | null>(null)
 
   const activeOfferingCourses = useMemo(
     () => courses.filter((course) => offeringsByCourseId[course.id]?.is_active),
@@ -142,11 +144,16 @@ export default function TeacherClassroomPage() {
 
       setClassroom(classData)
 
-      const [{ data: enrollmentData }, { data: assignmentData }, { data: courseData }, { data: offeringsData }] = await Promise.all([
+      const [{ data: enrollmentData }, { data: assignmentData }, { data: courseData }, { data: offeringsData }, { data: portionAssignmentsData }] = await Promise.all([
         supabase.from('enrollments').select('id, student_id, classroom_id, enrolled_at').eq('classroom_id', classroomId),
         supabase.from('assignments').select('*').eq('classroom_id', classroomId).order('created_at', { ascending: false }),
         supabase.from('courses').select('id, name, description, difficulty_level').eq('is_active', true).order('name', { ascending: true }),
         supabase.from('classroom_course_offerings').select('id, course_id, is_active').eq('classroom_id', classroomId),
+        supabase
+          .from('lesson_assignments')
+          .select('id, assigned_at, due_date, instructions, lesson:lesson_id(id, title, lesson_number, unit:unit_id(id, title, unit_number, course:course_id(id, name)))')
+          .eq('classroom_id', classroomId)
+          .order('assigned_at', { ascending: false }),
       ])
 
       const studentIds = (enrollmentData || []).map((row: any) => row.student_id).filter(Boolean)
@@ -167,6 +174,7 @@ export default function TeacherClassroomPage() {
       )
       setAssignments(assignmentData || [])
       setCourses(courseData || [])
+      setPortionAssignments(portionAssignmentsData || [])
 
       const mapped: Record<string, { id: string; is_active: boolean }> = {}
       ;(offeringsData || []).forEach((offering: any) => {
@@ -313,8 +321,22 @@ export default function TeacherClassroomPage() {
     setSelectedLessonIds({})
     setPortionInstructions('')
     setPortionDueDate('')
+    await loadData()
     setAssigningPortion(false)
     alert(`Assigned ${lessonIds.length} lesson${lessonIds.length === 1 ? '' : 's'} to this class.`)
+  }
+
+  async function removePortionAssignment(assignmentId: string) {
+    setRemovingPortionId(assignmentId)
+    const supabase = createClient()
+    const { error } = await supabase.from('lesson_assignments').delete().eq('id', assignmentId)
+    if (error) {
+      alert(error.message)
+      setRemovingPortionId(null)
+      return
+    }
+    setPortionAssignments((prev) => prev.filter((item) => item.id !== assignmentId))
+    setRemovingPortionId(null)
   }
 
   if (loading) {
@@ -375,8 +397,8 @@ export default function TeacherClassroomPage() {
                 const offered = offeringsByCourseId[course.id]?.is_active || false
                 return (
                   <div key={course.id} className="border rounded-lg p-3 bg-card">
-                    <p className="font-medium text-sm">{course.name}</p>
-                    <p className="text-xs text-muted-foreground mb-2">{course.difficulty_level || 'course'}</p>
+                    <p className="font-medium text-sm text-slate-100">{course.name}</p>
+                    <p className="text-xs text-slate-400 mb-2">{course.difficulty_level || 'course'}</p>
                     <Button
                       size="sm"
                       variant={offered ? 'default' : 'outline'}
@@ -429,16 +451,16 @@ export default function TeacherClassroomPage() {
             </div>
 
             {selectedCourseId && courseUnits.length === 0 && (
-              <p className="text-sm text-muted-foreground">No lessons found in this course yet.</p>
+              <p className="text-sm text-slate-300">No lessons found in this course yet.</p>
             )}
 
             <div className="space-y-4 max-h-[380px] overflow-auto pr-2">
               {courseUnits.map((unit) => (
-                <div key={unit.id} className="border rounded-lg p-3">
-                  <p className="font-medium mb-2">Unit {unit.unit_number || unit.order_index || '-'}: {unit.title}</p>
+                <div key={unit.id} className="border border-white/10 bg-white/5 rounded-lg p-3">
+                  <p className="font-medium mb-2 text-slate-100">Unit {unit.unit_number || unit.order_index || '-'}: {unit.title}</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {unit.lessons.map((lesson) => (
-                      <label key={lesson.id} className="text-sm flex items-center gap-2">
+                      <label key={lesson.id} className="text-sm flex items-center gap-2 text-slate-200">
                         <input
                           type="checkbox"
                           checked={!!selectedLessonIds[lesson.id]}
@@ -461,8 +483,47 @@ export default function TeacherClassroomPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Assigned Course Portions</CardTitle>
+            <CardDescription>Manage and remove lesson portions already assigned to this class.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {portionAssignments.length === 0 ? (
+              <p className="text-sm text-slate-300">No lesson portions assigned yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {portionAssignments.map((item) => (
+                  <div key={item.id} className="border border-white/10 bg-white/5 rounded-lg p-3 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-slate-100">
+                        {item.lesson?.unit?.course?.name || 'Course'} - Unit {item.lesson?.unit?.unit_number || '-'} Lesson {item.lesson?.lesson_number || '-'}
+                      </p>
+                      <p className="text-sm text-slate-300">{item.lesson?.title || 'Lesson'}</p>
+                      {item.due_date && (
+                        <p className="text-xs text-slate-400">Due: {new Date(item.due_date).toLocaleDateString()}</p>
+                      )}
+                      {item.instructions && (
+                        <p className="text-xs text-slate-400 mt-1">Notes: {item.instructions}</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => removePortionAssignment(item.id)}
+                      disabled={removingPortionId === item.id}
+                    >
+                      {removingPortionId === item.id ? 'Removing...' : 'Remove'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div>
-          <h2 className="text-xl font-semibold text-secondary mb-4 flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
             <Users className="w-5 h-5" />
             Enrolled Students ({students.length})
           </h2>
@@ -478,9 +539,9 @@ export default function TeacherClassroomPage() {
               {students.map((student) => (
                 <Card key={student.id} className="border-primary/10">
                   <CardContent className="pt-6">
-                    <p className="font-medium text-secondary">{student.profiles?.full_name}</p>
-                    <p className="text-sm text-muted-foreground">{student.profiles?.email}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
+                    <p className="font-medium text-white">{student.profiles?.full_name || 'Student'}</p>
+                    <p className="text-sm text-slate-300">{student.profiles?.email || 'No email'}</p>
+                    <p className="text-xs text-slate-400 mt-2">
                       Enrolled: {new Date(student.enrolled_at).toLocaleDateString()}
                     </p>
                   </CardContent>
@@ -492,7 +553,7 @@ export default function TeacherClassroomPage() {
 
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-secondary">Assignments</h2>
+            <h2 className="text-xl font-semibold text-white">Assignments</h2>
             <Button
               onClick={() => setShowNewAssignment(!showNewAssignment)}
               className="bg-primary hover:bg-primary/90 gap-2"
@@ -586,11 +647,11 @@ export default function TeacherClassroomPage() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-secondary">{assignment.title}</CardTitle>
-                        <CardDescription>{assignment.description}</CardDescription>
+                        <CardTitle className="text-white">{assignment.title}</CardTitle>
+                        <CardDescription className="text-slate-300">{assignment.description}</CardDescription>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-slate-400">
                           {assignment.language?.charAt(0).toUpperCase() + assignment.language?.slice(1)}
                         </p>
                       </div>
