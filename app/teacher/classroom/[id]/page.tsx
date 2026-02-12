@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,19 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Plus, Users } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
+
+type UnitRow = {
+  id: string
+  unit_number: number | null
+  order_index: number | null
+  title: string
+  lessons: Array<{
+    id: string
+    lesson_number: number | null
+    order_index: number | null
+    title: string
+  }>
+}
 
 export default function TeacherClassroomPage() {
   const router = useRouter()
@@ -30,72 +43,127 @@ export default function TeacherClassroomPage() {
   const [creatingAssignment, setCreatingAssignment] = useState(false)
   const [userId, setUserId] = useState<string>('')
 
+  const [courses, setCourses] = useState<any[]>([])
+  const [offeringsByCourseId, setOfferingsByCourseId] = useState<Record<string, { id: string; is_active: boolean }>>({})
+  const [savingAccess, setSavingAccess] = useState(false)
+
+  const [selectedCourseId, setSelectedCourseId] = useState('')
+  const [courseUnits, setCourseUnits] = useState<UnitRow[]>([])
+  const [selectedLessonIds, setSelectedLessonIds] = useState<Record<string, boolean>>({})
+  const [portionDueDate, setPortionDueDate] = useState('')
+  const [portionInstructions, setPortionInstructions] = useState('')
+  const [assigningPortion, setAssigningPortion] = useState(false)
+
+  const activeOfferingCourses = useMemo(
+    () => courses.filter((course) => offeringsByCourseId[course.id]?.is_active),
+    [courses, offeringsByCourseId],
+  )
+
   useEffect(() => {
-    async function loadData() {
-      const supabase = createClient()
-      try {
-        const {
-          data: { user: authUser },
-          error: userError,
-        } = await supabase.auth.getUser()
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classroomId])
 
-        if (userError || !authUser) {
-          router.push('/auth/login')
-          return
-        }
-        setUserId(authUser.id)
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', authUser.id)
-          .single()
-
-        if (profile?.role !== 'teacher') {
-          router.push('/protected')
-          return
-        }
-
-        // Load classroom
-        const { data: classData } = await supabase
-          .from('classrooms')
-          .select('*')
-          .eq('id', classroomId)
-          .eq('teacher_id', authUser.id)
-          .single()
-
-        if (!classData) {
-          router.push('/protected/teacher')
-          return
-        }
-
-        setClassroom(classData)
-
-        // Load enrolled students
-        const { data: enrollmentData } = await supabase
-          .from('enrollments')
-          .select('*, profiles(email, full_name)')
-          .eq('classroom_id', classroomId)
-
-        setStudents(enrollmentData || [])
-
-        // Load assignments
-        const { data: assignmentData } = await supabase
-          .from('assignments')
-          .select('*')
-          .eq('classroom_id', classroomId)
-          .order('created_at', { ascending: false })
-
-        setAssignments(assignmentData || [])
-      } catch (err: any) {
-        console.error('Error loading data:', err)
-      } finally {
-        setLoading(false)
-      }
+  useEffect(() => {
+    if (!selectedCourseId) {
+      setCourseUnits([])
+      setSelectedLessonIds({})
+      return
     }
 
-    loadData()
-  }, [classroomId])
+    async function loadCourseUnits() {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('units')
+        .select('id, unit_number, order_index, title, lessons(id, lesson_number, order_index, title)')
+        .eq('course_id', selectedCourseId)
+        .order('order_index', { ascending: true })
+
+      if (error) {
+        console.error('[v0] error loading unit portions', error)
+        setCourseUnits([])
+        return
+      }
+
+      const normalized = ((data || []) as UnitRow[]).map((unit) => ({
+        ...unit,
+        lessons: (unit.lessons || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
+      }))
+
+      setCourseUnits(normalized)
+      setSelectedLessonIds({})
+    }
+
+    loadCourseUnits()
+  }, [selectedCourseId])
+
+  useEffect(() => {
+    if (!selectedCourseId && activeOfferingCourses.length > 0) {
+      setSelectedCourseId(activeOfferingCourses[0].id)
+    }
+  }, [selectedCourseId, activeOfferingCourses])
+
+  async function loadData() {
+    const supabase = createClient()
+    try {
+      const {
+        data: { user: authUser },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !authUser) {
+        router.push('/auth/login')
+        return
+      }
+      setUserId(authUser.id)
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .single()
+
+      if (profile?.role !== 'teacher') {
+        router.push('/protected')
+        return
+      }
+
+      const { data: classData } = await supabase
+        .from('classrooms')
+        .select('id, name, code, allow_non_related_courses')
+        .eq('id', classroomId)
+        .eq('teacher_id', authUser.id)
+        .single()
+
+      if (!classData) {
+        router.push('/protected/teacher')
+        return
+      }
+
+      setClassroom(classData)
+
+      const [{ data: enrollmentData }, { data: assignmentData }, { data: courseData }, { data: offeringsData }] = await Promise.all([
+        supabase.from('enrollments').select('*, profiles(email, full_name)').eq('classroom_id', classroomId),
+        supabase.from('assignments').select('*').eq('classroom_id', classroomId).order('created_at', { ascending: false }),
+        supabase.from('courses').select('id, name, description, difficulty_level').eq('is_active', true).order('name', { ascending: true }),
+        supabase.from('classroom_course_offerings').select('id, course_id, is_active').eq('classroom_id', classroomId),
+      ])
+
+      setStudents(enrollmentData || [])
+      setAssignments(assignmentData || [])
+      setCourses(courseData || [])
+
+      const mapped: Record<string, { id: string; is_active: boolean }> = {}
+      ;(offeringsData || []).forEach((offering: any) => {
+        mapped[offering.course_id] = { id: offering.id, is_active: offering.is_active }
+      })
+      setOfferingsByCourseId(mapped)
+    } catch (err: any) {
+      console.error('Error loading data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleCreateAssignment() {
     if (!classroom || !userId) return
@@ -132,6 +200,108 @@ export default function TeacherClassroomPage() {
     }
   }
 
+  async function setAllowNonRelatedCourses(value: boolean) {
+    if (!classroom) return
+    setSavingAccess(true)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('classrooms')
+      .update({ allow_non_related_courses: value })
+      .eq('id', classroom.id)
+
+    if (error) {
+      alert(error.message)
+      setSavingAccess(false)
+      return
+    }
+
+    setClassroom((prev: any) => ({ ...prev, allow_non_related_courses: value }))
+    setSavingAccess(false)
+  }
+
+  async function toggleCourseOffering(courseId: string, active: boolean) {
+    if (!classroom || !userId) return
+    setSavingAccess(true)
+    const supabase = createClient()
+
+    let error: any = null
+    if (active) {
+      const result = await supabase.from('classroom_course_offerings').upsert(
+        {
+          classroom_id: classroom.id,
+          course_id: courseId,
+          offered_by: userId,
+          is_active: true,
+        },
+        { onConflict: 'classroom_id,course_id' },
+      )
+      error = result.error
+    } else {
+      const result = await supabase
+        .from('classroom_course_offerings')
+        .update({ is_active: false, offered_by: userId })
+        .eq('classroom_id', classroom.id)
+        .eq('course_id', courseId)
+      error = result.error
+    }
+
+    if (error) {
+      alert(error.message)
+      setSavingAccess(false)
+      return
+    }
+
+    setOfferingsByCourseId((prev) => ({
+      ...prev,
+      [courseId]: { id: prev[courseId]?.id || `${classroom.id}-${courseId}`, is_active: active },
+    }))
+
+    if (!active && selectedCourseId === courseId) {
+      const nextCourse = activeOfferingCourses.find((course) => course.id !== courseId)
+      setSelectedCourseId(nextCourse?.id || '')
+    }
+
+    if (active && !selectedCourseId) {
+      setSelectedCourseId(courseId)
+    }
+
+    setSavingAccess(false)
+  }
+
+  async function assignCoursePortion() {
+    const lessonIds = Object.keys(selectedLessonIds).filter((id) => selectedLessonIds[id])
+    if (!classroom || !userId || lessonIds.length === 0) return
+
+    setAssigningPortion(true)
+    const supabase = createClient()
+
+    const payload = lessonIds.map((lessonId) => ({
+      classroom_id: classroom.id,
+      lesson_id: lessonId,
+      assigned_by: userId,
+      due_date: portionDueDate ? new Date(portionDueDate).toISOString() : null,
+      instructions: portionInstructions.trim() || null,
+      is_required: true,
+      points_possible: 100,
+    }))
+
+    const { error } = await supabase
+      .from('lesson_assignments')
+      .upsert(payload, { onConflict: 'classroom_id,lesson_id' })
+
+    if (error) {
+      alert(error.message)
+      setAssigningPortion(false)
+      return
+    }
+
+    setSelectedLessonIds({})
+    setPortionInstructions('')
+    setPortionDueDate('')
+    setAssigningPortion(false)
+    alert(`Assigned ${lessonIds.length} lesson${lessonIds.length === 1 ? '' : 's'} to this class.`)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
@@ -139,6 +309,8 @@ export default function TeacherClassroomPage() {
       </div>
     )
   }
+
+  const selectedLessonCount = Object.values(selectedLessonIds).filter(Boolean).length
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
@@ -155,7 +327,125 @@ export default function TeacherClassroomPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        {/* Students Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Course Access Controls</CardTitle>
+            <CardDescription>Offer courses for this class and choose whether students may take unrelated courses.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <Label className="mb-2 block">Allow Non-Related Courses</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={classroom?.allow_non_related_courses ? 'default' : 'outline'}
+                  disabled={savingAccess}
+                  onClick={() => setAllowNonRelatedCourses(true)}
+                >
+                  True
+                </Button>
+                <Button
+                  type="button"
+                  variant={!classroom?.allow_non_related_courses ? 'default' : 'outline'}
+                  disabled={savingAccess}
+                  onClick={() => setAllowNonRelatedCourses(false)}
+                >
+                  False
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {courses.map((course) => {
+                const offered = offeringsByCourseId[course.id]?.is_active || false
+                return (
+                  <div key={course.id} className="border rounded-lg p-3 bg-card">
+                    <p className="font-medium text-sm">{course.name}</p>
+                    <p className="text-xs text-muted-foreground mb-2">{course.difficulty_level || 'course'}</p>
+                    <Button
+                      size="sm"
+                      variant={offered ? 'default' : 'outline'}
+                      disabled={savingAccess}
+                      onClick={() => toggleCourseOffering(course.id, !offered)}
+                    >
+                      {offered ? 'Offered' : 'Not Offered'}
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Assign Course Portions</CardTitle>
+            <CardDescription>Assign specific lessons from offered courses to this classroom.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="portion-course">Offered Course</Label>
+                <select
+                  id="portion-course"
+                  value={selectedCourseId}
+                  onChange={(e) => setSelectedCourseId(e.target.value)}
+                  className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                >
+                  <option value="">Select offered course</option>
+                  {activeOfferingCourses.map((course) => (
+                    <option key={course.id} value={course.id}>{course.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="portion-due-date">Due Date (optional)</Label>
+                <Input id="portion-due-date" type="date" value={portionDueDate} onChange={(e) => setPortionDueDate(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="portion-notes">Instructions (optional)</Label>
+                <Input
+                  id="portion-notes"
+                  value={portionInstructions}
+                  onChange={(e) => setPortionInstructions(e.target.value)}
+                  placeholder="Instructions for students"
+                />
+              </div>
+            </div>
+
+            {selectedCourseId && courseUnits.length === 0 && (
+              <p className="text-sm text-muted-foreground">No lessons found in this course yet.</p>
+            )}
+
+            <div className="space-y-4 max-h-[380px] overflow-auto pr-2">
+              {courseUnits.map((unit) => (
+                <div key={unit.id} className="border rounded-lg p-3">
+                  <p className="font-medium mb-2">Unit {unit.unit_number || unit.order_index || '-'}: {unit.title}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {unit.lessons.map((lesson) => (
+                      <label key={lesson.id} className="text-sm flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={!!selectedLessonIds[lesson.id]}
+                          onChange={(e) => setSelectedLessonIds((prev) => ({ ...prev, [lesson.id]: e.target.checked }))}
+                        />
+                        <span>Lesson {lesson.lesson_number || lesson.order_index || '-'}: {lesson.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              onClick={assignCoursePortion}
+              disabled={assigningPortion || selectedLessonCount === 0 || !selectedCourseId}
+            >
+              {assigningPortion ? 'Assigning...' : `Assign ${selectedLessonCount} Lesson${selectedLessonCount === 1 ? '' : 's'}`}
+            </Button>
+          </CardContent>
+        </Card>
+
         <div>
           <h2 className="text-xl font-semibold text-secondary mb-4 flex items-center gap-2">
             <Users className="w-5 h-5" />
@@ -185,7 +475,6 @@ export default function TeacherClassroomPage() {
           )}
         </div>
 
-        {/* Assignments Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-secondary">Assignments</h2>

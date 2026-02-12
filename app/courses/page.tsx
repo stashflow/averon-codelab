@@ -52,6 +52,8 @@ export default function CoursesPage() {
   const [coursesByCategory, setCoursesByCategory] = useState<Record<string, Course[]>>({})
   const [enrollments, setEnrollments] = useState<Map<string, Enrollment>>(new Map())
   const [hasClassroomEnrollment, setHasClassroomEnrollment] = useState(false)
+  const [allowNonRelatedCourses, setAllowNonRelatedCourses] = useState(false)
+  const [offeredCourseIds, setOfferedCourseIds] = useState<Set<string>>(new Set())
   const [enrolling, setEnrolling] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -75,12 +77,27 @@ export default function CoursesPage() {
         // Check if student is enrolled in any classroom
         const { data: classroomEnrollments } = await supabase
           .from('enrollments')
-          .select('id')
+          .select('classroom_id, classrooms(allow_non_related_courses)')
           .eq('student_id', authUser.id)
-          .limit(1)
+          .limit(200)
 
         const hasClassroom = (classroomEnrollments?.length || 0) > 0
         setHasClassroomEnrollment(hasClassroom)
+        const classIds = (classroomEnrollments || []).map((row: any) => row.classroom_id).filter(Boolean)
+        const allowUnrelated = (classroomEnrollments || []).some((row: any) => row.classrooms?.allow_non_related_courses === true)
+        setAllowNonRelatedCourses(allowUnrelated)
+
+        if (classIds.length > 0) {
+          const { data: offeringsData } = await supabase
+            .from('classroom_course_offerings')
+            .select('course_id')
+            .in('classroom_id', classIds)
+            .eq('is_active', true)
+
+          setOfferedCourseIds(new Set((offeringsData || []).map((row: any) => row.course_id).filter(Boolean)))
+        } else {
+          setOfferedCourseIds(new Set())
+        }
 
         // Load course categories
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -134,12 +151,17 @@ export default function CoursesPage() {
     loadData()
   }, [router])
 
+  const isCourseAvailableToStudent = (courseId: string) => allowNonRelatedCourses || offeredCourseIds.has(courseId)
+
   async function handleEnroll(courseId: string) {
     if (!user) return
 
-    // Check classroom enrollment requirement
     if (!hasClassroomEnrollment) {
       alert('You must be enrolled in at least one classroom to access courses. Please join a classroom first.')
+      return
+    }
+    if (!isCourseAvailableToStudent(courseId)) {
+      alert('This course is not offered to your classroom right now.')
       return
     }
 
@@ -147,10 +169,6 @@ export default function CoursesPage() {
 
     try {
       const supabase = createClient()
-
-      // In production, this would trigger payment flow
-      // For now, we'll create enrollment with 'paid' status
-      // TODO: Integrate Stripe payment
 
       const { error } = await supabase.from('course_enrollments').insert({
         student_id: user.id,
@@ -319,6 +337,7 @@ export default function CoursesPage() {
                   const enrolled = isEnrolled(course.id)
                   const hasAccess = canAccessCourse(course.id)
                   const enrollment = enrollments.get(course.id)
+                  const isAvailableToStudent = isCourseAvailableToStudent(course.id)
 
                   return (
                     <Card
@@ -373,7 +392,7 @@ export default function CoursesPage() {
                           ) : course.requires_payment ? (
                             <Button
                               onClick={() => handleEnroll(course.id)}
-                              disabled={enrolling === course.id || !hasClassroomEnrollment}
+                              disabled={enrolling === course.id || !hasClassroomEnrollment || !isAvailableToStudent}
                               className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {enrolling === course.id ? 'Enrolling...' : (
@@ -386,12 +405,17 @@ export default function CoursesPage() {
                           ) : (
                             <Button
                               onClick={() => handleEnroll(course.id)}
-                              disabled={enrolling === course.id || !hasClassroomEnrollment}
+                              disabled={enrolling === course.id || !hasClassroomEnrollment || !isAvailableToStudent}
                               className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {enrolling === course.id ? 'Enrolling...' : 'Enroll Now'}
                               {enrolling !== course.id && <ArrowRight className="w-4 h-4 ml-2" />}
                             </Button>
+                          )}
+                          {!isAvailableToStudent && !hasAccess && (
+                            <p className="text-xs text-amber-300">
+                              Your teacher has not offered this course to your classroom.
+                            </p>
                           )}
                         </div>
                       </CardContent>

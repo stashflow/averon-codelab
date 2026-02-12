@@ -32,6 +32,7 @@ export default function TeacherDashboard() {
   const [newClassDesc, setNewClassDesc] = useState('')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [deletingClassId, setDeletingClassId] = useState<string | null>(null)
   const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
   const [savingPreferences, setSavingPreferences] = useState(false)
   const [classroomSearch, setClassroomSearch] = useState('')
@@ -245,6 +246,25 @@ export default function TeacherDashboard() {
     router.push('/auth/login')
   }
 
+  async function handleDeleteClass(classroomId: string, classroomName: string) {
+    const confirmed = window.confirm(
+      `Delete class \"${classroomName}\"? This will remove enrollments, assignments, and related records.`,
+    )
+    if (!confirmed) return
+
+    setDeletingClassId(classroomId)
+    const supabase = createClient()
+    try {
+      const { error } = await supabase.from('classrooms').delete().eq('id', classroomId)
+      if (error) throw error
+      await loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete class')
+    } finally {
+      setDeletingClassId(null)
+    }
+  }
+
   function setFeaturePreference(key: keyof UserFeaturePreferences, value: boolean) {
     setPreferences((prev) => ({ ...prev, [key]: value }))
   }
@@ -449,9 +469,18 @@ export default function TeacherDashboard() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <p className="text-sm text-muted-foreground">Students: {studentsByClass[classroom.id] || 0}</p>
-                      <Button asChild className="w-full">
-                        <Link href={`/teacher/classroom/${classroom.id}`}>Manage Class</Link>
-                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button asChild>
+                          <Link href={`/teacher/classroom/${classroom.id}`}>Manage Class</Link>
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleDeleteClass(classroom.id, classroom.name)}
+                          disabled={deletingClassId === classroom.id}
+                        >
+                          {deletingClassId === classroom.id ? 'Deleting...' : 'Delete Class'}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}

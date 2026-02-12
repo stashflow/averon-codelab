@@ -36,7 +36,8 @@ WHERE schemaname = 'public'
     'messages',
     'magic_links',
     'courses',
-    'course_categories'
+    'course_categories',
+    'classroom_course_offerings'
   )
 ORDER BY tablename;
 
@@ -77,6 +78,7 @@ WHERE n.nspname = 'public'
     'app_can_edit_curriculum',
     'app_can_create_magic_link',
     'app_can_send_message',
+    'app_student_can_enroll_course',
     'enforce_submission_mutation',
     'enforce_profile_mutation',
     'enforce_message_mutation',
@@ -141,7 +143,8 @@ WHERE schemaname = 'public'
     'messages',
     'magic_links',
     'courses',
-    'course_categories'
+    'course_categories',
+    'classroom_course_offerings'
   )
 ORDER BY tablename, policyname;
 
@@ -193,7 +196,15 @@ SELECT
   'messages_self_targeted' AS check_name,
   COUNT(*) AS issue_count
 FROM public.messages m
-WHERE m.sender_id = m.recipient_id;
+WHERE m.sender_id = m.recipient_id
+UNION ALL
+SELECT
+  'orphan_classroom_course_offerings' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.classroom_course_offerings cco
+LEFT JOIN public.classrooms c ON c.id = cco.classroom_id
+LEFT JOIN public.courses co ON co.id = cco.course_id
+WHERE c.id IS NULL OR co.id IS NULL;
 
 -- ============================================================================
 -- 7) Recursion risk check (policy text should not self-query the same table)
@@ -234,7 +245,8 @@ WHERE schemaname = 'public'
     'messages',
     'magic_links',
     'courses',
-    'course_categories'
+    'course_categories',
+    'classroom_course_offerings'
   )
 ORDER BY tablename, policyname;
 
