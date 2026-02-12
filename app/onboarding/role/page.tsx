@@ -62,10 +62,20 @@ export default function RoleOnboardingPage() {
       return
     }
 
+    const fallbackName = user.user_metadata?.full_name ?? user.user_metadata?.name ?? null
+    const fallbackEmail = user.email ?? ''
+
     const { error } = await supabase
       .from('profiles')
-      .update({ role })
-      .eq('id', user.id)
+      .upsert(
+        {
+          id: user.id,
+          email: fallbackEmail,
+          full_name: fallbackName,
+          role,
+        },
+        { onConflict: 'id' }
+      )
 
     if (error) {
       alert(error.message)

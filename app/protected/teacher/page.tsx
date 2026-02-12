@@ -121,11 +121,26 @@ export default function TeacherDashboard() {
 
       setUser(authUser)
 
-      const { data: profileData } = await supabase
+      let missingSchoolIdColumn = false
+      let profileData: { role?: string; school_id?: string | null } | null = null
+      const profileWithSchool = await supabase
         .from('profiles')
         .select('role, school_id')
         .eq('id', authUser.id)
         .single()
+
+      if (profileWithSchool.error && profileWithSchool.error.message?.toLowerCase().includes('school_id')) {
+        missingSchoolIdColumn = true
+        const profileWithoutSchool = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .single()
+
+        profileData = profileWithoutSchool.data ? { ...profileWithoutSchool.data, school_id: null } : null
+      } else {
+        profileData = profileWithSchool.data
+      }
 
       setProfile(profileData)
 
@@ -134,7 +149,7 @@ export default function TeacherDashboard() {
         return
       }
 
-      if (!profileData?.school_id) {
+      if (!missingSchoolIdColumn && !profileData?.school_id) {
         router.push('/onboarding/teacher')
         return
       }

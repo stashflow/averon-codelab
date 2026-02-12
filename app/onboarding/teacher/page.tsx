@@ -41,14 +41,36 @@ export default function TeacherOnboarding() {
           return
         }
 
-        const { data: profile } = await supabase
+        let missingSchoolIdColumn = false
+        let profile: { role?: string; school_id?: string | null } | null = null
+        const profileWithSchool = await supabase
           .from('profiles')
           .select('role, school_id')
           .eq('id', user.id)
           .single()
 
+        if (profileWithSchool.error && profileWithSchool.error.message?.toLowerCase().includes('school_id')) {
+          missingSchoolIdColumn = true
+          const profileWithoutSchool = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+          profile = profileWithoutSchool.data ? { ...profileWithoutSchool.data, school_id: null } : null
+        } else if (profileWithSchool.error) {
+          throw profileWithSchool.error
+        } else {
+          profile = profileWithSchool.data
+        }
+
         if (profile?.role !== 'teacher') {
           router.push('/protected')
+          return
+        }
+
+        if (missingSchoolIdColumn) {
+          router.push('/protected/teacher')
           return
         }
 
