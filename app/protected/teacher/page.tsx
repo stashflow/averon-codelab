@@ -66,8 +66,16 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     if (!preferences.keyboard_shortcuts) return
+    const isTypingTarget = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null
+      if (!el) return false
+      const tag = el.tagName
+      return el.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isTypingTarget(event.target)) return
       if (event.key.toLowerCase() === 'n') setShowNewClass(true)
       if (event.key.toLowerCase() === 's') router.push('/settings')
     }

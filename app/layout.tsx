@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   generator: 'v0.app',
   icons: {
     icon: '/ACL.png',
+    shortcut: '/ACL.png',
     apple: '/ACL.png',
   },
 }

@@ -1566,9 +1566,10 @@ USING (
       AND da.district_id = schools.district_id
   )
   OR EXISTS (
-    SELECT 1 FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid()
-      AND sa.school_id = schools.id
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = schools.id
   )
   OR EXISTS (
     SELECT 1 FROM public.profiles p
@@ -1610,9 +1611,10 @@ USING (
       AND da.district_id = schools.district_id
   )
   OR EXISTS (
-    SELECT 1 FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid()
-      AND sa.school_id = schools.id
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = schools.id
   )
 );
 
@@ -1666,8 +1668,10 @@ USING (
     WHERE da.admin_id = auth.uid() AND s.id = classrooms.school_id
   )
   OR EXISTS (
-    SELECT 1 FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid() AND sa.school_id = classrooms.school_id
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = classrooms.school_id
   )
   OR classrooms.teacher_id = auth.uid()
   OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.student_id = auth.uid() AND e.classroom_id = classrooms.id)
@@ -1682,8 +1686,10 @@ WITH CHECK (
   classrooms.teacher_id = auth.uid()
   OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'full_admin')
   OR EXISTS (
-    SELECT 1 FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid() AND sa.school_id = classrooms.school_id
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = classrooms.school_id
   )
 );
 
@@ -1696,8 +1702,10 @@ USING (
   classrooms.teacher_id = auth.uid()
   OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'full_admin')
   OR EXISTS (
-    SELECT 1 FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid() AND sa.school_id = classrooms.school_id
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = classrooms.school_id
   )
 );
 
@@ -1825,9 +1833,10 @@ USING (
   )
   OR EXISTS (
     SELECT 1
-    FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid()
-      AND sa.school_id = magic_links.school_id
+    FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = magic_links.school_id
   )
 );
 
@@ -1844,9 +1853,10 @@ WITH CHECK (
   )
   OR EXISTS (
     SELECT 1
-    FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid()
-      AND sa.school_id = magic_links.school_id
+    FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = magic_links.school_id
   )
 );
 
@@ -1862,9 +1872,10 @@ USING (
   )
   OR EXISTS (
     SELECT 1
-    FROM public.school_admins sa
-    WHERE sa.admin_id = auth.uid()
-      AND sa.school_id = magic_links.school_id
+    FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'school_admin'
+      AND p.school_id = magic_links.school_id
   )
 );
 

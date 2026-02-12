@@ -86,8 +86,16 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (!preferences.keyboard_shortcuts) return
+    const isTypingTarget = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null
+      if (!el) return false
+      const tag = el.tagName
+      return el.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isTypingTarget(event.target)) return
       if (event.key.toLowerCase() === 'c') router.push('/courses')
       if (event.key.toLowerCase() === 's') router.push('/settings')
     }
