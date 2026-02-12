@@ -95,11 +95,7 @@ USING (
       AND p.school_id = classrooms.school_id
   )
   OR classrooms.teacher_id = auth.uid()
-  OR EXISTS (
-    SELECT 1 FROM public.enrollments e
-    WHERE e.student_id = auth.uid()
-      AND e.classroom_id = classrooms.id
-  )
+  OR public.is_enrolled_in_classroom(classrooms.id)
 );
 
 DROP POLICY IF EXISTS "classrooms_insert_hierarchy" ON public.classrooms;

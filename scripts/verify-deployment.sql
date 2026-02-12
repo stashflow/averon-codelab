@@ -1,140 +1,245 @@
--- Deployment Verification Script
--- Run this in Supabase SQL Editor after deployment to verify everything is working
+-- Deployment Verification Script (Role Security Final)
+-- Run after applying schema migrations, especially:
+-- - scripts/031_fix_school_admins_policy_recursion.sql
+-- - scripts/032_fix_classrooms_policy_recursion.sql
+-- - scripts/033_role_permissions_hardening.sql
+-- - scripts/034_role_permissions_finalize.sql
 
 -- ============================================================================
--- 1. Check that RLS is enabled on critical tables
+-- 1) RLS must be enabled on core role-sensitive tables
 -- ============================================================================
-
-SELECT 
+SELECT
   tablename,
-  rowsecurity as "RLS Enabled"
+  rowsecurity AS rls_enabled
 FROM pg_tables
 WHERE schemaname = 'public'
-  AND tablename IN ('school_admins', 'schools', 'classrooms', 'magic_links')
+  AND tablename IN (
+    'profiles',
+    'districts',
+    'district_admins',
+    'schools',
+    'school_admins',
+    'classrooms',
+    'enrollments',
+    'assignments',
+    'submissions',
+    'lesson_assignments',
+    'student_lesson_progress',
+    'units',
+    'lessons',
+    'checkpoints',
+    'checkpoint_submissions',
+    'class_announcements',
+    'course_enrollments',
+    'class_requests',
+    'teacher_requests',
+    'messages',
+    'magic_links',
+    'courses',
+    'course_categories'
+  )
 ORDER BY tablename;
 
--- Expected: All should show TRUE
+-- ============================================================================
+-- 2) Core helper functions must exist
+-- ============================================================================
+SELECT
+  p.proname AS function_name
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname IN (
+    'app_user_role',
+    'app_user_school_id',
+    'app_is_full_admin',
+    'app_is_district_admin',
+    'app_is_school_admin',
+    'app_is_teacher',
+    'app_is_student',
+    'app_is_admin',
+    'app_user_manages_district',
+    'app_user_school_district_id',
+    'app_can_manage_school',
+    'app_is_profile_in_admin_scope',
+    'app_is_enrolled_in_classroom',
+    'app_teacher_owns_classroom',
+    'app_can_manage_classroom',
+    'app_can_view_classroom',
+    'app_classroom_is_joinable',
+    'lookup_classroom_by_code',
+    'app_can_manage_assignment',
+    'app_can_view_assignment',
+    'app_is_student_assigned_lesson',
+    'app_is_student_assigned_checkpoint',
+    'app_can_view_lesson_progress',
+    'app_can_manage_checkpoint_submission',
+    'app_is_valid_progress_assignment',
+    'app_can_edit_curriculum',
+    'app_can_create_magic_link',
+    'app_can_send_message',
+    'enforce_submission_mutation',
+    'enforce_profile_mutation',
+    'enforce_message_mutation',
+    'redeem_magic_link'
+  )
+ORDER BY p.proname;
 
 -- ============================================================================
--- 2. Check that non-recursive policies exist
+-- 3) Validate canonical role constraints
 -- ============================================================================
+SELECT
+  conname,
+  pg_get_constraintdef(c.oid) AS definition
+FROM pg_constraint c
+JOIN pg_class t ON t.oid = c.conrelid
+JOIN pg_namespace n ON n.oid = t.relnamespace
+WHERE n.nspname = 'public'
+  AND t.relname = 'profiles'
+  AND conname IN ('profiles_role_check', 'profiles_teacher_school_required')
+ORDER BY conname;
 
-SELECT 
-  schemaname,
+-- ============================================================================
+-- 4) Guardrail triggers must exist
+-- ============================================================================
+SELECT
+  c.relname AS table_name,
+  t.tgname AS trigger_name
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND NOT t.tgisinternal
+  AND t.tgname IN ('trg_enforce_submission_mutation', 'trg_enforce_profile_mutation', 'trg_enforce_message_mutation')
+ORDER BY c.relname, t.tgname;
+
+-- ============================================================================
+-- 5) Check policy inventory for core tables
+-- ============================================================================
+SELECT
   tablename,
   policyname,
-  permissive,
   cmd
 FROM pg_policies
 WHERE schemaname = 'public'
-  AND tablename IN ('school_admins', 'schools', 'classrooms', 'magic_links')
+  AND tablename IN (
+    'profiles',
+    'schools',
+    'school_admins',
+    'classrooms',
+    'enrollments',
+    'assignments',
+    'submissions',
+    'lesson_assignments',
+    'student_lesson_progress',
+    'units',
+    'lessons',
+    'checkpoints',
+    'checkpoint_submissions',
+    'class_announcements',
+    'class_requests',
+    'teacher_requests',
+    'messages',
+    'magic_links',
+    'courses',
+    'course_categories'
+  )
 ORDER BY tablename, policyname;
 
--- Expected: Should see policies like:
--- - school_admins_select_hierarchy
--- - schools_select_hierarchy
--- - classrooms_select_hierarchy
--- - magic_links_select_admin
-
 -- ============================================================================
--- 3. Verify key tables exist and have data
+-- 6) Sanity checks for key relational integrity
 -- ============================================================================
-
--- Check profiles table
-SELECT COUNT(*) as profile_count FROM public.profiles;
-
--- Check districts
-SELECT COUNT(*) as district_count FROM public.districts;
-
--- Check schools
-SELECT COUNT(*) as school_count FROM public.schools;
-
--- Check classrooms
-SELECT COUNT(*) as classroom_count FROM public.classrooms;
-
--- Check magic_links
-SELECT COUNT(*) as magic_link_count FROM public.magic_links;
-
--- ============================================================================
--- 4. Test a simple query that was failing before
--- ============================================================================
-
--- This query was returning 500 error before the fix
--- It should now return successfully (even if empty)
-SELECT 
-  s.id,
-  s.name,
-  s.district_id,
-  s.is_active
-FROM public.schools s
-LIMIT 5;
-
--- Expected: Query executes without error (may return 0 rows if no schools yet)
-
--- ============================================================================
--- 5. Verify magic_links table structure
--- ============================================================================
-
-SELECT 
-  column_name,
-  data_type,
-  is_nullable
-FROM information_schema.columns
-WHERE table_schema = 'public'
-  AND table_name = 'magic_links'
-ORDER BY ordinal_position;
-
--- ============================================================================
--- 6. Check for any active magic links
--- ============================================================================
-
-SELECT 
-  id,
-  email,
-  role,
-  school_id,
-  district_id,
-  expires_at,
-  used_at IS NULL as "Still Valid"
-FROM public.magic_links
-WHERE expires_at > NOW()
-  AND used_at IS NULL
-ORDER BY created_at DESC
-LIMIT 10;
-
--- ============================================================================
--- DEPLOYMENT STATUS
--- ============================================================================
-
--- If all queries above run without errors, deployment is successful!
-
--- Quick summary
-SELECT 
-  'Deployment Status' as check_type,
-  'SUCCESSFUL' as status,
-  'All RLS policies are non-recursive and working correctly' as message
+SELECT
+  'classrooms_without_school' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.classrooms
+WHERE school_id IS NULL
 UNION ALL
-SELECT 
-  'Database Tables',
-  'OK',
-  'All required tables exist'
+SELECT
+  'school_admin_without_school' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.profiles
+WHERE role = 'school_admin'
+  AND school_id IS NULL
 UNION ALL
-SELECT 
-  'RLS Policies',
-  'OK',
-  'Non-recursive policies applied'
+SELECT
+  'orphan_enrollments' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.enrollments e
+LEFT JOIN public.classrooms c ON c.id = e.classroom_id
+WHERE c.id IS NULL
 UNION ALL
-SELECT 
-  'API Routes',
-  'READY',
-  'All routes configured correctly';
+SELECT
+  'orphan_submissions' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.submissions s
+LEFT JOIN public.assignments a ON a.id = s.assignment_id
+WHERE a.id IS NULL
+UNION ALL
+SELECT
+  'orphan_class_requests' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.class_requests cr
+LEFT JOIN public.classrooms c ON c.id = cr.classroom_id
+WHERE c.id IS NULL
+UNION ALL
+SELECT
+  'orphan_teacher_requests' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.teacher_requests tr
+LEFT JOIN public.classrooms c ON c.id = tr.classroom_id
+WHERE c.id IS NULL
+UNION ALL
+SELECT
+  'messages_self_targeted' AS check_name,
+  COUNT(*) AS issue_count
+FROM public.messages m
+WHERE m.sender_id = m.recipient_id;
 
 -- ============================================================================
--- NEXT STEPS
+-- 7) Recursion risk check (policy text should not self-query the same table)
 -- ============================================================================
+SELECT
+  tablename,
+  policyname,
+  CASE
+    WHEN COALESCE(qual, '') ILIKE ('%from public.' || tablename || '%')
+      OR COALESCE(qual, '') ILIKE ('%join public.' || tablename || '%')
+      OR COALESCE(with_check, '') ILIKE ('%from public.' || tablename || '%')
+      OR COALESCE(with_check, '') ILIKE ('%join public.' || tablename || '%')
+    THEN 'RISK'
+    ELSE 'OK'
+  END AS recursion_risk
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND tablename IN (
+    'profiles',
+    'districts',
+    'district_admins',
+    'schools',
+    'school_admins',
+    'classrooms',
+    'enrollments',
+    'assignments',
+    'submissions',
+    'lesson_assignments',
+    'student_lesson_progress',
+    'units',
+    'lessons',
+    'checkpoints',
+    'checkpoint_submissions',
+    'class_announcements',
+    'course_enrollments',
+    'class_requests',
+    'teacher_requests',
+    'messages',
+    'magic_links',
+    'courses',
+    'course_categories'
+  )
+ORDER BY tablename, policyname;
 
--- 1. Create your first full_admin user via Supabase Auth dashboard
--- 2. Update their profile: UPDATE profiles SET role = 'full_admin' WHERE email = 'your@email.com';
--- 3. Login to the application
--- 4. Visit /admin/panel
--- 5. Start creating districts and schools!
+-- ============================================================================
+-- 8) Optional summary
+-- ============================================================================
+SELECT
+  'Role security verification complete. Review issue_count and recursion_risk outputs.' AS status;

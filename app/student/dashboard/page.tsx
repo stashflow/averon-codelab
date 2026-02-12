@@ -54,6 +54,12 @@ interface Announcement {
   classroom_id: string
 }
 
+interface ClassroomCodeLookup {
+  id: string
+  name: string
+  code: string
+}
+
 export default function StudentDashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -210,11 +216,11 @@ export default function StudentDashboard() {
 
     try {
       const normalizedCode = joinCode.trim().toUpperCase()
-      const { data: classroom, error: classError } = await supabase
-        .from('classrooms')
-        .select('id, name, code')
-        .eq('code', normalizedCode)
+      const { data, error: classError } = await supabase
+        .rpc('lookup_classroom_by_code', { target_code: normalizedCode, require_admin_created: false })
         .single()
+
+      const classroom = (data ?? null) as ClassroomCodeLookup | null
 
       if (classError || !classroom) {
         setJoinError('Class code not found.')

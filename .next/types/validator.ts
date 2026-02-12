@@ -488,33 +488,6 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
-// Validate ../../app/icon-forest/route.tsx
-{
-  type __IsExpected<Specific extends RouteHandlerConfig<"/icon-forest">> = Specific
-  const handler = {} as typeof import("../../app/icon-forest/route.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
-// Validate ../../app/icon-rose/route.tsx
-{
-  type __IsExpected<Specific extends RouteHandlerConfig<"/icon-rose">> = Specific
-  const handler = {} as typeof import("../../app/icon-rose/route.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
-// Validate ../../app/icon-sunset/route.tsx
-{
-  type __IsExpected<Specific extends RouteHandlerConfig<"/icon-sunset">> = Specific
-  const handler = {} as typeof import("../../app/icon-sunset/route.js")
-  type __Check = __IsExpected<typeof handler>
-  // @ts-ignore
-  type __Unused = __Check
-}
-
 
 
 

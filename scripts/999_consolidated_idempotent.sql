@@ -1471,6 +1471,24 @@ DROP FUNCTION IF EXISTS trial_days_remaining(uuid);
 
 -- School constraints + RLS
 
+CREATE OR REPLACE FUNCTION public.is_enrolled_in_classroom(target_classroom_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.enrollments e
+    WHERE e.classroom_id = target_classroom_id
+      AND e.student_id = auth.uid()
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_enrolled_in_classroom(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_enrolled_in_classroom(uuid) TO authenticated;
+
 -- Ensure teacher/school_admin rows have school_id before enforcing constraint.
 -- This makes the migration rerunnable even on partially migrated datasets.
 DO $$
@@ -1674,7 +1692,7 @@ USING (
       AND p.school_id = classrooms.school_id
   )
   OR classrooms.teacher_id = auth.uid()
-  OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.student_id = auth.uid() AND e.classroom_id = classrooms.id)
+  OR public.is_enrolled_in_classroom(classrooms.id)
 );
 
 DROP POLICY IF EXISTS "classrooms_insert_district_admin" ON public.classrooms;

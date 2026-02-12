@@ -16,10 +16,10 @@ export const dynamic = 'force-dynamic'
 interface ClassroomInfo {
   id: string
   name: string
-  description: string
+  description: string | null
   code: string
-  max_teachers: number
-  max_students: number
+  max_teachers?: number | null
+  max_students?: number | null
 }
 
 interface Request {
@@ -109,14 +109,15 @@ export default function TeacherJoinPage() {
 
     try {
       const { data, error: searchError } = await supabase
-        .from('classrooms')
-        .select('*')
-        .eq('code', classCode.trim().toUpperCase())
-        .eq('created_by_admin', true)
-        .eq('is_active', true)
+        .rpc('lookup_classroom_by_code', {
+          target_code: classCode.trim().toUpperCase(),
+          require_admin_created: true,
+        })
         .single()
 
-      if (searchError || !data) {
+      const classroomData = (data ?? null) as ClassroomInfo | null
+
+      if (searchError || !classroomData) {
         setError('Class code not found or inactive')
         return
       }
@@ -125,7 +126,7 @@ export default function TeacherJoinPage() {
       const { data: existingRequest } = await supabase
         .from('teacher_requests')
         .select('id, status')
-        .eq('classroom_id', data.id)
+        .eq('classroom_id', classroomData.id)
         .eq('teacher_id', user.id)
         .single()
 
@@ -134,7 +135,7 @@ export default function TeacherJoinPage() {
         return
       }
 
-      setClassroom(data)
+      setClassroom(classroomData)
     } catch (err: any) {
       setError('Error searching for class')
     } finally {

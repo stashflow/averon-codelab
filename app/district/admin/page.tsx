@@ -15,11 +15,12 @@ export const dynamic = 'force-dynamic'
 export default function DistrictAdminPanel() {
   const [user, setUser] = useState<any>(null)
   const [district, setDistrict] = useState<any>(null)
+  const [schools, setSchools] = useState<any[]>([])
   const [classrooms, setClassrooms] = useState<any[]>([])
   const [classRequests, setClassRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewClass, setShowNewClass] = useState(false)
-  const [newClass, setNewClass] = useState({ name: '', description: '', course_id: '' })
+  const [newClass, setNewClass] = useState({ name: '', description: '', school_id: '' })
   const [creating, setCreating] = useState(false)
   const router = useRouter()
 
@@ -57,10 +58,21 @@ export default function DistrictAdminPanel() {
 
       setDistrict(districtAdminData.districts)
 
+      const { data: schoolsData } = await supabase
+        .from('schools')
+        .select('id, name')
+        .eq('district_id', districtAdminData.district_id)
+        .order('name', { ascending: true })
+
+      setSchools(schoolsData || [])
+      if (!newClass.school_id && (schoolsData?.length || 0) > 0) {
+        setNewClass((prev) => ({ ...prev, school_id: schoolsData![0].id }))
+      }
+
       // Load classrooms for this district
       const { data: classroomsData } = await supabase
         .from('classrooms')
-        .select('*, courses(name)')
+        .select('*, courses(name), schools(name)')
         .eq('district_id', districtAdminData.district_id)
         .order('created_at', { ascending: false })
 
@@ -83,7 +95,7 @@ export default function DistrictAdminPanel() {
   }
 
   async function handleCreateClassRequest() {
-    if (!newClass.name.trim()) return
+    if (!newClass.name.trim() || !newClass.school_id) return
 
     setCreating(true)
     const supabase = createClient()
@@ -96,6 +108,7 @@ export default function DistrictAdminPanel() {
           name: newClass.name,
           description: newClass.description,
           district_id: district.id,
+          school_id: newClass.school_id,
           pending_activation: true,
           is_active: false,
           code: Math.random().toString(36).substring(2, 10).toUpperCase(),
@@ -114,7 +127,7 @@ export default function DistrictAdminPanel() {
       })
 
       setShowNewClass(false)
-      setNewClass({ name: '', description: '', course_id: '' })
+      setNewClass({ name: '', description: '', school_id: schools[0]?.id || '' })
       loadDistrictData()
     } catch (err: any) {
       console.error('[v0] Error creating class request:', err)
@@ -255,6 +268,22 @@ export default function DistrictAdminPanel() {
           {showNewClass && (
             <CardContent className="space-y-4 border-t border-border pt-6">
               <div>
+                <Label htmlFor="school">School</Label>
+                <select
+                  id="school"
+                  value={newClass.school_id}
+                  onChange={(e) => setNewClass({ ...newClass, school_id: e.target.value })}
+                  className="w-full h-10 rounded-md border border-input bg-background text-foreground px-3"
+                >
+                  <option value="">Select school</option>
+                  {schools.map((school) => (
+                    <option key={school.id} value={school.id}>
+                      {school.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <Label htmlFor="name">Class Name</Label>
                 <Input
                   id="name"
@@ -275,7 +304,7 @@ export default function DistrictAdminPanel() {
               <div className="flex gap-2">
                 <Button
                   onClick={handleCreateClassRequest}
-                  disabled={creating || !newClass.name.trim()}
+                  disabled={creating || !newClass.name.trim() || !newClass.school_id}
                   className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white"
                 >
                   {creating ? 'Submitting...' : 'Submit Request'}
@@ -331,6 +360,9 @@ export default function DistrictAdminPanel() {
                         )}
                         <div className="flex items-center gap-4 mt-2">
                           <span className="text-xs text-muted-foreground font-medium">Code: {classroom.code}</span>
+                          {classroom.schools && (
+                            <span className="text-xs text-muted-foreground font-medium">School: {classroom.schools.name}</span>
+                          )}
                           {classroom.courses && (
                             <span className="text-xs text-muted-foreground font-medium">Course: {classroom.courses.name}</span>
                           )}
