@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Code, BookOpen, Clock, Users, ArrowRight, LogOut, GraduationCap, Database, AlertCircle } from 'lucide-react'
+import { Code, BookOpen, Users, ArrowRight, LogOut, GraduationCap, Database, AlertCircle, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export const dynamic = 'force-dynamic'
@@ -52,9 +52,12 @@ export default function CoursesPage() {
   const [coursesByCategory, setCoursesByCategory] = useState<Record<string, Course[]>>({})
   const [enrollments, setEnrollments] = useState<Map<string, Enrollment>>(new Map())
   const [hasClassroomEnrollment, setHasClassroomEnrollment] = useState(false)
+  const [studentClassroomIds, setStudentClassroomIds] = useState<string[]>([])
   const [allowNonRelatedCourses, setAllowNonRelatedCourses] = useState(false)
   const [offeredCourseIds, setOfferedCourseIds] = useState<Set<string>>(new Set())
+  const [offeredCourseClassrooms, setOfferedCourseClassrooms] = useState<Map<string, string[]>>(new Map())
   const [enrolling, setEnrolling] = useState<string | null>(null)
+  const [unenrolling, setUnenrolling] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -84,19 +87,31 @@ export default function CoursesPage() {
         const hasClassroom = (classroomEnrollments?.length || 0) > 0
         setHasClassroomEnrollment(hasClassroom)
         const classIds = (classroomEnrollments || []).map((row: any) => row.classroom_id).filter(Boolean)
+        setStudentClassroomIds(classIds)
         const allowUnrelated = (classroomEnrollments || []).some((row: any) => row.classrooms?.allow_non_related_courses === true)
         setAllowNonRelatedCourses(allowUnrelated)
 
         if (classIds.length > 0) {
           const { data: offeringsData } = await supabase
             .from('classroom_course_offerings')
-            .select('course_id')
+            .select('course_id, classroom_id')
             .in('classroom_id', classIds)
             .eq('is_active', true)
 
-          setOfferedCourseIds(new Set((offeringsData || []).map((row: any) => row.course_id).filter(Boolean)))
+          const offeredRows = (offeringsData || []).filter((row: any) => row.course_id && row.classroom_id)
+          setOfferedCourseIds(new Set(offeredRows.map((row: any) => row.course_id)))
+          const courseClassroomMap = new Map<string, string[]>()
+          offeredRows.forEach((row: any) => {
+            const courseId = String(row.course_id)
+            const classroomId = String(row.classroom_id)
+            const existing = courseClassroomMap.get(courseId) || []
+            if (!existing.includes(classroomId)) existing.push(classroomId)
+            courseClassroomMap.set(courseId, existing)
+          })
+          setOfferedCourseClassrooms(courseClassroomMap)
         } else {
           setOfferedCourseIds(new Set())
+          setOfferedCourseClassrooms(new Map())
         }
 
         // Load course categories
@@ -176,6 +191,26 @@ export default function CoursesPage() {
       .filter((category) => (coursesByCategory[category.id] || []).length > 0)
   }, [categories, coursesByCategory])
 
+  const sortedCoursesByCategory = useMemo(() => {
+    const sorted: Record<string, Course[]> = {}
+
+    for (const [categoryId, courses] of Object.entries(coursesByCategory)) {
+      sorted[categoryId] = [...courses].sort((a, b) => {
+        const aOffered = offeredCourseIds.has(a.id) ? 1 : 0
+        const bOffered = offeredCourseIds.has(b.id) ? 1 : 0
+        if (aOffered !== bOffered) return bOffered - aOffered
+
+        const aEnrolled = enrollments.has(a.id) ? 1 : 0
+        const bEnrolled = enrollments.has(b.id) ? 1 : 0
+        if (aEnrolled !== bEnrolled) return bEnrolled - aEnrolled
+
+        return a.name.localeCompare(b.name)
+      })
+    }
+
+    return sorted
+  }, [coursesByCategory, offeredCourseIds, enrollments])
+
   async function handleEnroll(courseId: string) {
     if (!user) return
 
@@ -199,6 +234,8 @@ export default function CoursesPage() {
         is_active: true,
         payment_status: 'paid',
         status: 'active',
+        enrollment_source: 'classroom',
+        classroom_id: offeredCourseClassrooms.get(courseId)?.[0] || studentClassroomIds[0] || null,
       }
 
       let { error } = await supabase.from('course_enrollments').insert(modernPayload)
@@ -221,7 +258,11 @@ export default function CoursesPage() {
         status: 'active',
         progress_percentage: 0
       }
-      setEnrollments(new Map(enrollments.set(courseId, newEnrollment)))
+      setEnrollments((prev) => {
+        const next = new Map(prev)
+        next.set(courseId, newEnrollment)
+        return next
+      })
 
       // Redirect to course
       router.push(`/courses/${courseId}`)
@@ -230,6 +271,36 @@ export default function CoursesPage() {
       alert('Failed to enroll in course: ' + err.message)
     } finally {
       setEnrolling(null)
+    }
+  }
+
+  async function handleUnenroll(courseId: string) {
+    if (!user) return
+
+    const confirmed = window.confirm('Remove this course from your account?')
+    if (!confirmed) return
+
+    setUnenrolling(courseId)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('course_enrollments')
+        .delete()
+        .eq('student_id', user.id)
+        .eq('course_id', courseId)
+
+      if (error) throw error
+
+      setEnrollments((prev) => {
+        const next = new Map(prev)
+        next.delete(courseId)
+        return next
+      })
+    } catch (err: any) {
+      console.error('[v0] Error removing course enrollment:', err)
+      alert('Failed to remove course: ' + err.message)
+    } finally {
+      setUnenrolling(null)
     }
   }
 
@@ -349,7 +420,7 @@ export default function CoursesPage() {
         )}
 
         {displayCategories.map((category) => {
-          const categoryCourses = coursesByCategory[category.id] || []
+          const categoryCourses = sortedCoursesByCategory[category.id] || []
           if (categoryCourses.length === 0) return null
 
           return (
@@ -392,15 +463,9 @@ export default function CoursesPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          <div className="flex items-center gap-6 text-sm text-white/50">
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4" />
-                              <span>{course.estimated_hours || 30} hours</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <BookOpen className="w-4 h-4" />
-                              <span>{course.language}</span>
-                            </div>
+                          <div className="flex items-center gap-2 text-sm text-white/50">
+                            <BookOpen className="w-4 h-4" />
+                            <span>{course.language}</span>
                           </div>
 
                           {enrolled && enrollment && (
@@ -415,20 +480,32 @@ export default function CoursesPage() {
                             </div>
                           )}
 
-                          {hasAccess ? (
-                            <Link href={`/courses/${course.id}`}>
-                              <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-cyan-500/25 transition-all">
-                                Continue Learning <ArrowRight className="w-4 h-4 ml-2" />
+                          {enrolled ? (
+                            <div className="space-y-2">
+                              {hasAccess ? (
+                                <Link href={`/courses/${course.id}`}>
+                                  <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-cyan-500/25 transition-all">
+                                    Continue Learning <ArrowRight className="w-4 h-4 ml-2" />
+                                  </Button>
+                                </Link>
+                              ) : (
+                                <Button
+                                  disabled
+                                  className="w-full bg-slate-700/60 text-slate-200 font-semibold disabled:opacity-80"
+                                >
+                                  Enrollment Inactive
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                onClick={() => handleUnenroll(course.id)}
+                                disabled={unenrolling === course.id}
+                                className="w-full border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                {unenrolling === course.id ? 'Removing...' : 'Remove Course'}
                               </Button>
-                            </Link>
-                          ) : course.requires_payment ? (
-                            <Button
-                              onClick={() => handleEnroll(course.id)}
-                              disabled={enrolling === course.id || !hasClassroomEnrollment || !isAvailableToStudent}
-                              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {enrolling === course.id ? 'Enrolling...' : 'Enroll Now'}
-                            </Button>
+                            </div>
                           ) : (
                             <Button
                               onClick={() => handleEnroll(course.id)}

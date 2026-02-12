@@ -248,7 +248,7 @@ export default function TeacherDashboard() {
 
   async function handleDeleteClass(classroomId: string, classroomName: string) {
     const confirmed = window.confirm(
-      `Delete class \"${classroomName}\"? This will remove enrollments, assignments, and related records.`,
+      `Delete class \"${classroomName}\"? This will remove enrollments, student course access from this class, assignments, and related records.`,
     )
     if (!confirmed) return
 

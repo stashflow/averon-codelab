@@ -19,12 +19,13 @@ import {
   mergePreferences,
   type UserFeaturePreferences,
 } from '@/lib/user-preferences'
-import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users, Bell, AlertCircle } from 'lucide-react'
+import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users, Bell, AlertCircle, Trash2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 interface Course {
   id: string
+  enrollment_id: string
   name: string
   description: string
   language: string
@@ -75,6 +76,7 @@ export default function StudentDashboard() {
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null)
   const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
   const [savingPreferences, setSavingPreferences] = useState(false)
+  const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null)
   const router = useRouter()
 
   const overallCourseProgress = useMemo(() => {
@@ -142,7 +144,7 @@ export default function StudentDashboard() {
 
       const [{ data: profileData }, { data: enrollmentData }, { data: classEnrollmentData }, { data: streakData }, { data: badgeData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', authUser.id).single(),
-        supabase.from('course_enrollments').select('course_id, courses(*)').eq('student_id', authUser.id).eq('is_active', true),
+        supabase.from('course_enrollments').select('id, course_id, courses(*)').eq('student_id', authUser.id).eq('is_active', true),
         supabase
           .from('enrollments')
           .select('id, classroom_id, classrooms(id, name, code, teacher_id)')
@@ -161,7 +163,11 @@ export default function StudentDashboard() {
         return
       }
 
-      setEnrolledCourses((enrollmentData || []).map((e: any) => e.courses).filter(Boolean))
+      setEnrolledCourses(
+        (enrollmentData || [])
+          .map((e: any) => (e.courses ? { ...e.courses, enrollment_id: e.id } : null))
+          .filter(Boolean)
+      )
       setClassEnrollments((classEnrollmentData as any) || [])
       setStreak(streakData || { current_streak: 0, longest_streak: 0 })
       setBadges(badgeData || [])
@@ -255,6 +261,32 @@ export default function StudentDashboard() {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  async function handleDeleteCourse(courseId: string) {
+    if (!user) return
+    const confirmed = window.confirm('Remove this course from your account?')
+    if (!confirmed) return
+
+    setDeletingCourseId(courseId)
+    const supabase = createClient()
+
+    try {
+      const { error } = await supabase
+        .from('course_enrollments')
+        .delete()
+        .eq('student_id', user.id)
+        .eq('course_id', courseId)
+
+      if (error) throw error
+
+      setEnrolledCourses((prev) => prev.filter((course) => course.id !== courseId))
+    } catch (err: any) {
+      console.error('[v0] delete course enrollment error', err)
+      alert(err.message || 'Failed to remove course.')
+    } finally {
+      setDeletingCourseId(null)
+    }
   }
 
   function setFeaturePreference(key: keyof UserFeaturePreferences, value: boolean) {
@@ -506,13 +538,22 @@ export default function StudentDashboard() {
                     <div key={course.id} className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
                       <p className="font-medium text-white">{course.name}</p>
                       <p className="text-sm text-slate-400 line-clamp-2 mt-1">{course.description}</p>
-                      <div className="mt-3 flex items-center justify-between">
-                        <p className="text-xs text-slate-500">{course.estimated_hours || 30} hours</p>
+                      <div className="mt-3 flex items-center justify-end gap-2">
                         <Link href={`/courses/${course.id}`}>
                           <Button size="sm" variant="outline" className="gap-1 bg-white/5 border-white/10 text-slate-200 hover:bg-white/10 hover:text-white">
                             Continue <ArrowRight className="w-3 h-3" />
                           </Button>
                         </Link>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteCourse(course.id)}
+                          disabled={deletingCourseId === course.id}
+                          className="gap-1 border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          {deletingCourseId === course.id ? 'Removing...' : 'Remove'}
+                        </Button>
                       </div>
                     </div>
                   ))

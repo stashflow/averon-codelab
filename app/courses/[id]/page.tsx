@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, BookOpen, CheckCircle2, Lock, Play, Clock } from 'lucide-react'
+import { ArrowLeft, BookOpen, CheckCircle2, Lock, Play } from 'lucide-react'
 
 interface Lesson {
   order_index: number
@@ -192,15 +192,9 @@ export default function CourseDetailPage() {
                 {course.name}
               </h1>
               <p className="text-xl text-white/60 font-light mb-6">{course.description}</p>
-              <div className="flex items-center gap-6 text-sm text-white/50">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  <span>{course.estimated_hours} hours</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  <span>{units.length} units</span>
-                </div>
+              <div className="flex items-center gap-2 text-sm text-white/50">
+                <BookOpen className="w-4 h-4" />
+                <span>{units.length} units</span>
               </div>
             </div>
           </div>
@@ -246,9 +240,6 @@ export default function CourseDetailPage() {
                             <div className="text-white font-semibold group-hover:text-cyan-300 transition-colors">
                               {lessonIndex + 1}. {lesson.title}
                             </div>
-                            {lesson.duration_minutes && (
-                              <div className="text-white/65 text-sm mt-1 font-medium">{lesson.duration_minutes} minutes</div>
-                            )}
                           </div>
                           {status === 'completed' && (
                             <Badge className="bg-green-500/10 text-green-400 border-green-500/20 border">
