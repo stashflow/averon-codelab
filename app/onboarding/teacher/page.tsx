@@ -64,28 +64,29 @@ export default function TeacherOnboarding() {
           profile = profileWithSchool.data
         }
 
-        if (profile?.role !== 'teacher') {
+        if (profile?.role && ['full_admin', 'district_admin', 'school_admin'].includes(profile.role)) {
           router.push('/protected')
           return
         }
 
-        if (missingSchoolIdColumn) {
+        if (missingSchoolIdColumn && profile?.role === 'teacher') {
           router.push('/protected/teacher')
           return
         }
 
-        if (profile?.school_id) {
+        if (profile?.role === 'teacher' && profile?.school_id) {
           router.push('/protected/teacher')
           return
         }
 
-        const [{ data: districtData }, { data: schoolData }] = await Promise.all([
-          supabase.from('districts').select('id, name').order('name', { ascending: true }),
-          supabase.from('schools').select('id, name, district_id').eq('is_active', true).order('name', { ascending: true }),
-        ])
+        const response = await fetch('/api/onboarding/schools', { cache: 'no-store' })
+        const payload = await response.json()
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to load schools')
+        }
 
-        setDistricts(districtData || [])
-        setSchools(schoolData || [])
+        setDistricts(payload.districts || [])
+        setSchools(payload.schools || [])
       } catch (err: any) {
         console.error('[v0] onboarding load error', err)
         setError('Failed to load schools. Please try again.')
@@ -113,7 +114,7 @@ export default function TeacherOnboarding() {
 
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ school_id: selectedSchoolId })
+        .update({ role: 'teacher', school_id: selectedSchoolId })
         .eq('id', user.id)
 
       if (updateError) throw updateError
@@ -241,6 +242,9 @@ export default function TeacherOnboarding() {
                     <option key={school.id} value={school.id}>{school.name}</option>
                   ))}
                 </select>
+                {filteredSchools.length === 0 && (
+                  <p className="text-xs text-slate-400">No active schools found for this district yet.</p>
+                )}
               </div>
 
               <Button

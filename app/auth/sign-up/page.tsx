@@ -47,7 +47,7 @@ export default function SignUp() {
           emailRedirectTo: `${window.location.origin}/protected`,
           data: {
             full_name: fullName,
-            role,
+            role: 'student',
           },
         },
       })
@@ -68,7 +68,7 @@ export default function SignUp() {
 
         // Redirect teachers to onboarding, students to success page
         if (role === 'teacher') {
-          router.push('/onboarding/teacher')
+          router.push('/onboarding/teacher?intent=teacher')
         } else {
           router.push('/auth/sign-up-success')
         }

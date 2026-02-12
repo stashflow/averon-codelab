@@ -5,6 +5,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 export default function Page() {
   return (
@@ -23,6 +25,11 @@ export default function Page() {
                 You&apos;ve successfully signed up. Please check your email to
                 confirm your account before signing in.
               </p>
+              <div className="mt-4">
+                <Link href="/auth/login?confirm=email">
+                  <Button className="w-full">Go to Login</Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -50,6 +50,11 @@ export default function RoleOnboardingPage() {
 
   async function saveRole() {
     if (!confirmed) return
+    if (role === 'teacher') {
+      router.push('/onboarding/teacher?intent=teacher')
+      return
+    }
+
     setSaving(true)
 
     const supabase = createClient()
@@ -80,11 +85,6 @@ export default function RoleOnboardingPage() {
     if (error) {
       alert(error.message)
       setSaving(false)
-      return
-    }
-
-    if (role === 'teacher') {
-      router.push('/onboarding/teacher')
       return
     }
 

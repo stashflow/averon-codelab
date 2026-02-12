@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -19,7 +19,15 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showConfirmNotice, setShowConfirmNotice] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search)
+    if (query.get('confirm') === 'email') {
+      setShowConfirmNotice(true)
+    }
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -38,7 +46,13 @@ export default function Login() {
       router.push('/protected')
       router.refresh()
     } catch (err: any) {
-      setError(err.message || 'An error occurred during login')
+      const message = err.message || 'An error occurred during login'
+      if (message.toLowerCase().includes('email not confirmed')) {
+        setShowConfirmNotice(true)
+        setError('Please confirm your email first, then sign in.')
+      } else {
+        setError(message)
+      }
     } finally {
       setLoading(false)
     }
@@ -82,6 +96,18 @@ export default function Login() {
 
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
             <div className="space-y-5">
+              {showConfirmNotice && (
+                <div className="rounded-lg border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100 flex items-start justify-between gap-3">
+                  <p>Before signing in, confirm your email from the verification message we sent you.</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmNotice(false)}
+                    className="text-amber-200/80 hover:text-amber-100 text-xs"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
               <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-slate-300">
