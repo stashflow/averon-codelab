@@ -143,13 +143,28 @@ export default function TeacherClassroomPage() {
       setClassroom(classData)
 
       const [{ data: enrollmentData }, { data: assignmentData }, { data: courseData }, { data: offeringsData }] = await Promise.all([
-        supabase.from('enrollments').select('*, profiles(email, full_name)').eq('classroom_id', classroomId),
+        supabase.from('enrollments').select('id, student_id, classroom_id, enrolled_at').eq('classroom_id', classroomId),
         supabase.from('assignments').select('*').eq('classroom_id', classroomId).order('created_at', { ascending: false }),
         supabase.from('courses').select('id, name, description, difficulty_level').eq('is_active', true).order('name', { ascending: true }),
         supabase.from('classroom_course_offerings').select('id, course_id, is_active').eq('classroom_id', classroomId),
       ])
 
-      setStudents(enrollmentData || [])
+      const studentIds = (enrollmentData || []).map((row: any) => row.student_id).filter(Boolean)
+      let profileById: Record<string, { email: string | null; full_name: string | null }> = {}
+      if (studentIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', studentIds)
+        profileById = Object.fromEntries((profileRows || []).map((row: any) => [row.id, { email: row.email || null, full_name: row.full_name || null }]))
+      }
+
+      setStudents(
+        (enrollmentData || []).map((row: any) => ({
+          ...row,
+          profiles: profileById[row.student_id] || null,
+        })),
+      )
       setAssignments(assignmentData || [])
       setCourses(courseData || [])
 

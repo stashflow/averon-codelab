@@ -31,8 +31,8 @@ export async function POST(request: Request) {
     if (uniqueLessonIds.length === 0) {
       return NextResponse.json({ error: 'At least one valid lesson ID is required' }, { status: 400 })
     }
-    if (uniqueLessonIds.length > 50) {
-      return NextResponse.json({ error: 'Cannot assign more than 50 lessons at once' }, { status: 400 })
+    if (uniqueLessonIds.length > 1000) {
+      return NextResponse.json({ error: 'Cannot assign more than 1000 lessons at once' }, { status: 400 })
     }
 
     const parsedPoints = Number(points_possible)

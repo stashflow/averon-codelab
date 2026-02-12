@@ -79,6 +79,7 @@ WHERE n.nspname = 'public'
     'app_can_create_magic_link',
     'app_can_send_message',
     'app_student_can_enroll_course',
+    'app_teacher_can_view_profile',
     'enforce_submission_mutation',
     'enforce_profile_mutation',
     'enforce_message_mutation',

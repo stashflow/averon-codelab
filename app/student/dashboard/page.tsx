@@ -145,7 +145,7 @@ export default function StudentDashboard() {
         supabase.from('course_enrollments').select('course_id, courses(*)').eq('student_id', authUser.id).eq('is_active', true),
         supabase
           .from('enrollments')
-          .select('id, classroom_id, classrooms(id, name, code, teacher_id, profiles!classrooms_teacher_id_fkey(full_name, email))')
+          .select('id, classroom_id, classrooms(id, name, code, teacher_id)')
           .eq('student_id', authUser.id),
         supabase.from('student_streaks').select('*').eq('student_id', authUser.id).single(),
         supabase.from('badges').select('*').eq('student_id', authUser.id).order('earned_at', { ascending: false }).limit(6),
