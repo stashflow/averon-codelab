@@ -72,7 +72,7 @@ ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_teacher_school_re
 ALTER TABLE public.profiles
   ADD CONSTRAINT profiles_teacher_school_required
   CHECK (
-    role NOT IN ('teacher', 'school_admin')
+    role <> 'school_admin'
     OR school_id IS NOT NULL
   );
 

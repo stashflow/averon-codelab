@@ -57,6 +57,7 @@ export default function AdminPanel() {
     expires_in_hours: 72,
   })
   const [promotion, setPromotion] = useState({ teacher_id: '', school_id: '' })
+  const [teacherSchoolAssignment, setTeacherSchoolAssignment] = useState({ teacher_id: '', school_id: '' })
   const [classAssignment, setClassAssignment] = useState({ classroom_id: '', teacher_id: '' })
   const [generatedInvite, setGeneratedInvite] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
@@ -351,6 +352,24 @@ export default function AdminPanel() {
     }
 
     setPromotion({ teacher_id: '', school_id: '' })
+    await loadData()
+  }
+
+  async function assignTeacherToSchool() {
+    if (!canManageOrganization || !teacherSchoolAssignment.teacher_id || !teacherSchoolAssignment.school_id) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('profiles')
+      .update({ school_id: teacherSchoolAssignment.school_id })
+      .eq('id', teacherSchoolAssignment.teacher_id)
+      .eq('role', 'teacher')
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setTeacherSchoolAssignment({ teacher_id: '', school_id: '' })
     await loadData()
   }
 
@@ -756,6 +775,38 @@ export default function AdminPanel() {
                       </div>
                     </div>
                     <Button onClick={createSchool}>Create School</Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Assign Teacher to School</CardTitle>
+                    <CardDescription>Set or update school assignment for teacher accounts.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <select
+                      value={teacherSchoolAssignment.teacher_id}
+                      onChange={(e) => setTeacherSchoolAssignment((prev) => ({ ...prev, teacher_id: e.target.value }))}
+                      className="h-10 rounded-md border px-3 bg-background"
+                    >
+                      <option value="">Select teacher</option>
+                      {teachers
+                        .filter((t) => t.role === 'teacher')
+                        .map((teacher) => (
+                          <option key={teacher.id} value={teacher.id}>{teacher.full_name || teacher.email}</option>
+                        ))}
+                    </select>
+                    <select
+                      value={teacherSchoolAssignment.school_id}
+                      onChange={(e) => setTeacherSchoolAssignment((prev) => ({ ...prev, school_id: e.target.value }))}
+                      className="h-10 rounded-md border px-3 bg-background"
+                    >
+                      <option value="">Select school</option>
+                      {schools.map((school) => (
+                        <option key={school.id} value={school.id}>{school.name}</option>
+                      ))}
+                    </select>
+                    <Button onClick={assignTeacherToSchool}>Assign School</Button>
                   </CardContent>
                 </Card>
 
