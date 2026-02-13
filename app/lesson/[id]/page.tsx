@@ -12,7 +12,19 @@ import rehypeRaw from 'rehype-raw'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, CheckCircle, PlayCircle, Trophy, AlertCircle, Code2, Braces, FileCode2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  CheckCircle,
+  PlayCircle,
+  Trophy,
+  AlertCircle,
+  Code2,
+  Braces,
+  FileCode2,
+  BookOpen,
+  Circle,
+  Search,
+} from 'lucide-react'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
 import type { editor } from 'monaco-editor'
 
@@ -25,7 +37,6 @@ type Checkpoint = {
   title: string
   problem_description: string
   starter_code: string
-  test_cases: unknown
   points: number
   order_index: number
 }
@@ -35,7 +46,24 @@ type Lesson = {
   title: string
   description: string
   content_body: string
+  lesson_number: number | null
+  order_index: number | null
   unit_id: string
+}
+
+type SidebarLesson = {
+  id: string
+  title: string
+  lesson_number: number | null
+  order_index: number | null
+}
+
+type SidebarUnit = {
+  id: string
+  title: string
+  unit_number: number | null
+  order_index: number | null
+  lessons: SidebarLesson[]
 }
 
 type MarkdownSection = {
@@ -91,6 +119,24 @@ function getLanguageLabel(language: MonacoLanguage): string {
   return LANGUAGE_OPTIONS.find((option) => option.value === language)?.label || language
 }
 
+function languageExtension(language: MonacoLanguage): string {
+  if (language === 'python') return 'py'
+  if (language === 'javascript') return 'js'
+  if (language === 'typescript') return 'ts'
+  if (language === 'java') return 'java'
+  if (language === 'cpp') return 'cpp'
+  if (language === 'c') return 'c'
+  return 'json'
+}
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+}
+
 function stripHtmlTags(input: string): string {
   return input
     .replace(/<br\s*\/?>/gi, '\n')
@@ -106,44 +152,78 @@ function stripHtmlTags(input: string): string {
 }
 
 function normalizeLessonMarkdown(raw: string): string {
-  const source = (raw || '').trim()
+  let source = (raw || '').trim()
   if (!source) return ''
 
-  // Handle content stored with escaped line breaks.
-  const unescaped = source.includes('\\n') ? source.replace(/\\n/g, '\n') : source
-  const startsLikeJson = unescaped.startsWith('{') || unescaped.startsWith('[')
-  if (!startsLikeJson) return unescaped
+  source = source.includes('\\n') ? source.replace(/\\n/g, '\n') : source
+
+  if (source.startsWith('"') && source.endsWith('"')) {
+    try {
+      const parsedString = JSON.parse(source)
+      if (typeof parsedString === 'string') {
+        source = parsedString
+      }
+    } catch {
+      // Keep raw source if parse fails.
+    }
+  }
+
+  if (!source.startsWith('{') && !source.startsWith('[')) {
+    if (/<[a-z][\s\S]*>/i.test(source) && !source.includes('#')) {
+      return stripHtmlTags(source)
+    }
+    return source
+  }
 
   try {
-    const parsed = JSON.parse(unescaped) as any
+    const parsed = JSON.parse(source) as any
     if (typeof parsed === 'string') return parsed
-    if (!parsed || typeof parsed !== 'object') return unescaped
+
+    if (Array.isArray(parsed)) {
+      const chunks = parsed
+        .map((item, index) => {
+          if (typeof item === 'string') return item
+          if (!item || typeof item !== 'object') return ''
+          const title = String(item.title || item.name || `Section ${index + 1}`)
+          const body = String(item.body || item.content_markdown || item.content || '')
+          return `## ${title}\n\n${body}`
+        })
+        .filter(Boolean)
+      return chunks.join('\n\n').trim() || source
+    }
+
+    if (!parsed || typeof parsed !== 'object') return source
 
     if (typeof parsed.markdown === 'string') return parsed.markdown
     if (typeof parsed.content_markdown === 'string') return parsed.content_markdown
     if (typeof parsed.content_body === 'string') return parsed.content_body
+    if (typeof parsed.body === 'string') return parsed.body
 
     const chunks: string[] = []
+
     if (typeof parsed.challenge_title === 'string') {
       chunks.push(`# ${parsed.challenge_title}`)
     } else if (typeof parsed.title === 'string') {
       chunks.push(`# ${parsed.title}`)
     }
+
     if (typeof parsed.description === 'string') {
       chunks.push(parsed.description)
     }
 
-    if (Array.isArray(parsed.stages)) {
-      parsed.stages.forEach((stage: any, index: number) => {
-        const stageTitle = stage?.title || `Stage ${index + 1}`
-        chunks.push(`## ${stageTitle}`)
-        if (typeof stage?.content_markdown === 'string') {
-          chunks.push(stage.content_markdown)
-        } else if (typeof stage?.content_html === 'string') {
-          chunks.push(stripHtmlTags(stage.content_html))
-        }
-        if (stage?.checkpoint?.question) {
-          chunks.push(`> Checkpoint: ${String(stage.checkpoint.question)}`)
+    const sectionGroups = [parsed.stages, parsed.sections, parsed.pages, parsed.notes_pages]
+    for (const group of sectionGroups) {
+      if (!Array.isArray(group)) continue
+      group.forEach((section: any, index: number) => {
+        const sectionTitle = String(section?.title || section?.name || `Section ${index + 1}`)
+        chunks.push(`## ${sectionTitle}`)
+        if (typeof section?.content_markdown === 'string') chunks.push(section.content_markdown)
+        else if (typeof section?.content === 'string') chunks.push(section.content)
+        else if (typeof section?.content_html === 'string') chunks.push(stripHtmlTags(section.content_html))
+
+        if (Array.isArray(section?.questions) && section.questions.length > 0) {
+          chunks.push('### Questions')
+          section.questions.forEach((question: unknown) => chunks.push(`- Q: ${String(question)}`))
         }
       })
     }
@@ -159,7 +239,12 @@ function normalizeLessonMarkdown(raw: string): string {
 
     if (Array.isArray(parsed.hints) && parsed.hints.length > 0) {
       chunks.push('## Hints')
-      parsed.hints.forEach((hint: any) => chunks.push(`- ${String(hint)}`))
+      parsed.hints.forEach((hint: unknown) => chunks.push(`- ${String(hint)}`))
+    }
+
+    if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+      chunks.push('## Quick Questions')
+      parsed.questions.forEach((question: unknown) => chunks.push(`- Q: ${String(question)}`))
     }
 
     if (typeof parsed.completion_summary === 'string') {
@@ -168,10 +253,19 @@ function normalizeLessonMarkdown(raw: string): string {
     }
 
     const output = chunks.join('\n\n').trim()
-    return output || unescaped
+    return output || source
   } catch {
-    return unescaped
+    return source
   }
+}
+
+function buildFallbackLessonMarkdown(title: string, description: string): string {
+  return `# ${title}\n\n## Notes Page 1: Core Idea\n${description || 'This lesson is being updated. Use this page to summarize the core concept in your own words.'}\n\n## Notes Page 2: Guided Steps\n1. Read the lesson goal and restate it in one sentence.\n2. Predict what the sample code should do.\n3. Implement the checkpoint task and test iteratively.\n\n## Quick Questions\n- Q: What input does the function require?\n- Q: What output format must your code return?\n- Q: Which edge case could break your first draft?\n\n## Four-Method Learning Loop\n- **Spaced Repetition:** connect this lesson to one prior concept.\n- **Active Recall:** predict one test result before running tests.\n- **Interleaving:** compare this lesson to another unit concept.\n- **Deliberate Practice:** improve readability after tests pass.`
+}
+
+function ensureFourMethodBlock(markdown: string): string {
+  if (/Four-Method Learning Loop/i.test(markdown)) return markdown
+  return `${markdown.trim()}\n\n## Four-Method Learning Loop\n- **Spaced Repetition:** restate one prior concept this lesson depends on.\n- **Active Recall:** predict output before running any code.\n- **Interleaving:** relate this task to a previous unit and explain the connection.\n- **Deliberate Practice:** revise after feedback and improve one measurable quality metric.`
 }
 
 function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
@@ -209,6 +303,33 @@ function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
   }
 
   return sections.length > 0 ? sections : [{ title: 'Overview', body: source }]
+}
+
+function extractQuestions(markdownSectionBody: string): string[] {
+  const lines = markdownSectionBody.split('\n')
+  const questions: string[] = []
+  let inCodeFence = false
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (/^```/.test(line)) {
+      inCodeFence = !inCodeFence
+      continue
+    }
+    if (inCodeFence || !line) continue
+
+    const markerMatch = line.match(/^[-*]\s*(?:Q:|\*\*Q:\*\*)\s*(.+)$/i)
+    if (markerMatch?.[1]) {
+      questions.push(markerMatch[1].trim())
+      continue
+    }
+
+    if (!line.startsWith('#') && line.endsWith('?') && line.length > 8) {
+      questions.push(line.replace(/^[-*]\s*/, '').trim())
+    }
+  }
+
+  return Array.from(new Set(questions)).slice(0, 6)
 }
 
 function inferMonacoLanguage(source: string): MonacoLanguage {
@@ -265,18 +386,31 @@ export const dynamic = 'force-dynamic'
 export default function LessonViewer() {
   const params = useParams()
   const lessonId = params?.id as string
+
   const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [courseTitle, setCourseTitle] = useState('Course')
+  const [courseId, setCourseId] = useState<string | null>(null)
+  const [courseUnits, setCourseUnits] = useState<SidebarUnit[]>([])
+  const [lessonSearch, setLessonSearch] = useState('')
+  const [progressByLessonId, setProgressByLessonId] = useState<Map<string, string>>(new Map())
+
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([])
   const [currentCheckpoint, setCurrentCheckpoint] = useState<Checkpoint | null>(null)
+
   const [code, setCode] = useState('')
   const [editorLanguage, setEditorLanguage] = useState<MonacoLanguage>('python')
   const [courseLanguage, setCourseLanguage] = useState<string>('python')
-  const [courseId, setCourseId] = useState<string | null>(null)
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 })
+
   const [testResults, setTestResults] = useState<{ passed: boolean; score: number; results: Array<{ passed: boolean }> } | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
+
   const [activeSectionIndex, setActiveSectionIndex] = useState(0)
+  const [questionResponses, setQuestionResponses] = useState<Record<string, string>>({})
+
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const router = useRouter()
 
@@ -285,13 +419,34 @@ export default function LessonViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId])
 
-  const normalizedLessonContent = useMemo(() => normalizeLessonMarkdown(lesson?.content_body || ''), [lesson?.content_body])
-  const sections = useMemo(() => splitMarkdownIntoSections(normalizedLessonContent), [normalizedLessonContent])
+  const markdownSource = useMemo(() => {
+    const normalized = normalizeLessonMarkdown(lesson?.content_body || '')
+    const fallback = buildFallbackLessonMarkdown(lesson?.title || 'Lesson', lesson?.description || '')
+    return ensureFourMethodBlock(normalized || fallback)
+  }, [lesson?.content_body, lesson?.description, lesson?.title])
+
+  const sections = useMemo(() => splitMarkdownIntoSections(markdownSource), [markdownSource])
+  const activeSection = sections[Math.min(activeSectionIndex, Math.max(0, sections.length - 1))]
+  const sectionQuestions = useMemo(() => extractQuestions(activeSection?.body || ''), [activeSection])
+
+  const filteredUnits = useMemo(() => {
+    const query = lessonSearch.trim().toLowerCase()
+    if (!query) return courseUnits
+
+    return courseUnits
+      .map((unit) => {
+        const unitMatches = unit.title.toLowerCase().includes(query)
+        const lessons = unit.lessons.filter((entry) => entry.title.toLowerCase().includes(query) || unitMatches)
+        return { ...unit, lessons }
+      })
+      .filter((unit) => unit.lessons.length > 0 || unit.title.toLowerCase().includes(query))
+  }, [courseUnits, lessonSearch])
 
   const staticIssues = useMemo(() => runStaticChecks(code, editorLanguage), [code, editorLanguage])
 
   async function loadLessonData() {
     const supabase = createClient()
+    let resolvedCourseLanguage = 'python'
 
     try {
       const {
@@ -306,23 +461,56 @@ export default function LessonViewer() {
 
       setUser({ id: authUser.id })
 
-      const { data: lessonData, error: lessonError } = await supabase.from('lessons').select('*').eq('id', lessonId).single()
-      if (lessonError) throw lessonError
-      setLesson(lessonData)
+      const { data: lessonData, error: lessonError } = await supabase
+        .from('lessons')
+        .select('id, title, description, content_body, unit_id, lesson_number, order_index')
+        .eq('id', lessonId)
+        .single()
+      if (lessonError || !lessonData) throw lessonError
+      setLesson(lessonData as Lesson)
 
-      const { data: unitData } = await supabase.from('units').select('course_id').eq('id', lessonData.unit_id).single()
-      if (unitData?.course_id) {
-        setCourseId(unitData.course_id)
-        const { data: courseData } = await supabase.from('courses').select('language').eq('id', unitData.course_id).single()
-        if (courseData?.language) {
-          setCourseLanguage(String(courseData.language))
-          setEditorLanguage(inferMonacoLanguage(String(courseData.language)))
-        }
+      const { data: unitData } = await supabase.from('units').select('id, course_id').eq('id', lessonData.unit_id).single()
+      const resolvedCourseId = unitData?.course_id || null
+      if (resolvedCourseId) {
+        setCourseId(resolvedCourseId)
+
+        const [{ data: courseData }, { data: unitsData }, { data: progressRows }] = await Promise.all([
+          supabase.from('courses').select('name, language').eq('id', resolvedCourseId).single(),
+          supabase
+            .from('units')
+            .select('id, title, unit_number, order_index, lessons(id, title, lesson_number, order_index)')
+            .eq('course_id', resolvedCourseId)
+            .order('order_index', { ascending: true }),
+          supabase.from('student_lesson_progress').select('lesson_id, status').eq('student_id', authUser.id),
+        ])
+
+        if (courseData?.name) setCourseTitle(String(courseData.name))
+
+        const languageHint = String(courseData?.language || 'python')
+        resolvedCourseLanguage = languageHint
+        setCourseLanguage(languageHint)
+
+        const normalizedUnits = ((unitsData || []) as SidebarUnit[])
+          .map((unit) => ({
+            ...unit,
+            lessons: (unit.lessons || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
+          }))
+          .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+
+        setCourseUnits(normalizedUnits)
+
+        const progressMap = new Map<string, string>()
+        ;(progressRows || []).forEach((row: any) => {
+          progressMap.set(String(row.lesson_id), String(row.status || 'not_started'))
+        })
+        setProgressByLessonId(progressMap)
+
+        setEditorLanguage(inferMonacoLanguage(languageHint))
       }
 
       const { data: checkpointsData, error: checkpointsError } = await supabase
         .from('checkpoints')
-        .select('*')
+        .select('id, title, problem_description, starter_code, points, order_index')
         .eq('lesson_id', lessonId)
         .order('order_index', { ascending: true })
 
@@ -335,8 +523,13 @@ export default function LessonViewer() {
         setCurrentCheckpoint(first)
         const starter = first.starter_code || ''
         setCode(starter)
-        setEditorLanguage(inferMonacoLanguage(`${starter}\n${courseLanguage}`))
+        setEditorLanguage(inferMonacoLanguage(`${starter}\n${resolvedCourseLanguage}`))
+      } else {
+        setCurrentCheckpoint(null)
+        setCode('')
       }
+
+      setActiveSectionIndex(0)
     } catch (err: unknown) {
       console.error('[v0] Error loading lesson:', err)
     } finally {
@@ -346,6 +539,14 @@ export default function LessonViewer() {
 
   const onEditorMount: OnMount = (editorInstance) => {
     editorRef.current = editorInstance
+    const position = editorInstance.getPosition()
+    if (position) {
+      setCursorPosition({ line: position.lineNumber, column: position.column })
+    }
+
+    editorInstance.onDidChangeCursorPosition((event) => {
+      setCursorPosition({ line: event.position.lineNumber, column: event.position.column })
+    })
   }
 
   async function handleRunTests() {
@@ -416,6 +617,12 @@ export default function LessonViewer() {
         last_accessed: new Date().toISOString(),
       })
 
+      setProgressByLessonId((previous) => {
+        const next = new Map(previous)
+        next.set(lesson.id, 'completed')
+        return next
+      })
+
       if (courseId) {
         router.push(`/courses/${courseId}`)
         return
@@ -441,6 +648,23 @@ export default function LessonViewer() {
     setTestResults(null)
   }
 
+  function getLessonStatus(lessonEntryId: string): 'completed' | 'in_progress' | 'not_started' {
+    const status = progressByLessonId.get(lessonEntryId)
+    if (status === 'completed') return 'completed'
+    if (status === 'in_progress') return 'in_progress'
+    return 'not_started'
+  }
+
+  function getQuestionResponseKey(questionIndex: number): string {
+    return `${lessonId}:${activeSectionIndex}:${questionIndex}`
+  }
+
+  function checkpointFileName(): string {
+    if (!currentCheckpoint) return `lesson.${languageExtension(editorLanguage)}`
+    const slug = slugify(currentCheckpoint.title || 'checkpoint') || 'checkpoint'
+    return `${slug}.${languageExtension(editorLanguage)}`
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950">
@@ -457,12 +681,10 @@ export default function LessonViewer() {
     )
   }
 
-  const activeSection = sections[Math.min(activeSectionIndex, Math.max(0, sections.length - 1))]
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between px-4 py-3 lg:px-6">
+        <div className="mx-auto flex w-full max-w-[1800px] items-center justify-between px-4 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Link href={courseId ? `/courses/${courseId}` : '/student/dashboard'}>
               <Button variant="ghost" size="sm" className="gap-2 text-slate-300 hover:bg-slate-800 hover:text-white">
@@ -472,23 +694,98 @@ export default function LessonViewer() {
             </Link>
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold text-white lg:text-xl">{lesson.title}</h1>
-              <p className="truncate text-sm text-slate-400">{lesson.description}</p>
+              <p className="truncate text-sm text-slate-400">{courseTitle}</p>
             </div>
           </div>
           <div className="hidden items-center gap-2 lg:flex">
-            <Badge className="border-slate-700 bg-slate-900 text-slate-200">Markdown Lesson</Badge>
-            <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">Monaco Editor</Badge>
+            <Badge className="border-slate-700 bg-slate-900 text-slate-200">Markdown Notes + Questions</Badge>
+            <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">IDE Workspace</Badge>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1600px] px-4 py-4 lg:px-6 lg:py-6">
+      <main className="mx-auto w-full max-w-[1800px] px-4 py-4 lg:px-6 lg:py-6">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <section className="xl:col-span-5">
+          <aside className="xl:col-span-3">
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">Lesson Content</p>
-                <p className="text-xs text-slate-400">Structured markdown with section navigation</p>
+                <p className="text-sm font-medium text-slate-200">Lesson Sidebar</p>
+                <p className="text-xs text-slate-400">Search and open any lesson in this course</p>
+              </div>
+
+              <div className="border-b border-slate-800 p-3">
+                <label htmlFor="lesson-search" className="sr-only">Search lessons</label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                  <input
+                    id="lesson-search"
+                    value={lessonSearch}
+                    onChange={(event) => setLessonSearch(event.target.value)}
+                    placeholder="Search lesson or unit"
+                    className="w-full rounded-md border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-y-auto p-3">
+                <div className="space-y-4">
+                  {filteredUnits.map((unit) => (
+                    <div key={unit.id} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-300">
+                        Unit {unit.unit_number || unit.order_index || '-'}
+                      </p>
+                      <p className="mb-3 text-sm font-semibold text-white">{unit.title}</p>
+
+                      <div className="space-y-2">
+                        {unit.lessons.map((entry) => {
+                          const active = entry.id === lesson.id
+                          const status = getLessonStatus(entry.id)
+                          return (
+                            <Link key={entry.id} href={`/lesson/${entry.id}`}>
+                              <div
+                                className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition ${
+                                  active
+                                    ? 'border border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                                    : 'border border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate">
+                                    {entry.lesson_number || entry.order_index || '-'} . {entry.title}
+                                  </p>
+                                </div>
+                                <div className="ml-3 shrink-0">
+                                  {status === 'completed' ? (
+                                    <CheckCircle className="h-4 w-4 text-emerald-300" />
+                                  ) : status === 'in_progress' ? (
+                                    <Circle className="h-4 w-4 text-cyan-300" />
+                                  ) : (
+                                    <Circle className="h-4 w-4 text-slate-600" />
+                                  )}
+                                </div>
+                              </div>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {filteredUnits.length === 0 && (
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
+                      No lessons match your search.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <section className="xl:col-span-4">
+            <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
+              <div className="border-b border-slate-800 px-4 py-3">
+                <p className="text-sm font-medium text-slate-200">Lesson Notes</p>
+                <p className="text-xs text-slate-400">Markdown notes pages and guided questions</p>
               </div>
 
               <div className="border-b border-slate-800 p-3">
@@ -516,28 +813,63 @@ export default function LessonViewer() {
                           : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
                       }`}
                     >
-                      {index + 1}. {section.title}
+                      Notes {index + 1}: {section.title}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="overflow-y-auto px-5 py-5">
-                <h2 className="mb-4 text-2xl font-semibold text-white">{activeSection.title}</h2>
+              <div className="flex-1 overflow-y-auto px-5 py-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold text-white">{activeSection?.title || 'Overview'}</h2>
+                  <Badge className="border-slate-700 bg-slate-900 text-slate-200">
+                    Page {Math.min(activeSectionIndex + 1, sections.length)} / {sections.length}
+                  </Badge>
+                </div>
+
                 <div className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                    {activeSection.body}
+                    {activeSection?.body || 'Lesson notes are loading.'}
                   </ReactMarkdown>
+                </div>
+
+                <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-cyan-300" />
+                    <p className="text-sm font-semibold text-white">Notes Questions</p>
+                  </div>
+
+                  {sectionQuestions.length > 0 ? (
+                    <div className="space-y-3">
+                      {sectionQuestions.map((question, index) => {
+                        const key = getQuestionResponseKey(index)
+                        return (
+                          <div key={`${key}-${question}`} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                            <p className="mb-2 text-sm text-slate-100">Q{index + 1}. {question}</p>
+                            <textarea
+                              value={questionResponses[key] || ''}
+                              onChange={(event) => setQuestionResponses((prev) => ({ ...prev, [key]: event.target.value }))}
+                              placeholder="Write your response here..."
+                              rows={3}
+                              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">No explicit questions were found on this notes page yet.</p>
+                  )}
                 </div>
               </div>
             </div>
           </section>
 
-          <section className="xl:col-span-7">
+          <section className="xl:col-span-5">
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">Assignment + Coding Workspace</p>
-                <p className="text-xs text-slate-400">Focused center workspace for instructions, coding, and validation</p>
+                <p className="text-sm font-medium text-slate-200">Assignment + Coding Environment</p>
+                <p className="text-xs text-slate-400">Production-style editor with tests and completion flow</p>
               </div>
 
               <div className="border-b border-slate-800 p-3">
@@ -582,35 +914,11 @@ export default function LessonViewer() {
 
                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <h4 className="flex items-center gap-2 text-base font-semibold text-white">
                           <Code2 className="h-5 w-5 text-cyan-300" />
-                          <h4 className="text-base font-semibold text-white">Code Editor</h4>
-                        </div>
+                          Code Editor
+                        </h4>
                         <div className="flex items-center gap-2">
-                          <div className="overflow-hidden rounded-md border border-slate-700 bg-slate-900">
-                            <Image
-                              src={LANGUAGE_BADGE_SRC[editorLanguage]}
-                              alt={`${getLanguageLabel(editorLanguage)} language`}
-                              width={160}
-                              height={56}
-                              className="h-7 w-auto"
-                            />
-                          </div>
-                          <label htmlFor="editor-language" className="text-xs text-slate-400">
-                            Language
-                          </label>
-                          <select
-                            id="editor-language"
-                            value={editorLanguage}
-                            onChange={(event) => setEditorLanguage(event.target.value as MonacoLanguage)}
-                            className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
-                          >
-                            {LANGUAGE_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
                           <Button
                             type="button"
                             size="sm"
@@ -633,7 +941,43 @@ export default function LessonViewer() {
                         </div>
                       </div>
 
-                      <div className="overflow-hidden rounded-lg border border-slate-700">
+                      <div className="overflow-hidden rounded-lg border border-slate-700 bg-[#0b1020]">
+                        <div className="flex items-center justify-between border-b border-slate-700 bg-[#111a33] px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                              <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                            </div>
+                            <div className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-200">
+                              {checkpointFileName()}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="overflow-hidden rounded-md border border-slate-700 bg-slate-900">
+                              <Image
+                                src={LANGUAGE_BADGE_SRC[editorLanguage]}
+                                alt={`${getLanguageLabel(editorLanguage)} language`}
+                                width={160}
+                                height={56}
+                                className="h-7 w-auto"
+                              />
+                            </div>
+                            <select
+                              id="editor-language"
+                              value={editorLanguage}
+                              onChange={(event) => setEditorLanguage(event.target.value as MonacoLanguage)}
+                              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
+                            >
+                              {LANGUAGE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
                         <MonacoEditor
                           height="420px"
                           language={editorLanguage}
@@ -642,7 +986,7 @@ export default function LessonViewer() {
                           onChange={(value) => setCode(value ?? '')}
                           theme="vs-dark"
                           options={{
-                            minimap: { enabled: false },
+                            minimap: { enabled: true },
                             fontSize: 14,
                             lineNumbers: 'on',
                             roundedSelection: false,
@@ -652,8 +996,23 @@ export default function LessonViewer() {
                             wordWrap: 'on',
                             formatOnPaste: true,
                             formatOnType: true,
+                            cursorSmoothCaretAnimation: 'on',
+                            smoothScrolling: true,
+                            bracketPairColorization: { enabled: true },
+                            guides: { bracketPairs: true, indentation: true },
                           }}
                         />
+
+                        <div className="flex items-center justify-between border-t border-slate-700 bg-[#111a33] px-3 py-2 text-xs text-slate-300">
+                          <div className="flex items-center gap-4">
+                            <span>{getLanguageLabel(editorLanguage)}</span>
+                            <span>UTF-8</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span>Ln {cursorPosition.line}</span>
+                            <span>Col {cursorPosition.column}</span>
+                          </div>
+                        </div>
                       </div>
 
                       {staticIssues.length > 0 && (

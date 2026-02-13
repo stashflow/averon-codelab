@@ -138,6 +138,7 @@ export default function AssignmentPage() {
   const [testResults, setTestResults] = useState<JudgePayload | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [editorLanguage, setEditorLanguage] = useState<MonacoLanguage>('python')
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 })
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
@@ -221,6 +222,29 @@ export default function AssignmentPage() {
 
   const onEditorMount: OnMount = (editorInstance) => {
     editorRef.current = editorInstance
+    const position = editorInstance.getPosition()
+    if (position) {
+      setCursorPosition({ line: position.lineNumber, column: position.column })
+    }
+
+    editorInstance.onDidChangeCursorPosition((event) => {
+      setCursorPosition({ line: event.position.lineNumber, column: event.position.column })
+    })
+  }
+
+  function editorFileName(): string {
+    const extension =
+      editorLanguage === 'python'
+        ? 'py'
+        : editorLanguage === 'javascript'
+          ? 'js'
+          : editorLanguage === 'typescript'
+            ? 'ts'
+            : editorLanguage
+    const base = assignment?.title
+      ? assignment.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+      : 'assignment'
+    return `${base || 'assignment'}.${extension}`
   }
 
   async function handleRunTests() {
@@ -435,7 +459,21 @@ export default function AssignmentPage() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-lg border border-slate-700">
+              <div className="overflow-hidden rounded-lg border border-slate-700 bg-[#0b1020]">
+                <div className="flex items-center justify-between border-b border-slate-700 bg-[#111a33] px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                    </div>
+                    <div className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-200">
+                      {editorFileName()}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-300">{getLanguageLabel(editorLanguage)}</p>
+                </div>
+
                 <MonacoEditor
                   height="460px"
                   language={editorLanguage}
@@ -444,7 +482,7 @@ export default function AssignmentPage() {
                   onChange={(value) => setCode(value ?? '')}
                   theme="vs-dark"
                   options={{
-                    minimap: { enabled: false },
+                    minimap: { enabled: true },
                     fontSize: 14,
                     lineNumbers: 'on',
                     automaticLayout: true,
@@ -452,8 +490,23 @@ export default function AssignmentPage() {
                     wordWrap: 'on',
                     formatOnType: true,
                     formatOnPaste: true,
+                    cursorSmoothCaretAnimation: 'on',
+                    smoothScrolling: true,
+                    bracketPairColorization: { enabled: true },
+                    guides: { bracketPairs: true, indentation: true },
                   }}
                 />
+
+                <div className="flex items-center justify-between border-t border-slate-700 bg-[#111a33] px-3 py-2 text-xs text-slate-300">
+                  <div className="flex items-center gap-4">
+                    <span>{getLanguageLabel(editorLanguage)}</span>
+                    <span>UTF-8</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span>Ln {cursorPosition.line}</span>
+                    <span>Col {cursorPosition.column}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
