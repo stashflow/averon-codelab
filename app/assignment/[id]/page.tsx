@@ -4,6 +4,7 @@ import nextDynamic from 'next/dynamic'
 import type { OnMount } from '@monaco-editor/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -48,6 +49,36 @@ type JudgePayload = {
   passed: boolean
   score: number
   results: JudgeResult[]
+}
+
+const LANGUAGE_BADGE_SRC: Record<MonacoLanguage, string> = {
+  python: '/languages/python.svg',
+  javascript: '/languages/javascript.svg',
+  typescript: '/languages/typescript.svg',
+  java: '/languages/java.svg',
+  cpp: '/languages/cpp.svg',
+  c: '/languages/c.svg',
+  json: '/languages/json.svg',
+}
+
+function getLanguageLabel(language: MonacoLanguage): string {
+  switch (language) {
+    case 'javascript':
+      return 'JavaScript'
+    case 'typescript':
+      return 'TypeScript'
+    case 'java':
+      return 'Java'
+    case 'cpp':
+      return 'C++'
+    case 'c':
+      return 'C'
+    case 'json':
+      return 'JSON'
+    case 'python':
+    default:
+      return 'Python'
+  }
 }
 
 function resolveMonacoLanguage(language: string | null | undefined): MonacoLanguage {
@@ -372,6 +403,15 @@ export default function AssignmentPage() {
                   Code Editor
                 </h3>
                 <div className="flex items-center gap-2">
+                  <div className="overflow-hidden rounded-md border border-slate-700 bg-slate-900">
+                    <Image
+                      src={LANGUAGE_BADGE_SRC[editorLanguage]}
+                      alt={`${getLanguageLabel(editorLanguage)} language`}
+                      width={160}
+                      height={56}
+                      className="h-7 w-auto"
+                    />
+                  </div>
                   <Badge className="border-slate-700 bg-slate-900 text-slate-200">{editorLanguage}</Badge>
                   <Button
                     type="button"

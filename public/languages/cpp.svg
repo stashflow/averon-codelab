@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="56" viewBox="0 0 160 56" role="img" aria-label="C Plus Plus">
+  <rect x="1" y="1" width="158" height="54" rx="12" fill="#0f172a" stroke="#334155"/>
+  <rect x="8" y="8" width="44" height="40" rx="8" fill="#2563eb"/>
+  <text x="30" y="33" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#ffffff">C++</text>
+  <text x="62" y="34" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0">C Plus Plus</text>
+</svg>

@@ -5,6 +5,7 @@ import type { OnMount } from '@monaco-editor/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -57,6 +58,16 @@ const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
   { value: 'json', label: 'JSON' },
 ]
 
+const LANGUAGE_BADGE_SRC: Record<MonacoLanguage, string> = {
+  python: '/languages/python.svg',
+  javascript: '/languages/javascript.svg',
+  typescript: '/languages/typescript.svg',
+  java: '/languages/java.svg',
+  cpp: '/languages/cpp.svg',
+  c: '/languages/c.svg',
+  json: '/languages/json.svg',
+}
+
 const LEARNING_METHODS = [
   {
     title: 'Spaced Repetition',
@@ -75,6 +86,10 @@ const LEARNING_METHODS = [
     prompt: 'Revise one part of your solution after feedback to improve clarity.',
   },
 ]
+
+function getLanguageLabel(language: MonacoLanguage): string {
+  return LANGUAGE_OPTIONS.find((option) => option.value === language)?.label || language
+}
 
 function stripHtmlTags(input: string): string {
   return input
@@ -572,6 +587,15 @@ export default function LessonViewer() {
                           <h4 className="text-base font-semibold text-white">Code Editor</h4>
                         </div>
                         <div className="flex items-center gap-2">
+                          <div className="overflow-hidden rounded-md border border-slate-700 bg-slate-900">
+                            <Image
+                              src={LANGUAGE_BADGE_SRC[editorLanguage]}
+                              alt={`${getLanguageLabel(editorLanguage)} language`}
+                              width={160}
+                              height={56}
+                              className="h-7 w-auto"
+                            />
+                          </div>
                           <label htmlFor="editor-language" className="text-xs text-slate-400">
                             Language
                           </label>
