@@ -236,11 +236,11 @@ VALUES
   NOW()
 );
 
-WITH lesson_seed AS (
-  SELECT *
-  FROM (VALUES
+CREATE TEMP TABLE pg_temp.ap_csp_lesson_seed ON COMMIT DROP AS
+SELECT *
+FROM (VALUES
     (1, 1, 'Problem Statements and Constraints', 'Define solvable problems and non-negotiable constraints.', 'Big Idea 1: Creative Development', 'CTP 1: Computational Solution Design', 'Spaced Repetition', 'python', 'Good computing starts with a clear problem statement, measurable success criteria, and explicit constraints.', 'Convert a vague idea into a one-sentence problem statement and three constraints.', 'What is the user need?', 'What constraint matters most?', 'How will success be measured?', E'def summarize_problem(user_need, constraint):\n    return f"Need: {user_need} | Constraint: {constraint}"\n', 'Implement summarize_problem(user_need, constraint) with the exact output format.', E'def summarize_problem(user_need, constraint):\n    # TODO\n    return ""\n', E'def summarize_problem(user_need, constraint):\n    return f"Need: {user_need} | Constraint: {constraint}"\n', '"track homework","time"', '"Need: track homework | Constraint: time"', '"share notes","privacy"', '"Need: share notes | Constraint: privacy"', 'easy', ARRAY['problem_solving','constraints','strings']),
-    (1, 2, 'User-Centered Design Basics', 'Prioritize user experience and clarity.', 'Big Idea 1: Creative Development', 'CTP 5: Computing Innovations', 'Active Recall', 'python', 'User-centered design means decisions are justified by user tasks, not developer preference.', 'Write criteria for a usable beginner interface and test against scenarios.', 'Who is the target learner?', 'What confusion could occur first?', 'How would you reduce one friction point?', E'def first_screen_message(audience):\n    return f"Welcome, {audience}! Let\'s build your first solution."\n', 'Implement first_screen_message(audience) with exact punctuation.', E'def first_screen_message(audience):\n    # TODO\n    return ""\n', E'def first_screen_message(audience):\n    return f"Welcome, {audience}! Let\'s build your first solution."\n', '"students"', '"Welcome, students! Let\'s build your first solution."', '"teachers"', '"Welcome, teachers! Let\'s build your first solution."', 'easy', ARRAY['design','users','strings']),
+    (1, 2, 'User-Centered Design Basics', 'Prioritize user experience and clarity.', 'Big Idea 1: Creative Development', 'CTP 5: Computing Innovations', 'Active Recall', 'python', 'User-centered design means decisions are justified by user tasks, not developer preference.', 'Write criteria for a usable beginner interface and test against scenarios.', 'Who is the target learner?', 'What confusion could occur first?', 'How would you reduce one friction point?', E'def first_screen_message(audience):\n    return f"Welcome, {audience}! Let''s build your first solution."\n', 'Implement first_screen_message(audience) with exact punctuation.', E'def first_screen_message(audience):\n    # TODO\n    return ""\n', E'def first_screen_message(audience):\n    return f"Welcome, {audience}! Let''s build your first solution."\n', '"students"', '"Welcome, students! Let''s build your first solution."', '"teachers"', '"Welcome, teachers! Let''s build your first solution."', 'easy', ARRAY['design','users','strings']),
     (1, 3, 'Prototype and Feedback Loops', 'Use rapid iteration to improve ideas.', 'Big Idea 1: Creative Development', 'CTP 2: Algorithms and Program Development', 'Interleaving', 'python', 'Iteration quality improves when each cycle has one focused improvement target.', 'Track prototype revisions with concise notes and expected impact.', 'What changed this version?', 'Why is it better?', 'What evidence supports your revision?', E'def revision_note(version, change):\n    return f"v{version}: {change}"\n', 'Implement revision_note(version, change).', E'def revision_note(version, change):\n    # TODO\n    return ""\n', E'def revision_note(version, change):\n    return f"v{version}: {change}"\n', '2,"added clear labels"', '"v2: added clear labels"', '5,"reduced clicks"', '"v5: reduced clicks"', 'easy', ARRAY['iteration','feedback','formatting']),
     (1, 4, 'Revision Sprint and Communication', 'Communicate design decisions clearly.', 'Big Idea 1: Creative Development', 'CTP 6: Responsible Computing', 'Deliberate Practice', 'python', 'Communication quality is part of engineering quality; decisions should be understandable and defensible.', 'Write a concise decision summary with tradeoff language.', 'What tradeoff did you accept?', 'Who benefits most from this decision?', 'What risk remains?', E'def decision_summary(choice, tradeoff):\n    return f"Choice: {choice}; Tradeoff: {tradeoff}"\n', 'Implement decision_summary(choice, tradeoff).', E'def decision_summary(choice, tradeoff):\n    # TODO\n    return ""\n', E'def decision_summary(choice, tradeoff):\n    return f"Choice: {choice}; Tradeoff: {tradeoff}"\n', '"shorter form","less detail"', '"Choice: shorter form; Tradeoff: less detail"', '"strong password rules","more setup time"', '"Choice: strong password rules; Tradeoff: more setup time"', 'easy', ARRAY['communication','tradeoffs','design']),
 
@@ -302,9 +302,9 @@ WITH lesson_seed AS (
     expected_2,
     difficulty,
     concept_tags
-  )
-),
-lesson_rows AS (
+  );
+
+WITH lesson_rows AS (
   SELECT
     (
       '75000000-0000-' || lpad(unit_number::text, 4, '0') || '-' || lpad(lesson_number::text, 4, '0') || '-' || lpad((unit_number * 100 + lesson_number)::text, 12, '0')
@@ -313,7 +313,7 @@ lesson_rows AS (
       '74000000-0000-0000-0000-' || lpad(unit_number::text, 12, '0')
     )::uuid AS unit_id,
     *
-  FROM lesson_seed
+  FROM pg_temp.ap_csp_lesson_seed
 )
 INSERT INTO public.lessons (
   id,
@@ -398,9 +398,13 @@ $md$,
   NOW()
 FROM lesson_rows;
 
-WITH lesson_seed AS (
-  SELECT *
-  FROM lesson_rows
+WITH lesson_rows AS (
+  SELECT
+    (
+      '75000000-0000-' || lpad(unit_number::text, 4, '0') || '-' || lpad(lesson_number::text, 4, '0') || '-' || lpad((unit_number * 100 + lesson_number)::text, 12, '0')
+    )::uuid AS lesson_id,
+    *
+  FROM pg_temp.ap_csp_lesson_seed
 )
 INSERT INTO public.checkpoints (
   id,
@@ -455,6 +459,6 @@ $task$,
   difficulty,
   concept_tags,
   NOW()
-FROM lesson_seed;
+FROM lesson_rows;
 
 COMMIT;
