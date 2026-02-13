@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -56,6 +57,108 @@ const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
   { value: 'json', label: 'JSON' },
 ]
 
+const LEARNING_METHODS = [
+  {
+    title: 'Spaced Repetition',
+    prompt: 'Restate one concept from the previous lesson before writing code.',
+  },
+  {
+    title: 'Active Recall',
+    prompt: 'Predict output for one test case before running the checker.',
+  },
+  {
+    title: 'Interleaving',
+    prompt: 'Connect this task to a concept from a different unit.',
+  },
+  {
+    title: 'Deliberate Practice',
+    prompt: 'Revise one part of your solution after feedback to improve clarity.',
+  },
+]
+
+function stripHtmlTags(input: string): string {
+  return input
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim()
+}
+
+function normalizeLessonMarkdown(raw: string): string {
+  const source = (raw || '').trim()
+  if (!source) return ''
+
+  // Handle content stored with escaped line breaks.
+  const unescaped = source.includes('\\n') ? source.replace(/\\n/g, '\n') : source
+  const startsLikeJson = unescaped.startsWith('{') || unescaped.startsWith('[')
+  if (!startsLikeJson) return unescaped
+
+  try {
+    const parsed = JSON.parse(unescaped) as any
+    if (typeof parsed === 'string') return parsed
+    if (!parsed || typeof parsed !== 'object') return unescaped
+
+    if (typeof parsed.markdown === 'string') return parsed.markdown
+    if (typeof parsed.content_markdown === 'string') return parsed.content_markdown
+    if (typeof parsed.content_body === 'string') return parsed.content_body
+
+    const chunks: string[] = []
+    if (typeof parsed.challenge_title === 'string') {
+      chunks.push(`# ${parsed.challenge_title}`)
+    } else if (typeof parsed.title === 'string') {
+      chunks.push(`# ${parsed.title}`)
+    }
+    if (typeof parsed.description === 'string') {
+      chunks.push(parsed.description)
+    }
+
+    if (Array.isArray(parsed.stages)) {
+      parsed.stages.forEach((stage: any, index: number) => {
+        const stageTitle = stage?.title || `Stage ${index + 1}`
+        chunks.push(`## ${stageTitle}`)
+        if (typeof stage?.content_markdown === 'string') {
+          chunks.push(stage.content_markdown)
+        } else if (typeof stage?.content_html === 'string') {
+          chunks.push(stripHtmlTags(stage.content_html))
+        }
+        if (stage?.checkpoint?.question) {
+          chunks.push(`> Checkpoint: ${String(stage.checkpoint.question)}`)
+        }
+      })
+    }
+
+    if (Array.isArray(parsed.io_examples) && parsed.io_examples.length > 0) {
+      chunks.push('## Input / Output Examples')
+      parsed.io_examples.forEach((example: any, index: number) => {
+        chunks.push(`### Example ${index + 1}`)
+        chunks.push(`- Input: \`${String(example?.input ?? '')}\``)
+        chunks.push(`- Output: \`${String(example?.output ?? '')}\``)
+      })
+    }
+
+    if (Array.isArray(parsed.hints) && parsed.hints.length > 0) {
+      chunks.push('## Hints')
+      parsed.hints.forEach((hint: any) => chunks.push(`- ${String(hint)}`))
+    }
+
+    if (typeof parsed.completion_summary === 'string') {
+      chunks.push('## Summary')
+      chunks.push(parsed.completion_summary)
+    }
+
+    const output = chunks.join('\n\n').trim()
+    return output || unescaped
+  } catch {
+    return unescaped
+  }
+}
+
 function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
   const source = (markdown || '').replace(/\r\n/g, '\n').trim()
   if (!source) {
@@ -66,9 +169,16 @@ function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
   const sections: MarkdownSection[] = []
   let currentTitle = 'Overview'
   let currentLines: string[] = []
+  let inCodeFence = false
 
   for (const line of lines) {
-    if (/^##\s+/.test(line)) {
+    if (/^```/.test(line.trim())) {
+      inCodeFence = !inCodeFence
+      currentLines.push(line)
+      continue
+    }
+
+    if (!inCodeFence && /^##\s+/.test(line)) {
       if (currentLines.join('\n').trim()) {
         sections.push({ title: currentTitle, body: currentLines.join('\n').trim() })
       }
@@ -160,7 +270,8 @@ export default function LessonViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId])
 
-  const sections = useMemo(() => splitMarkdownIntoSections(lesson?.content_body || ''), [lesson?.content_body])
+  const normalizedLessonContent = useMemo(() => normalizeLessonMarkdown(lesson?.content_body || ''), [lesson?.content_body])
+  const sections = useMemo(() => splitMarkdownIntoSections(normalizedLessonContent), [normalizedLessonContent])
 
   const staticIssues = useMemo(() => runStaticChecks(code, editorLanguage), [code, editorLanguage])
 
@@ -365,6 +476,18 @@ export default function LessonViewer() {
                 <p className="text-xs text-slate-400">Structured markdown with section navigation</p>
               </div>
 
+              <div className="border-b border-slate-800 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Four Method Workflow</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {LEARNING_METHODS.map((method) => (
+                    <div key={method.title} className="rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2">
+                      <p className="text-xs font-semibold text-cyan-200">{method.title}</p>
+                      <p className="text-xs text-slate-300">{method.prompt}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="border-b border-slate-800 p-2">
                 <div className="flex gap-2 overflow-x-auto">
                   {sections.map((section, index) => (
@@ -387,7 +510,9 @@ export default function LessonViewer() {
               <div className="overflow-y-auto px-5 py-5">
                 <h2 className="mb-4 text-2xl font-semibold text-white">{activeSection.title}</h2>
                 <div className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{activeSection.body}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                    {activeSection.body}
+                  </ReactMarkdown>
                 </div>
               </div>
             </div>
@@ -434,7 +559,7 @@ export default function LessonViewer() {
                         <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
                       </div>
                       <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                           {currentCheckpoint.problem_description || 'No assignment instructions provided.'}
                         </ReactMarkdown>
                       </div>

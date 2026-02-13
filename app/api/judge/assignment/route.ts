@@ -80,10 +80,13 @@ export async function POST(request: Request) {
     const passedCount = resultsForUi.filter((test) => test.passed).length
     const totalCount = resultsForUi.length
     const score = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0
+    const passed = totalCount > 0 && passedCount === totalCount
 
     return NextResponse.json({
+      results: resultsForUi,
       tests: resultsForUi,
-      passed: passedCount,
+      passed,
+      passedCount,
       total: totalCount,
       score,
     })

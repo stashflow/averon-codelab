@@ -10,12 +10,50 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ArrowLeft, BookOpen, CheckCircle2, Lock, Play } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 
 interface Lesson {
   order_index: number
 }
 
 export const dynamic = 'force-dynamic'
+
+function normalizeMarkdown(raw: string | null | undefined): string {
+  const source = String(raw || '').trim()
+  if (!source) return ''
+  const unescaped = source.includes('\\n') ? source.replace(/\\n/g, '\n') : source
+  if (!unescaped.startsWith('{') && !unescaped.startsWith('[')) return unescaped
+
+  try {
+    const parsed = JSON.parse(unescaped) as any
+    if (typeof parsed === 'string') return parsed
+    if (!parsed || typeof parsed !== 'object') return unescaped
+
+    if (typeof parsed.markdown === 'string') return parsed.markdown
+    if (typeof parsed.description_markdown === 'string') return parsed.description_markdown
+    if (typeof parsed.content_markdown === 'string') return parsed.content_markdown
+    if (typeof parsed.description === 'string') return parsed.description
+
+    const chunks: string[] = []
+    if (typeof parsed.title === 'string') chunks.push(`# ${parsed.title}`)
+    if (typeof parsed.summary === 'string') chunks.push(parsed.summary)
+    if (Array.isArray(parsed.learning_objectives) && parsed.learning_objectives.length > 0) {
+      chunks.push('## Learning Objectives')
+      parsed.learning_objectives.forEach((objective: unknown) => chunks.push(`- ${String(objective)}`))
+    }
+    if (Array.isArray(parsed.hints) && parsed.hints.length > 0) {
+      chunks.push('## Notes')
+      parsed.hints.forEach((hint: unknown) => chunks.push(`- ${String(hint)}`))
+    }
+
+    const output = chunks.join('\n\n').trim()
+    return output || unescaped
+  } catch {
+    return unescaped
+  }
+}
 
 export default function CourseDetailPage() {
   const [course, setCourse] = useState<any>(null)
@@ -191,7 +229,11 @@ export default function CourseDetailPage() {
               <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-white via-cyan-200 to-blue-200 bg-clip-text text-transparent">
                 {course.name}
               </h1>
-              <p className="text-xl text-white/60 font-light mb-6">{course.description}</p>
+              <div className="text-xl text-white/70 font-light mb-6 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/50 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-900 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-8 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-900 [&_th]:p-2">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                  {normalizeMarkdown(course.description)}
+                </ReactMarkdown>
+              </div>
               <div className="flex items-center gap-2 text-sm text-white/50">
                 <BookOpen className="w-4 h-4" />
                 <span>{units.length} units</span>
@@ -224,7 +266,11 @@ export default function CourseDetailPage() {
                   <div>
                     <div className="text-cyan-400 text-sm font-semibold mb-2">Unit {unitIndex + 1}</div>
                     <CardTitle className="text-white text-2xl mb-2">{unit.title}</CardTitle>
-                    <CardDescription className="text-white/60">{unit.description}</CardDescription>
+                    <CardDescription className="text-white/70 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/40 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-900 [&_code]:px-1 [&_code]:py-0.5 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-3">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                        {normalizeMarkdown(unit.description)}
+                      </ReactMarkdown>
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
