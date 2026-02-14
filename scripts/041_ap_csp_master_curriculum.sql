@@ -346,11 +346,19 @@ $md$
 - **%2$s**
 - **%3$s**
 
+## Why This Matters
+This lesson targets AP CSP reasoning and communication habits you will reuse on the Create Task and multiple-choice exam prompts.
+
 ## Notes Page 1: Core Notes
 %4$s
 
 ## Notes Page 2: Practice Notes
 %5$s
+
+## Do Now (2 Minutes)
+- Write a one-sentence summary of the core problem in your own words.
+- Predict one common mistake a beginner might make on this task.
+- Name one test input you will run before submitting.
 
 ## Four-Method Learning Loop
 - **Primary Method:** %6$s
@@ -377,6 +385,7 @@ $md$
 - Visible tests pass.
 - Hidden test passes.
 - Output format matches exactly.
+- Your variable names and structure are readable to another student.
 $md$,
     title,
     big_idea,
@@ -425,11 +434,15 @@ SELECT
     '76000000-0000-' || lpad(unit_number::text, 4, '0') || '-' || lpad(lesson_number::text, 4, '0') || '-' || lpad((unit_number * 100 + lesson_number)::text, 12, '0')
   )::uuid,
   lesson_id,
-  format('Checkpoint %s.%s', unit_number, lesson_number),
+  format('Checkpoint %s.%s: %s', unit_number, lesson_number, title),
   format(
 $task$
 ## Objective
 %1$s
+
+## AP Focus
+- %2$s
+- %3$s
 
 ## Task
 Use the starter code to produce the required behavior.
@@ -439,13 +452,26 @@ Use the starter code to produce the required behavior.
 2. Match output formatting exactly.
 3. Handle both provided test scenarios.
 
+## Visible Example
+- Input: `%4$s`
+- Expected: `%5$s`
+
+## Debug Checklist
+- Confirm spacing and punctuation exactly match the expected output.
+- Run tests after each meaningful code change.
+- If a test fails, compare expected vs actual before editing again.
+
 ## Method Quality Check
-Use %2$s deliberately while solving:
+Use %6$s deliberately while solving:
 - Plan before editing.
 - Test after each meaningful change.
 - Revise one readability issue after tests pass.
 $task$,
     objective,
+    big_idea,
+    ct_practice,
+    test_input_1,
+    expected_1,
     primary_method
   ),
   starter_code,

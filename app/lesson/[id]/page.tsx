@@ -151,6 +151,21 @@ function stripHtmlTags(input: string): string {
     .trim()
 }
 
+function repairInlineMarkdown(input: string): string {
+  let source = String(input || '').replace(/\r\n/g, '\n')
+  if (!source.trim()) return ''
+
+  source = source.replace(/\s+(#{1,6}\s)/g, '\n\n$1')
+  source = source.replace(/([^\n])(\s+```[a-zA-Z0-9_-]*)/g, '$1\n\n$2')
+  source = source.replace(/([^\n])(\s+-\s(?:\*\*|Q:))/g, '$1\n$2')
+  source = source.replace(/([^\n])(\s+\d+\.\s)/g, '$1\n$2')
+  source = source.replace(/```[ \t]*(#{1,6}\s)/g, '```\n\n$1')
+  source = source.replace(/[ \t]+\n/g, '\n')
+  source = source.replace(/\n{3,}/g, '\n\n')
+
+  return source.trim()
+}
+
 function normalizeLessonMarkdown(raw: string): string {
   let source = (raw || '').trim()
   if (!source) return ''
@@ -170,14 +185,14 @@ function normalizeLessonMarkdown(raw: string): string {
 
   if (!source.startsWith('{') && !source.startsWith('[')) {
     if (/<[a-z][\s\S]*>/i.test(source) && !source.includes('#')) {
-      return stripHtmlTags(source)
+      return repairInlineMarkdown(stripHtmlTags(source))
     }
-    return source
+    return repairInlineMarkdown(source)
   }
 
   try {
     const parsed = JSON.parse(source) as any
-    if (typeof parsed === 'string') return parsed
+    if (typeof parsed === 'string') return repairInlineMarkdown(parsed)
 
     if (Array.isArray(parsed)) {
       const chunks = parsed
@@ -189,15 +204,15 @@ function normalizeLessonMarkdown(raw: string): string {
           return `## ${title}\n\n${body}`
         })
         .filter(Boolean)
-      return chunks.join('\n\n').trim() || source
+      return repairInlineMarkdown(chunks.join('\n\n').trim() || source)
     }
 
-    if (!parsed || typeof parsed !== 'object') return source
+    if (!parsed || typeof parsed !== 'object') return repairInlineMarkdown(source)
 
-    if (typeof parsed.markdown === 'string') return parsed.markdown
-    if (typeof parsed.content_markdown === 'string') return parsed.content_markdown
-    if (typeof parsed.content_body === 'string') return parsed.content_body
-    if (typeof parsed.body === 'string') return parsed.body
+    if (typeof parsed.markdown === 'string') return repairInlineMarkdown(parsed.markdown)
+    if (typeof parsed.content_markdown === 'string') return repairInlineMarkdown(parsed.content_markdown)
+    if (typeof parsed.content_body === 'string') return repairInlineMarkdown(parsed.content_body)
+    if (typeof parsed.body === 'string') return repairInlineMarkdown(parsed.body)
 
     const chunks: string[] = []
 
@@ -253,9 +268,9 @@ function normalizeLessonMarkdown(raw: string): string {
     }
 
     const output = chunks.join('\n\n').trim()
-    return output || source
+    return repairInlineMarkdown(output || source)
   } catch {
-    return source
+    return repairInlineMarkdown(source)
   }
 }
 
@@ -428,6 +443,10 @@ export default function LessonViewer() {
   const sections = useMemo(() => splitMarkdownIntoSections(markdownSource), [markdownSource])
   const activeSection = sections[Math.min(activeSectionIndex, Math.max(0, sections.length - 1))]
   const sectionQuestions = useMemo(() => extractQuestions(activeSection?.body || ''), [activeSection])
+  const checkpointMarkdown = useMemo(
+    () => normalizeLessonMarkdown(currentCheckpoint?.problem_description || ''),
+    [currentCheckpoint?.problem_description],
+  )
 
   const filteredUnits = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase()
@@ -907,7 +926,7 @@ export default function LessonViewer() {
                       </div>
                       <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
                         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                          {currentCheckpoint.problem_description || 'No assignment instructions provided.'}
+                          {checkpointMarkdown || 'No assignment instructions provided.'}
                         </ReactMarkdown>
                       </div>
                     </div>

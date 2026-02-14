@@ -102,23 +102,38 @@ function resolveMonacoLanguage(language: string | null | undefined): MonacoLangu
   }
 }
 
+function repairInlineMarkdown(input: string): string {
+  let source = String(input || '').replace(/\r\n/g, '\n')
+  if (!source.trim()) return ''
+
+  source = source.replace(/\s+(#{1,6}\s)/g, '\n\n$1')
+  source = source.replace(/([^\n])(\s+```[a-zA-Z0-9_-]*)/g, '$1\n\n$2')
+  source = source.replace(/([^\n])(\s+-\s(?:\*\*|Q:))/g, '$1\n$2')
+  source = source.replace(/([^\n])(\s+\d+\.\s)/g, '$1\n$2')
+  source = source.replace(/```[ \t]*(#{1,6}\s)/g, '```\n\n$1')
+  source = source.replace(/[ \t]+\n/g, '\n')
+  source = source.replace(/\n{3,}/g, '\n\n')
+
+  return source.trim()
+}
+
 function normalizeMarkdown(raw: string | null | undefined): string {
   const source = String(raw || '').trim()
   if (!source) return 'No description provided.'
   const unescaped = source.includes('\\n') ? source.replace(/\\n/g, '\n') : source
-  if (!unescaped.startsWith('{') && !unescaped.startsWith('[')) return unescaped
+  if (!unescaped.startsWith('{') && !unescaped.startsWith('[')) return repairInlineMarkdown(unescaped)
 
   try {
     const parsed = JSON.parse(unescaped) as any
-    if (typeof parsed === 'string') return parsed
-    if (!parsed || typeof parsed !== 'object') return unescaped
-    if (typeof parsed.markdown === 'string') return parsed.markdown
-    if (typeof parsed.description === 'string') return parsed.description
-    if (typeof parsed.content_markdown === 'string') return parsed.content_markdown
-    if (typeof parsed.feedback === 'string') return parsed.feedback
-    return unescaped
+    if (typeof parsed === 'string') return repairInlineMarkdown(parsed)
+    if (!parsed || typeof parsed !== 'object') return repairInlineMarkdown(unescaped)
+    if (typeof parsed.markdown === 'string') return repairInlineMarkdown(parsed.markdown)
+    if (typeof parsed.description === 'string') return repairInlineMarkdown(parsed.description)
+    if (typeof parsed.content_markdown === 'string') return repairInlineMarkdown(parsed.content_markdown)
+    if (typeof parsed.feedback === 'string') return repairInlineMarkdown(parsed.feedback)
+    return repairInlineMarkdown(unescaped)
   } catch {
-    return unescaped
+    return repairInlineMarkdown(unescaped)
   }
 }
 

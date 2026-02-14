@@ -55,6 +55,7 @@ export default function TeacherClassroomPage() {
   const [assigningPortion, setAssigningPortion] = useState(false)
   const [portionAssignments, setPortionAssignments] = useState<any[]>([])
   const [removingPortionId, setRemovingPortionId] = useState<string | null>(null)
+  const [bulkPortionAction, setBulkPortionAction] = useState<string | null>(null)
 
   const activeOfferingCourses = useMemo(
     () => courses.filter((course) => offeringsByCourseId[course.id]?.is_active),
@@ -291,8 +292,21 @@ export default function TeacherClassroomPage() {
     setSavingAccess(false)
   }
 
-  async function assignCoursePortion() {
-    const lessonIds = Object.keys(selectedLessonIds).filter((id) => selectedLessonIds[id])
+  const allSelectedCourseLessonIds = useMemo(
+    () => courseUnits.flatMap((unit) => unit.lessons.map((lesson) => lesson.id)),
+    [courseUnits],
+  )
+  const assignedLessonIdSet = useMemo(
+    () => new Set((portionAssignments || []).map((item: any) => item?.lesson?.id).filter(Boolean)),
+    [portionAssignments],
+  )
+  const selectedCourseAssignedLessonIds = useMemo(
+    () => allSelectedCourseLessonIds.filter((lessonId) => assignedLessonIdSet.has(lessonId)),
+    [allSelectedCourseLessonIds, assignedLessonIdSet],
+  )
+
+  async function assignCoursePortion(lessonIdsOverride?: string[]) {
+    const lessonIds = lessonIdsOverride || Object.keys(selectedLessonIds).filter((id) => selectedLessonIds[id])
     if (!classroom || !userId || lessonIds.length === 0) return
 
     setAssigningPortion(true)
@@ -324,6 +338,57 @@ export default function TeacherClassroomPage() {
     await loadData()
     setAssigningPortion(false)
     alert(`Assigned ${lessonIds.length} lesson${lessonIds.length === 1 ? '' : 's'} to this class.`)
+  }
+
+  async function assignAllCourseLessons() {
+    if (!selectedCourseId || allSelectedCourseLessonIds.length === 0) return
+    await assignCoursePortion(allSelectedCourseLessonIds)
+  }
+
+  async function assignUnitLessons(unit: UnitRow) {
+    if (!selectedCourseId) return
+    const lessonIds = unit.lessons.map((lesson) => lesson.id)
+    if (lessonIds.length === 0) return
+    await assignCoursePortion(lessonIds)
+  }
+
+  async function removeLessonsFromCoursePortions(lessonIds: string[], successMessage: string) {
+    if (!classroom || lessonIds.length === 0) return
+    setBulkPortionAction('removing')
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('lesson_assignments')
+      .delete()
+      .eq('classroom_id', classroom.id)
+      .in('lesson_id', lessonIds)
+
+    if (error) {
+      alert(error.message)
+      setBulkPortionAction(null)
+      return
+    }
+
+    await loadData()
+    setBulkPortionAction(null)
+    alert(successMessage)
+  }
+
+  async function removeUnitLessons(unit: UnitRow) {
+    const lessonIds = unit.lessons.map((lesson) => lesson.id)
+    const assignedIds = lessonIds.filter((lessonId) => assignedLessonIdSet.has(lessonId))
+    if (assignedIds.length === 0) return
+    await removeLessonsFromCoursePortions(
+      assignedIds,
+      `Removed ${assignedIds.length} lesson assignment${assignedIds.length === 1 ? '' : 's'} from unit "${unit.title}".`,
+    )
+  }
+
+  async function removeAllSelectedCourseLessons() {
+    if (!selectedCourseId || selectedCourseAssignedLessonIds.length === 0) return
+    await removeLessonsFromCoursePortions(
+      selectedCourseAssignedLessonIds,
+      `Removed ${selectedCourseAssignedLessonIds.length} lesson assignment${selectedCourseAssignedLessonIds.length === 1 ? '' : 's'} from this course.`,
+    )
   }
 
   async function removePortionAssignment(assignmentId: string) {
@@ -457,7 +522,27 @@ export default function TeacherClassroomPage() {
             <div className="space-y-4 max-h-[380px] overflow-auto pr-2">
               {courseUnits.map((unit) => (
                 <div key={unit.id} className="border border-white/10 bg-white/5 rounded-lg p-3">
-                  <p className="font-medium mb-2 text-slate-100">Unit {unit.unit_number || unit.order_index || '-'}: {unit.title}</p>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-slate-100">Unit {unit.unit_number || unit.order_index || '-'}: {unit.title}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => assignUnitLessons(unit)}
+                        disabled={assigningPortion || !!bulkPortionAction || unit.lessons.length === 0}
+                      >
+                        {assigningPortion ? 'Assigning...' : `Assign Unit (${unit.lessons.length})`}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => removeUnitLessons(unit)}
+                        disabled={assigningPortion || !!bulkPortionAction || unit.lessons.every((lesson) => !assignedLessonIdSet.has(lesson.id))}
+                      >
+                        {bulkPortionAction ? 'Removing...' : 'Remove Unit'}
+                      </Button>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {unit.lessons.map((lesson) => (
                       <label key={lesson.id} className="text-sm flex items-center gap-2 text-slate-200">
@@ -474,12 +559,28 @@ export default function TeacherClassroomPage() {
               ))}
             </div>
 
-            <Button
-              onClick={assignCoursePortion}
-              disabled={assigningPortion || selectedLessonCount === 0 || !selectedCourseId}
-            >
-              {assigningPortion ? 'Assigning...' : `Assign ${selectedLessonCount} Lesson${selectedLessonCount === 1 ? '' : 's'}`}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => assignCoursePortion()}
+                disabled={assigningPortion || !!bulkPortionAction || selectedLessonCount === 0 || !selectedCourseId}
+              >
+                {assigningPortion ? 'Assigning...' : `Assign ${selectedLessonCount} Lesson${selectedLessonCount === 1 ? '' : 's'}`}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={assignAllCourseLessons}
+                disabled={assigningPortion || !!bulkPortionAction || !selectedCourseId || allSelectedCourseLessonIds.length === 0}
+              >
+                {assigningPortion ? 'Assigning...' : `Assign All (${allSelectedCourseLessonIds.length})`}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={removeAllSelectedCourseLessons}
+                disabled={assigningPortion || !!bulkPortionAction || !selectedCourseId || selectedCourseAssignedLessonIds.length === 0}
+              >
+                {bulkPortionAction ? 'Removing...' : `Remove All (${selectedCourseAssignedLessonIds.length})`}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
