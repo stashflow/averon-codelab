@@ -8,17 +8,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Code, BookOpen, Users, ArrowRight, LogOut, GraduationCap, Database, AlertCircle, Trash2 } from 'lucide-react'
+import { Code, BookOpen, Users, ArrowRight, LogOut, GraduationCap, Database, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export const dynamic = 'force-dynamic'
-
-const LEARNING_METHODS = [
-  { title: 'Spaced Repetition', tagline: 'Reinforce prior concepts every lesson.' },
-  { title: 'Active Recall', tagline: 'Predict outputs before running tests.' },
-  { title: 'Interleaving', tagline: 'Connect ideas across units.' },
-  { title: 'Deliberate Practice', tagline: 'Revise with targeted improvements.' },
-]
 
 interface CourseCategory {
   id: string
@@ -64,7 +57,6 @@ export default function CoursesPage() {
   const [offeredCourseIds, setOfferedCourseIds] = useState<Set<string>>(new Set())
   const [offeredCourseClassrooms, setOfferedCourseClassrooms] = useState<Map<string, string[]>>(new Map())
   const [enrolling, setEnrolling] = useState<string | null>(null)
-  const [unenrolling, setUnenrolling] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -281,36 +273,6 @@ export default function CoursesPage() {
     }
   }
 
-  async function handleUnenroll(courseId: string) {
-    if (!user) return
-
-    const confirmed = window.confirm('Remove this course from your account?')
-    if (!confirmed) return
-
-    setUnenrolling(courseId)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('course_enrollments')
-        .delete()
-        .eq('student_id', user.id)
-        .eq('course_id', courseId)
-
-      if (error) throw error
-
-      setEnrollments((prev) => {
-        const next = new Map(prev)
-        next.delete(courseId)
-        return next
-      })
-    } catch (err: any) {
-      console.error('[v0] Error removing course enrollment:', err)
-      alert('Failed to remove course: ' + err.message)
-    } finally {
-      setUnenrolling(null)
-    }
-  }
-
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -430,28 +392,9 @@ export default function CoursesPage() {
             Choose Your Course
           </h1>
           <p className="text-xl text-white/60 font-light">
-            AP-style coding courses with structured notes, methods, and checkpoint practice.
+            AP-style coding courses with lesson notes, checkpoints, and hands-on coding practice.
           </p>
         </div>
-
-        <Card className="mb-10 border border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 via-slate-900/70 to-blue-500/10 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-white text-xl">How Learning Works Here</CardTitle>
-            <CardDescription className="text-slate-300">
-              Every lesson uses the same four-method loop so progress stays consistent and measurable.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {LEARNING_METHODS.map((method) => (
-                <div key={method.title} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-3">
-                  <p className="text-sm font-semibold text-cyan-200">{method.title}</p>
-                  <p className="text-xs text-slate-300">{method.tagline}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {!hasClassroomEnrollment && (
           <Alert className="mb-8 border-yellow-500/20 bg-yellow-500/10">
@@ -510,13 +453,6 @@ export default function CoursesPage() {
                             <BookOpen className="w-4 h-4" />
                             <span>{course.language}</span>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {LEARNING_METHODS.map((method) => (
-                              <span key={`${course.id}-${method.title}`} className="rounded-full border border-slate-700 bg-slate-950/70 px-2 py-1 text-[11px] text-slate-300">
-                                {method.title}
-                              </span>
-                            ))}
-                          </div>
 
                           {enrolled && enrollment && (
                             <div className="text-sm text-white/60">
@@ -531,31 +467,20 @@ export default function CoursesPage() {
                           )}
 
                           {enrolled ? (
-                            <div className="space-y-2">
-                              {hasAccess ? (
-                                <Link href={`/courses/${course.id}`}>
-                                  <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-cyan-500/25 transition-all">
-                                    Continue Learning <ArrowRight className="w-4 h-4 ml-2" />
-                                  </Button>
-                                </Link>
-                              ) : (
-                                <Button
-                                  disabled
-                                  className="w-full bg-slate-700/60 text-slate-200 font-semibold disabled:opacity-80"
-                                >
-                                  Enrollment Inactive
+                            hasAccess ? (
+                              <Link href={`/courses/${course.id}`}>
+                                <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-cyan-500/25 transition-all">
+                                  Continue Learning <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
-                              )}
+                              </Link>
+                            ) : (
                               <Button
-                                variant="outline"
-                                onClick={() => handleUnenroll(course.id)}
-                                disabled={unenrolling === course.id}
-                                className="w-full border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent"
+                                disabled
+                                className="w-full bg-slate-700/60 text-slate-200 font-semibold disabled:opacity-80"
                               >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                {unenrolling === course.id ? 'Removing...' : 'Remove Course'}
+                                Enrollment Inactive
                               </Button>
-                            </div>
+                            )
                           ) : (
                             <Button
                               onClick={() => handleEnroll(course.id)}

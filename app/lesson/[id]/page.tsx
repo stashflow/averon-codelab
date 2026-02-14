@@ -24,6 +24,10 @@ import {
   BookOpen,
   Circle,
   Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+  NotebookText,
+  X,
 } from 'lucide-react'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
 import type { editor } from 'monaco-editor'
@@ -76,8 +80,6 @@ type StaticIssue = {
   message: string
 }
 
-type LearningMethodKey = 'spaced_repetition' | 'active_recall' | 'interleaving' | 'deliberate_practice'
-
 const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
   { value: 'python', label: 'Python' },
   { value: 'javascript', label: 'JavaScript' },
@@ -97,33 +99,6 @@ const LANGUAGE_BADGE_SRC: Record<MonacoLanguage, string> = {
   c: '/languages/c.svg',
   json: '/languages/json.svg',
 }
-
-const LEARNING_METHODS = [
-  {
-    key: 'spaced_repetition' as LearningMethodKey,
-    title: 'Spaced Repetition',
-    focusLabel: 'Recall prior concept',
-    prompt: 'Restate one concept from the previous lesson before writing code.',
-  },
-  {
-    key: 'active_recall' as LearningMethodKey,
-    title: 'Active Recall',
-    focusLabel: 'Predict before run',
-    prompt: 'Predict output for one test case before running the checker.',
-  },
-  {
-    key: 'interleaving' as LearningMethodKey,
-    title: 'Interleaving',
-    focusLabel: 'Connect across units',
-    prompt: 'Connect this task to a concept from a different unit.',
-  },
-  {
-    key: 'deliberate_practice' as LearningMethodKey,
-    title: 'Deliberate Practice',
-    focusLabel: 'Revise with intent',
-    prompt: 'Revise one part of your solution after feedback to improve clarity.',
-  },
-]
 
 function getLanguageLabel(language: MonacoLanguage): string {
   return LANGUAGE_OPTIONS.find((option) => option.value === language)?.label || language
@@ -185,9 +160,7 @@ function normalizeLessonMarkdown(raw: string): string {
   if (source.startsWith('"') && source.endsWith('"')) {
     try {
       const parsedString = JSON.parse(source)
-      if (typeof parsedString === 'string') {
-        source = parsedString
-      }
+      if (typeof parsedString === 'string') source = parsedString
     } catch {
       // Keep raw source if parse fails.
     }
@@ -226,15 +199,10 @@ function normalizeLessonMarkdown(raw: string): string {
 
     const chunks: string[] = []
 
-    if (typeof parsed.challenge_title === 'string') {
-      chunks.push(`# ${parsed.challenge_title}`)
-    } else if (typeof parsed.title === 'string') {
-      chunks.push(`# ${parsed.title}`)
-    }
+    if (typeof parsed.challenge_title === 'string') chunks.push(`# ${parsed.challenge_title}`)
+    else if (typeof parsed.title === 'string') chunks.push(`# ${parsed.title}`)
 
-    if (typeof parsed.description === 'string') {
-      chunks.push(parsed.description)
-    }
+    if (typeof parsed.description === 'string') chunks.push(parsed.description)
 
     const sectionGroups = [parsed.stages, parsed.sections, parsed.pages, parsed.notes_pages]
     for (const group of sectionGroups) {
@@ -285,19 +253,12 @@ function normalizeLessonMarkdown(raw: string): string {
 }
 
 function buildFallbackLessonMarkdown(title: string, description: string): string {
-  return `# ${title}\n\n## Notes Page 1: Core Idea\n${description || 'This lesson is being updated. Use this page to summarize the core concept in your own words.'}\n\n## Notes Page 2: Guided Steps\n1. Read the lesson goal and restate it in one sentence.\n2. Predict what the sample code should do.\n3. Implement the checkpoint task and test iteratively.\n\n## Quick Questions\n- Q: What input does the function require?\n- Q: What output format must your code return?\n- Q: Which edge case could break your first draft?\n\n## Four-Method Learning Loop\n- **Spaced Repetition:** connect this lesson to one prior concept.\n- **Active Recall:** predict one test result before running tests.\n- **Interleaving:** compare this lesson to another unit concept.\n- **Deliberate Practice:** improve readability after tests pass.`
-}
-
-function ensureFourMethodBlock(markdown: string): string {
-  if (/Four-Method Learning Loop/i.test(markdown)) return markdown
-  return `${markdown.trim()}\n\n## Four-Method Learning Loop\n- **Spaced Repetition:** restate one prior concept this lesson depends on.\n- **Active Recall:** predict output before running any code.\n- **Interleaving:** relate this task to a previous unit and explain the connection.\n- **Deliberate Practice:** revise after feedback and improve one measurable quality metric.`
+  return `# ${title}\n\n## Notes Page 1: Core Idea\n${description || 'This lesson is being updated. Use this page to summarize the core concept in your own words.'}\n\n## Notes Page 2: Guided Steps\n1. Read the lesson goal and restate it in one sentence.\n2. Predict what the sample code should do.\n3. Implement the checkpoint task and test iteratively.\n\n## Quick Questions\n- Q: What input does the function require?\n- Q: What output format must your code return?\n- Q: Which edge case could break your first draft?`
 }
 
 function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
   const source = (markdown || '').replace(/\r\n/g, '\n').trim()
-  if (!source) {
-    return [{ title: 'Overview', body: 'Lesson content is coming soon.' }]
-  }
+  if (!source) return [{ title: 'Overview', body: 'Lesson content is coming soon.' }]
 
   const lines = source.split('\n')
   const sections: MarkdownSection[] = []
@@ -327,7 +288,8 @@ function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
     sections.push({ title: currentTitle, body: currentLines.join('\n').trim() })
   }
 
-  return sections.length > 0 ? sections : [{ title: 'Overview', body: source }]
+  const filtered = sections.filter((section) => !/four-method learning loop/i.test(section.title))
+  return filtered.length > 0 ? filtered : [{ title: 'Overview', body: source }]
 }
 
 function extractQuestions(markdownSectionBody: string): string[] {
@@ -406,27 +368,6 @@ function runStaticChecks(code: string, language: MonacoLanguage): StaticIssue[] 
   return issues
 }
 
-function normalizeMethodName(input: string): LearningMethodKey | null {
-  const value = input.toLowerCase()
-  if (value.includes('spaced')) return 'spaced_repetition'
-  if (value.includes('active')) return 'active_recall'
-  if (value.includes('interleav')) return 'interleaving'
-  if (value.includes('deliberate')) return 'deliberate_practice'
-  return null
-}
-
-function detectPrimaryMethod(markdown: string): LearningMethodKey {
-  const lines = markdown.split('\n')
-  for (const rawLine of lines) {
-    const line = rawLine.trim()
-    const match = line.match(/primary method:\s*(.+)$/i)
-    if (!match?.[1]) continue
-    const normalized = normalizeMethodName(match[1])
-    if (normalized) return normalized
-  }
-  return 'active_recall'
-}
-
 export const dynamic = 'force-dynamic'
 
 export default function LessonViewer() {
@@ -456,7 +397,8 @@ export default function LessonViewer() {
 
   const [activeSectionIndex, setActiveSectionIndex] = useState(0)
   const [questionResponses, setQuestionResponses] = useState<Record<string, string>>({})
-  const [methodChecksBySection, setMethodChecksBySection] = useState<Record<string, Record<LearningMethodKey, boolean>>>({})
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const router = useRouter()
@@ -469,7 +411,7 @@ export default function LessonViewer() {
   const markdownSource = useMemo(() => {
     const normalized = normalizeLessonMarkdown(lesson?.content_body || '')
     const fallback = buildFallbackLessonMarkdown(lesson?.title || 'Lesson', lesson?.description || '')
-    return ensureFourMethodBlock(normalized || fallback)
+    return normalized || fallback
   }, [lesson?.content_body, lesson?.description, lesson?.title])
 
   const sections = useMemo(() => splitMarkdownIntoSections(markdownSource), [markdownSource])
@@ -478,25 +420,6 @@ export default function LessonViewer() {
   const checkpointMarkdown = useMemo(
     () => normalizeLessonMarkdown(currentCheckpoint?.problem_description || ''),
     [currentCheckpoint?.problem_description],
-  )
-  const primaryMethod = useMemo(() => detectPrimaryMethod(markdownSource), [markdownSource])
-  const methodStorageKey = useMemo(() => `acl:lesson-methods:${lessonId}`, [lessonId])
-  const methodChecks = useMemo(() => {
-    const raw = methodChecksBySection[String(activeSectionIndex)]
-    return {
-      spaced_repetition: raw?.spaced_repetition || false,
-      active_recall: raw?.active_recall || false,
-      interleaving: raw?.interleaving || false,
-      deliberate_practice: raw?.deliberate_practice || false,
-    }
-  }, [activeSectionIndex, methodChecksBySection])
-  const completedMethodCount = useMemo(
-    () => Object.values(methodChecks).filter(Boolean).length,
-    [methodChecks],
-  )
-  const primaryMethodMeta = useMemo(
-    () => LEARNING_METHODS.find((method) => method.key === primaryMethod) || LEARNING_METHODS[0],
-    [primaryMethod],
   )
 
   const filteredUnits = useMemo(() => {
@@ -513,23 +436,6 @@ export default function LessonViewer() {
   }, [courseUnits, lessonSearch])
 
   const staticIssues = useMemo(() => runStaticChecks(code, editorLanguage), [code, editorLanguage])
-
-  useEffect(() => {
-    if (!methodStorageKey) return
-    try {
-      const raw = localStorage.getItem(methodStorageKey)
-      if (!raw) return
-      const parsed = JSON.parse(raw) as Record<string, Record<LearningMethodKey, boolean>>
-      if (parsed && typeof parsed === 'object') setMethodChecksBySection(parsed)
-    } catch {
-      // Ignore malformed local method state.
-    }
-  }, [methodStorageKey])
-
-  useEffect(() => {
-    if (!methodStorageKey) return
-    localStorage.setItem(methodStorageKey, JSON.stringify(methodChecksBySection))
-  }, [methodChecksBySection, methodStorageKey])
 
   async function loadLessonData() {
     const supabase = createClient()
@@ -627,9 +533,7 @@ export default function LessonViewer() {
   const onEditorMount: OnMount = (editorInstance) => {
     editorRef.current = editorInstance
     const position = editorInstance.getPosition()
-    if (position) {
-      setCursorPosition({ line: position.lineNumber, column: position.column })
-    }
+    if (position) setCursorPosition({ line: position.lineNumber, column: position.column })
 
     editorInstance.onDidChangeCursorPosition((event) => {
       setCursorPosition({ line: event.position.lineNumber, column: event.position.column })
@@ -655,9 +559,7 @@ export default function LessonViewer() {
       })
 
       const judged = await response.json()
-      if (!response.ok) {
-        throw new Error(String(judged?.error || 'Failed to run tests'))
-      }
+      if (!response.ok) throw new Error(String(judged?.error || 'Failed to run tests'))
 
       const allPassed = Boolean(judged.passed)
       const score = Number(judged.score || 0)
@@ -723,9 +625,7 @@ export default function LessonViewer() {
 
   async function handleFormatCode() {
     const action = editorRef.current?.getAction('editor.action.formatDocument')
-    if (action) {
-      await action.run()
-    }
+    if (action) await action.run()
   }
 
   function switchCheckpoint(checkpoint: Checkpoint) {
@@ -750,25 +650,6 @@ export default function LessonViewer() {
     if (!currentCheckpoint) return `lesson.${languageExtension(editorLanguage)}`
     const slug = slugify(currentCheckpoint.title || 'checkpoint') || 'checkpoint'
     return `${slug}.${languageExtension(editorLanguage)}`
-  }
-
-  function toggleMethodCheck(method: LearningMethodKey) {
-    setMethodChecksBySection((prev) => {
-      const sectionKey = String(activeSectionIndex)
-      const current = prev[sectionKey] || {
-        spaced_repetition: false,
-        active_recall: false,
-        interleaving: false,
-        deliberate_practice: false,
-      }
-      return {
-        ...prev,
-        [sectionKey]: {
-          ...current,
-          [method]: !current[method],
-        },
-      }
-    })
   }
 
   if (loading) {
@@ -803,44 +684,68 @@ export default function LessonViewer() {
               <p className="truncate text-sm text-slate-400">{courseTitle}</p>
             </div>
           </div>
-          <div className="hidden items-center gap-2 lg:flex">
-            <Badge className="border-slate-700 bg-slate-900 text-slate-200">Markdown Notes + Questions</Badge>
-            <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">IDE Workspace</Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSidebarCollapsed((prev) => !prev)}
+              className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              <span className="hidden md:inline">{sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setNotesOpen(true)}
+              className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+            >
+              <NotebookText className="h-4 w-4" />
+              <span className="hidden md:inline">Notes</span>
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-[1800px] px-4 py-4 lg:px-6 lg:py-6">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <aside className="xl:col-span-3">
+          <aside className={sidebarCollapsed ? 'xl:col-span-2' : 'xl:col-span-3'}>
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">Lesson Sidebar</p>
-                <p className="text-xs text-slate-400">Search and open any lesson in this course</p>
+                <p className="text-sm font-medium text-slate-200">Lessons</p>
+                {!sidebarCollapsed && <p className="text-xs text-slate-400">Search and open any lesson in this course</p>}
               </div>
 
-              <div className="border-b border-slate-800 p-3">
-                <label htmlFor="lesson-search" className="sr-only">Search lessons</label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                  <input
-                    id="lesson-search"
-                    value={lessonSearch}
-                    onChange={(event) => setLessonSearch(event.target.value)}
-                    placeholder="Search lesson or unit"
-                    className="w-full rounded-md border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
-                  />
+              {!sidebarCollapsed && (
+                <div className="border-b border-slate-800 p-3">
+                  <label htmlFor="lesson-search" className="sr-only">Search lessons</label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                    <input
+                      id="lesson-search"
+                      value={lessonSearch}
+                      onChange={(event) => setLessonSearch(event.target.value)}
+                      placeholder="Search lesson or unit"
+                      className="w-full rounded-md border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="overflow-y-auto p-3">
                 <div className="space-y-4">
                   {filteredUnits.map((unit) => (
                     <div key={unit.id} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-300">
-                        Unit {unit.unit_number || unit.order_index || '-'}
-                      </p>
-                      <p className="mb-3 text-sm font-semibold text-white">{unit.title}</p>
+                      {!sidebarCollapsed && (
+                        <>
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-300">
+                            Unit {unit.unit_number || unit.order_index || '-'}
+                          </p>
+                          <p className="mb-3 text-sm font-semibold text-white">{unit.title}</p>
+                        </>
+                      )}
 
                       <div className="space-y-2">
                         {unit.lessons.map((entry) => {
@@ -855,12 +760,12 @@ export default function LessonViewer() {
                                     : 'border border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
                                 }`}
                               >
-                                <div className="min-w-0">
-                                  <p className="truncate">
-                                    {entry.lesson_number || entry.order_index || '-'} . {entry.title}
-                                  </p>
-                                </div>
-                                <div className="ml-3 shrink-0">
+                                {!sidebarCollapsed && (
+                                  <div className="min-w-0">
+                                    <p className="truncate">{entry.lesson_number || entry.order_index || '-'} . {entry.title}</p>
+                                  </div>
+                                )}
+                                <div className={sidebarCollapsed ? 'mx-auto shrink-0' : 'ml-3 shrink-0'}>
                                   {status === 'completed' ? (
                                     <CheckCircle className="h-4 w-4 text-emerald-300" />
                                   ) : status === 'in_progress' ? (
@@ -887,173 +792,21 @@ export default function LessonViewer() {
             </div>
           </aside>
 
-          <section className="xl:col-span-4">
+          <section className="xl:col-span-6">
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">Lesson Notes</p>
-                <p className="text-xs text-slate-400">Markdown notes pages and guided questions</p>
-              </div>
-
-              <div className="border-b border-slate-800 p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Four Method Workflow</p>
-                  <Badge className="border-slate-700 bg-slate-900 text-slate-200">
-                    {completedMethodCount} / 4 complete
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  {LEARNING_METHODS.map((method) => (
-                    <button
-                      key={method.title}
-                      type="button"
-                      onClick={() => toggleMethodCheck(method.key)}
-                      className={`rounded-md border px-3 py-2 text-left transition ${
-                        methodChecks[method.key]
-                          ? 'border-emerald-500/40 bg-emerald-500/10'
-                          : method.key === primaryMethod
-                            ? 'border-cyan-500/40 bg-cyan-500/10'
-                            : 'border-slate-700 bg-slate-950/60 hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-cyan-200">{method.title}</p>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                            methodChecks[method.key]
-                              ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100'
-                              : 'border-slate-600 text-slate-300'
-                          }`}
-                        >
-                          {methodChecks[method.key] ? 'Done' : 'Mark'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300">{method.prompt}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-b border-slate-800 p-2">
-                <div className="flex gap-2 overflow-x-auto">
-                  {sections.map((section, index) => (
-                    <button
-                      key={`${section.title}-${index}`}
-                      type="button"
-                      onClick={() => setActiveSectionIndex(index)}
-                      className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                        index === activeSectionIndex
-                          ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/30'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                      }`}
-                    >
-                      Notes {index + 1}: {section.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-5 py-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-2xl font-semibold text-white">{activeSection?.title || 'Overview'}</h2>
-                  <Badge className="border-slate-700 bg-slate-900 text-slate-200">
-                    Page {Math.min(activeSectionIndex + 1, sections.length)} / {sections.length}
-                  </Badge>
-                </div>
-
-                <div className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                    {activeSection?.body || 'Lesson notes are loading.'}
-                  </ReactMarkdown>
-                </div>
-
-                <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-cyan-300" />
-                    <p className="text-sm font-semibold text-white">Notes Questions</p>
-                  </div>
-
-                  {sectionQuestions.length > 0 ? (
-                    <div className="space-y-3">
-                      {sectionQuestions.map((question, index) => {
-                        const key = getQuestionResponseKey(index)
-                        return (
-                          <div key={`${key}-${question}`} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
-                            <p className="mb-2 text-sm text-slate-100">Q{index + 1}. {question}</p>
-                            <textarea
-                              value={questionResponses[key] || ''}
-                              onChange={(event) => setQuestionResponses((prev) => ({ ...prev, [key]: event.target.value }))}
-                              placeholder="Write your response here..."
-                              rows={3}
-                              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
-                            />
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No explicit questions were found on this notes page yet.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="xl:col-span-5">
-            <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
-              <div className="border-b border-slate-800 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">Assignment + Coding Environment</p>
-                <p className="text-xs text-slate-400">Production-style editor with tests and completion flow</p>
-              </div>
-
-              <div className="border-b border-slate-800 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {checkpoints.length === 0 && (
-                    <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">No assignment checkpoints in this lesson yet</Badge>
-                  )}
-                  {checkpoints.map((checkpoint, index) => (
-                    <button
-                      key={checkpoint.id}
-                      type="button"
-                      onClick={() => switchCheckpoint(checkpoint)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                        currentCheckpoint?.id === checkpoint.id
-                          ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/30'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                      }`}
-                    >
-                      {index + 1}. {checkpoint.title}
-                    </button>
-                  ))}
-                </div>
+                <p className="text-sm font-medium text-slate-200">Code Editor</p>
+                <p className="text-xs text-slate-400">Write and run your solution here</p>
               </div>
 
               <div className="flex-1 overflow-y-auto px-5 py-5">
                 {currentCheckpoint ? (
                   <div className="space-y-5">
                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-                          <FileCode2 className="h-5 w-5 text-cyan-300" />
-                          {currentCheckpoint.title}
-                        </h3>
-                        <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
-                      </div>
-                      <div className="mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Method Focus</p>
-                        <p className="text-sm text-cyan-100">{primaryMethodMeta.title}: {primaryMethodMeta.prompt}</p>
-                      </div>
-                      <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                          {checkpointMarkdown || 'No assignment instructions provided.'}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <h4 className="flex items-center gap-2 text-base font-semibold text-white">
                           <Code2 className="h-5 w-5 text-cyan-300" />
-                          Code Editor
+                          {currentCheckpoint.title}
                         </h4>
                         <div className="flex items-center gap-2">
                           <Button
@@ -1116,7 +869,7 @@ export default function LessonViewer() {
                         </div>
 
                         <MonacoEditor
-                          height="420px"
+                          height="560px"
                           language={editorLanguage}
                           value={code}
                           onMount={onEditorMount}
@@ -1124,7 +877,7 @@ export default function LessonViewer() {
                           theme="vs-dark"
                           options={{
                             minimap: { enabled: true },
-                            fontSize: 14,
+                            fontSize: 15,
                             lineNumbers: 'on',
                             roundedSelection: false,
                             scrollBeyondLastLine: false,
@@ -1228,14 +981,152 @@ export default function LessonViewer() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-6 text-sm text-slate-300">
-                    This lesson does not have coding checkpoints yet. Add one in content management to enable the coding workspace.
+                    This lesson has no coding checkpoint yet.
                   </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="xl:col-span-3">
+            <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
+              <div className="border-b border-slate-800 px-4 py-3">
+                <p className="text-sm font-medium text-slate-200">Assignment</p>
+                <p className="text-xs text-slate-400">Checkpoint instructions and points</p>
+              </div>
+
+              <div className="border-b border-slate-800 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {checkpoints.length === 0 && (
+                    <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">No checkpoint for this lesson</Badge>
+                  )}
+                  {checkpoints.map((checkpoint, index) => (
+                    <button
+                      key={checkpoint.id}
+                      type="button"
+                      onClick={() => switchCheckpoint(checkpoint)}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                        currentCheckpoint?.id === checkpoint.id
+                          ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/30'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                      }`}
+                    >
+                      {index + 1}. {checkpoint.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-5 py-5">
+                {currentCheckpoint ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+                        <FileCode2 className="h-5 w-5 text-cyan-300" />
+                        {currentCheckpoint.title}
+                      </h3>
+                      <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
+                    </div>
+                    <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                        {checkpointMarkdown || 'No assignment instructions provided.'}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">No assignment instructions available for this lesson.</p>
                 )}
               </div>
             </div>
           </section>
         </div>
       </main>
+
+      {notesOpen && (
+        <div className="fixed inset-0 z-[60] flex">
+          <button type="button" className="h-full flex-1 bg-black/60" onClick={() => setNotesOpen(false)} aria-label="Close notes" />
+          <div className="h-full w-full max-w-2xl border-l border-slate-700 bg-slate-950/98 backdrop-blur">
+            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-slate-200">Lesson Notes</p>
+                <p className="text-xs text-slate-400">Reference content and response prompts</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                onClick={() => setNotesOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="border-b border-slate-800 p-2">
+              <div className="flex gap-2 overflow-x-auto">
+                {sections.map((section, index) => (
+                  <button
+                    key={`${section.title}-${index}`}
+                    type="button"
+                    onClick={() => setActiveSectionIndex(index)}
+                    className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                      index === activeSectionIndex
+                        ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/30'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    Notes {index + 1}: {section.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-[calc(100%-112px)] overflow-y-auto px-5 py-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-2xl font-semibold text-white">{activeSection?.title || 'Overview'}</h2>
+                <Badge className="border-slate-700 bg-slate-900 text-slate-200">
+                  Page {Math.min(activeSectionIndex + 1, sections.length)} / {sections.length}
+                </Badge>
+              </div>
+
+              <div className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                  {activeSection?.body || 'Lesson notes are loading.'}
+                </ReactMarkdown>
+              </div>
+
+              <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-cyan-300" />
+                  <p className="text-sm font-semibold text-white">Notes Questions</p>
+                </div>
+
+                {sectionQuestions.length > 0 ? (
+                  <div className="space-y-3">
+                    {sectionQuestions.map((question, index) => {
+                      const key = getQuestionResponseKey(index)
+                      return (
+                        <div key={`${key}-${question}`} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                          <p className="mb-2 text-sm text-slate-100">Q{index + 1}. {question}</p>
+                          <textarea
+                            value={questionResponses[key] || ''}
+                            onChange={(event) => setQuestionResponses((prev) => ({ ...prev, [key]: event.target.value }))}
+                            placeholder="Write your response here..."
+                            rows={3}
+                            className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">No explicit questions were found on this notes page yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

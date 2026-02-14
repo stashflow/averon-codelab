@@ -19,7 +19,7 @@ import {
   mergePreferences,
   type UserFeaturePreferences,
 } from '@/lib/user-preferences'
-import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users, Bell, AlertCircle, Trash2 } from 'lucide-react'
+import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users, Bell, AlertCircle } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,7 +76,7 @@ export default function StudentDashboard() {
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null)
   const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
   const [savingPreferences, setSavingPreferences] = useState(false)
-  const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null)
+  const [leavingClassroomId, setLeavingClassroomId] = useState<string | null>(null)
   const router = useRouter()
 
   const overallCourseProgress = useMemo(() => {
@@ -263,29 +263,29 @@ export default function StudentDashboard() {
     router.push('/')
   }
 
-  async function handleDeleteCourse(courseId: string) {
+  async function handleLeaveClass(enrollmentId: string) {
     if (!user) return
-    const confirmed = window.confirm('Remove this course from your account?')
+    const confirmed = window.confirm('Leave this class? You can rejoin later with the class code.')
     if (!confirmed) return
 
-    setDeletingCourseId(courseId)
+    setLeavingClassroomId(enrollmentId)
     const supabase = createClient()
 
     try {
       const { error } = await supabase
-        .from('course_enrollments')
+        .from('enrollments')
         .delete()
         .eq('student_id', user.id)
-        .eq('course_id', courseId)
+        .eq('id', enrollmentId)
 
       if (error) throw error
 
-      setEnrolledCourses((prev) => prev.filter((course) => course.id !== courseId))
+      await loadDashboardData()
     } catch (err: any) {
-      console.error('[v0] delete course enrollment error', err)
-      alert(err.message || 'Failed to remove course.')
+      console.error('[v0] leave class error', err)
+      alert(err.message || 'Failed to leave class.')
     } finally {
-      setDeletingCourseId(null)
+      setLeavingClassroomId(null)
     }
   }
 
@@ -513,9 +513,20 @@ export default function StudentDashboard() {
                         Code: <span className="font-mono text-cyan-400">{enrollment.classrooms?.code}</span>
                       </p>
                     </div>
-                    <Badge variant="secondary" className="gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
-                      <Users className="w-3 h-3" /> Enrolled
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+                        <Users className="w-3 h-3" /> Enrolled
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleLeaveClass(enrollment.id)}
+                        disabled={leavingClassroomId === enrollment.id}
+                        className="border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent"
+                      >
+                        {leavingClassroomId === enrollment.id ? 'Leaving...' : 'Leave Class'}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -544,16 +555,6 @@ export default function StudentDashboard() {
                             Continue <ArrowRight className="w-3 h-3" />
                           </Button>
                         </Link>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteCourse(course.id)}
-                          disabled={deletingCourseId === course.id}
-                          className="gap-1 border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          {deletingCourseId === course.id ? 'Removing...' : 'Remove'}
-                        </Button>
                       </div>
                     </div>
                   ))

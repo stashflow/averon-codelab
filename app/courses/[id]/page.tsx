@@ -21,13 +21,6 @@ interface Lesson {
 
 export const dynamic = 'force-dynamic'
 
-const LEARNING_METHODS = [
-  { title: 'Spaced Repetition', cue: 'Restate the prior concept before coding.' },
-  { title: 'Active Recall', cue: 'Predict one output before running tests.' },
-  { title: 'Interleaving', cue: 'Connect this lesson to another unit.' },
-  { title: 'Deliberate Practice', cue: 'Revise one part after feedback.' },
-]
-
 function repairInlineMarkdown(input: string): string {
   let source = String(input || '').replace(/\r\n/g, '\n')
   if (!source.trim()) return ''
@@ -260,14 +253,6 @@ export default function CourseDetailPage() {
               <div className="flex items-center gap-2 text-sm text-white/50">
                 <BookOpen className="w-4 h-4" />
                 <span>{units.length} units</span>
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
-                {LEARNING_METHODS.map((method) => (
-                  <div key={method.title} className="rounded-lg border border-slate-700/70 bg-slate-950/60 px-3 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">{method.title}</p>
-                    <p className="text-xs text-slate-300">{method.cue}</p>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
