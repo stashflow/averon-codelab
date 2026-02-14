@@ -89,6 +89,12 @@ type QuickQuizItem = {
   rationale: string
 }
 
+type ApcspFrameworkTag = {
+  unitLabel: string
+  bigIdeas: string[]
+  practices: string[]
+}
+
 const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
   { value: 'python', label: 'Python' },
   { value: 'javascript', label: 'JavaScript' },
@@ -454,24 +460,92 @@ function buildApcspQuiz(lessonTitle: string): QuickQuizItem[] {
   return [
     {
       id: 'q1',
-      question: 'In AP CSP problem solving, constraints are:',
-      options: ['Ignored during coding', 'Limits your solution must respect', 'The same as comments', 'Only for grading'],
+      question: 'In AP CSP, constraints are best defined as:',
+      options: ['Optional style preferences', 'Limits your solution must satisfy', 'Only grading rules', 'Variables chosen by the compiler'],
       correctIndex: 1,
       rationale: 'Constraints are required limits that solutions must satisfy.',
     },
     {
       id: 'q2',
-      question: 'A good first coding step is to:',
-      options: ['Skip planning', 'Write pseudocode for the algorithm', 'Guess hidden tests', 'Change function signature'],
+      question: 'Before implementation, AP CSP recommends you first:',
+      options: ['Skip directly to code', 'Write pseudocode and define the algorithm', 'Focus only on UI colors', 'Rename all variables'],
       correctIndex: 1,
       rationale: 'Pseudocode clarifies logic before implementation.',
     },
     {
       id: 'q3',
-      question: 'Teacher-safe progress means:',
-      options: ['Any answer counts', 'Answer keys are explicit and checked', 'No quizzes are needed', 'Students grade themselves'],
-      correctIndex: 1,
-      rationale: 'Reliable grading requires explicit correct answers.',
+      question: 'Which AP CSP Big Idea includes creating and refining algorithms?',
+      options: ['Big Idea 1: Creative Development', 'Big Idea 2: Data', 'Big Idea 4: Computer Systems and Networks', 'Big Idea 5: Impact of Computing'],
+      correctIndex: 0,
+      rationale: 'Creative Development includes designing and improving computational solutions.',
+    },
+  ]
+}
+
+function inferApcspFrameworkTag(unitTitle: string, lessonTitle: string): ApcspFrameworkTag {
+  const text = `${unitTitle} ${lessonTitle}`.toLowerCase()
+
+  if (text.includes('data')) {
+    return {
+      unitLabel: 'AP CSP Data and Information',
+      bigIdeas: ['Big Idea 2: Data'],
+      practices: ['CTP 2: Algorithms and Program Development', 'CTP 4: Code Analysis'],
+    }
+  }
+
+  if (text.includes('internet') || text.includes('network')) {
+    return {
+      unitLabel: 'AP CSP Computer Systems and Networks',
+      bigIdeas: ['Big Idea 4: Computer Systems and Networks'],
+      practices: ['CTP 3: Abstraction in Program Development', 'CTP 6: Responsible Computing'],
+    }
+  }
+
+  if (text.includes('impact') || text.includes('ethic') || text.includes('society')) {
+    return {
+      unitLabel: 'AP CSP Impact of Computing',
+      bigIdeas: ['Big Idea 5: Impact of Computing'],
+      practices: ['CTP 1: Computational Solution Design', 'CTP 6: Responsible Computing'],
+    }
+  }
+
+  if (text.includes('algorithm') || text.includes('function') || text.includes('condition') || text.includes('code')) {
+    return {
+      unitLabel: 'AP CSP Creative Development',
+      bigIdeas: ['Big Idea 1: Creative Development'],
+      practices: ['CTP 1: Computational Solution Design', 'CTP 2: Algorithms and Program Development'],
+    }
+  }
+
+  return {
+    unitLabel: 'AP CSP Core Concepts',
+    bigIdeas: ['Big Idea 3: Algorithms and Programming'],
+    practices: ['CTP 1: Computational Solution Design', 'CTP 4: Code Analysis'],
+  }
+}
+
+function apcspFrameworkOverview(): Array<{ label: string; items: string[] }> {
+  return [
+    {
+      label: 'Big Ideas',
+      items: [
+        '1. Creative Development',
+        '2. Data',
+        '3. Algorithms and Programming',
+        '4. Computer Systems and Networks',
+        '5. Impact of Computing',
+      ],
+    },
+    {
+      label: 'Computational Thinking Practices',
+      items: [
+        'CTP 1: Computational Solution Design',
+        'CTP 2: Algorithms and Program Development',
+        'CTP 3: Abstraction in Program Development',
+        'CTP 4: Code Analysis',
+        'CTP 5: Computing Innovations',
+        'CTP 6: Responsible Computing',
+      ],
     },
   ]
 }
@@ -604,6 +678,19 @@ export default function LessonViewer() {
       })
       .filter((unit) => unit.lessons.length > 0 || unit.title.toLowerCase().includes(query))
   }, [courseUnits, lessonSearch])
+  const currentUnitTitle = useMemo(() => {
+    const currentLessonId = lesson?.id
+    if (!currentLessonId) return 'Unit'
+    for (const unit of courseUnits) {
+      if (unit.lessons.some((entry) => entry.id === currentLessonId)) return unit.title || 'Unit'
+    }
+    return 'Unit'
+  }, [courseUnits, lesson?.id])
+  const frameworkTag = useMemo(
+    () => (isApcspCourse ? inferApcspFrameworkTag(currentUnitTitle, lesson?.title || '') : null),
+    [currentUnitTitle, isApcspCourse, lesson?.title],
+  )
+  const frameworkOverview = useMemo(() => (isApcspCourse ? apcspFrameworkOverview() : []), [isApcspCourse])
 
   const staticIssues = useMemo(() => runStaticChecks(code, editorLanguage), [code, editorLanguage])
 
@@ -1255,6 +1342,14 @@ export default function LessonViewer() {
                       </h3>
                       <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
                     </div>
+                    {isApcspCourse && frameworkTag && (
+                      <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">AP CSP Alignment</p>
+                        <p className="mt-1 text-sm text-cyan-100">{frameworkTag.unitLabel}</p>
+                        <p className="mt-1 text-xs text-cyan-100">Big Ideas: {frameworkTag.bigIdeas.join(' | ')}</p>
+                        <p className="mt-1 text-xs text-cyan-100">Practices: {frameworkTag.practices.join(' | ')}</p>
+                      </div>
+                    )}
                     {isApcspCourse && pseudocodeGuide.length > 0 && (
                       <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">Pseudocode Plan</p>
@@ -1264,6 +1359,20 @@ export default function LessonViewer() {
                           ))}
                         </ul>
                         <p className="mt-2 text-xs text-indigo-200">Translate these steps into Python in the editor.</p>
+                      </div>
+                    )}
+                    {isApcspCourse && frameworkOverview.length > 0 && (
+                      <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 space-y-2">
+                        {frameworkOverview.map((group) => (
+                          <div key={group.label}>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">{group.label}</p>
+                            <ul className="mt-1 space-y-1 text-xs text-slate-200">
+                              {group.items.map((item) => (
+                                <li key={item}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
                       </div>
                     )}
                     <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
