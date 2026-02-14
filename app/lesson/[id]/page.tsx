@@ -18,6 +18,7 @@ import {
   PlayCircle,
   Trophy,
   AlertCircle,
+  Lock,
   Code2,
   Braces,
   FileCode2,
@@ -78,6 +79,14 @@ type MarkdownSection = {
 type StaticIssue = {
   severity: 'warning' | 'error'
   message: string
+}
+
+type QuickQuizItem = {
+  id: string
+  question: string
+  options: string[]
+  correctIndex: number
+  rationale: string
 }
 
 const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
@@ -329,6 +338,144 @@ function inferMonacoLanguage(source: string): MonacoLanguage {
   return 'python'
 }
 
+function normalizeLanguageHint(source: string): MonacoLanguage | null {
+  const normalized = source.trim().toLowerCase()
+  if (!normalized) return null
+  if (normalized.includes('python')) return 'python'
+  if (normalized.includes('javascript') || normalized === 'js') return 'javascript'
+  if (normalized.includes('typescript') || normalized === 'ts') return 'typescript'
+  if (normalized.includes('java')) return 'java'
+  if (normalized.includes('c++') || normalized === 'cpp') return 'cpp'
+  if (normalized === 'c') return 'c'
+  if (normalized.includes('json')) return 'json'
+  return null
+}
+
+function resolvePreferredLanguage(courseTitle: string, courseLanguageHint: string, starterCode: string): MonacoLanguage {
+  const title = courseTitle.toLowerCase()
+  if (title.includes('ap computer science principles') || title.includes('ap csp')) return 'python'
+
+  const fromCourse = normalizeLanguageHint(courseLanguageHint)
+  if (fromCourse) return fromCourse
+
+  return inferMonacoLanguage(starterCode)
+}
+
+function buildPseudocodeGuide(checkpoint: Checkpoint | null): string[] {
+  if (!checkpoint) return []
+  const title = checkpoint.title.toLowerCase()
+  if (title.includes('first function') || title.includes('greet')) {
+    return [
+      'Define a function with one input name.',
+      'Build a greeting string using "Hello, " + name + "!".',
+      'Return the greeting string.',
+    ]
+  }
+  if (title.includes('conditional') || title.includes('classify') || title.includes('temp')) {
+    return [
+      'If temperature is less than 50, return "cold".',
+      'Else if temperature is less than 75, return "warm".',
+      'Otherwise return "hot".',
+    ]
+  }
+  if (title.includes('normalize') || title.includes('name')) {
+    return [
+      'Remove leading and trailing spaces from input.',
+      'Reduce repeated spaces to single spaces.',
+      'Convert each word to title case and return result.',
+    ]
+  }
+  return [
+    'Read the required input and output format.',
+    'Plan the algorithm in 2-3 clear steps.',
+    'Implement the same steps in Python.',
+  ]
+}
+
+function buildApcspQuiz(lessonTitle: string): QuickQuizItem[] {
+  const normalizedTitle = lessonTitle.toLowerCase()
+  if (normalizedTitle.includes('first function') || normalizedTitle.includes('greet')) {
+    return [
+      {
+        id: 'q1',
+        question: 'What is the output of a function?',
+        options: ['The value it returns', 'Only printed text', 'Its parameter names', 'Its indentation'],
+        correctIndex: 0,
+        rationale: 'A function output is the returned value.',
+      },
+      {
+        id: 'q2',
+        question: 'In Python, which keyword sends a value back from a function?',
+        options: ['print', 'yield', 'return', 'input'],
+        correctIndex: 2,
+        rationale: '`return` sends the function result back.',
+      },
+      {
+        id: 'q3',
+        question: 'If name is "Ava", what should greet_student(name) return?',
+        options: ['Hello Ava', 'Hello, Ava!', 'Ava Hello', 'name'],
+        correctIndex: 1,
+        rationale: 'Required format is exactly `Hello, <name>!`.',
+      },
+    ]
+  }
+
+  if (normalizedTitle.includes('conditional') || normalizedTitle.includes('temp')) {
+    return [
+      {
+        id: 'q1',
+        question: 'Which branch should execute first in an ordered if-chain?',
+        options: ['The broadest condition', 'The most specific early condition', 'Always else', 'Randomly'],
+        correctIndex: 1,
+        rationale: 'Ordered checks should test specific thresholds first.',
+      },
+      {
+        id: 'q2',
+        question: 'If temp is 75 and rules are <50 cold, <75 warm, else hot, output is:',
+        options: ['cold', 'warm', 'hot', 'error'],
+        correctIndex: 2,
+        rationale: '75 is not <75, so it falls to else -> hot.',
+      },
+      {
+        id: 'q3',
+        question: 'Why is branch order important?',
+        options: [
+          'Python requires 3 branches',
+          'Earlier true conditions stop later checks',
+          'It changes variable names',
+          'It only affects style',
+        ],
+        correctIndex: 1,
+        rationale: 'Once a condition matches, subsequent branches are skipped.',
+      },
+    ]
+  }
+
+  return [
+    {
+      id: 'q1',
+      question: 'In AP CSP problem solving, constraints are:',
+      options: ['Ignored during coding', 'Limits your solution must respect', 'The same as comments', 'Only for grading'],
+      correctIndex: 1,
+      rationale: 'Constraints are required limits that solutions must satisfy.',
+    },
+    {
+      id: 'q2',
+      question: 'A good first coding step is to:',
+      options: ['Skip planning', 'Write pseudocode for the algorithm', 'Guess hidden tests', 'Change function signature'],
+      correctIndex: 1,
+      rationale: 'Pseudocode clarifies logic before implementation.',
+    },
+    {
+      id: 'q3',
+      question: 'Teacher-safe progress means:',
+      options: ['Any answer counts', 'Answer keys are explicit and checked', 'No quizzes are needed', 'Students grade themselves'],
+      correctIndex: 1,
+      rationale: 'Reliable grading requires explicit correct answers.',
+    },
+  ]
+}
+
 function runStaticChecks(code: string, language: MonacoLanguage): StaticIssue[] {
   const issues: StaticIssue[] = []
 
@@ -387,6 +534,7 @@ export default function LessonViewer() {
   const [code, setCode] = useState('')
   const [editorLanguage, setEditorLanguage] = useState<MonacoLanguage>('python')
   const [courseLanguage, setCourseLanguage] = useState<string>('python')
+  const [preferredLanguage, setPreferredLanguage] = useState<MonacoLanguage>('python')
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 })
 
   const [testResults, setTestResults] = useState<{ passed: boolean; score: number; results: Array<{ passed: boolean }> } | null>(null)
@@ -397,8 +545,10 @@ export default function LessonViewer() {
 
   const [activeSectionIndex, setActiveSectionIndex] = useState(0)
   const [questionResponses, setQuestionResponses] = useState<Record<string, string>>({})
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [notesOpen, setNotesOpen] = useState(false)
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({})
+  const [quizSubmitted, setQuizSubmitted] = useState(false)
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const router = useRouter()
@@ -421,6 +571,26 @@ export default function LessonViewer() {
     () => normalizeLessonMarkdown(currentCheckpoint?.problem_description || ''),
     [currentCheckpoint?.problem_description],
   )
+  const isApcspCourse = useMemo(() => /ap computer science principles|ap csp/i.test(courseTitle), [courseTitle])
+  const pseudocodeGuide = useMemo(() => buildPseudocodeGuide(currentCheckpoint), [currentCheckpoint])
+  const quickQuiz = useMemo(() => (isApcspCourse ? buildApcspQuiz(lesson?.title || '') : []), [isApcspCourse, lesson?.title])
+  const quizScore = useMemo(() => {
+    if (quickQuiz.length === 0) return 100
+    const answered = quickQuiz.filter((item) => Number.isFinite(quizAnswers[item.id]))
+    if (answered.length === 0) return 0
+    const correct = quickQuiz.filter((item) => quizAnswers[item.id] === item.correctIndex).length
+    return Math.round((correct / quickQuiz.length) * 100)
+  }, [quickQuiz, quizAnswers])
+  const hasMinimumNotesResponse = useMemo(() => {
+    const responses = Object.values(questionResponses).map((value) => value.trim()).filter(Boolean)
+    if (responses.length === 0) return true
+    return responses.some((value) => value.length >= 8)
+  }, [questionResponses])
+  const canStartCoding = useMemo(() => {
+    if (!isApcspCourse) return true
+    if (!quizSubmitted) return false
+    return quizScore >= 80 && hasMinimumNotesResponse
+  }, [hasMinimumNotesResponse, isApcspCourse, quizScore, quizSubmitted])
 
   const filteredUnits = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase()
@@ -440,6 +610,7 @@ export default function LessonViewer() {
   async function loadLessonData() {
     const supabase = createClient()
     let resolvedCourseLanguage = 'python'
+    let resolvedCourseName = ''
 
     try {
       const {
@@ -478,10 +649,13 @@ export default function LessonViewer() {
         ])
 
         if (courseData?.name) setCourseTitle(String(courseData.name))
+        resolvedCourseName = String(courseData?.name || '')
 
         const languageHint = String(courseData?.language || 'python')
         resolvedCourseLanguage = languageHint
         setCourseLanguage(languageHint)
+        const resolvedPreferred = resolvePreferredLanguage(resolvedCourseName, languageHint, '')
+        setPreferredLanguage(resolvedPreferred)
 
         const normalizedUnits = ((unitsData || []) as SidebarUnit[])
           .map((unit) => ({
@@ -498,7 +672,7 @@ export default function LessonViewer() {
         })
         setProgressByLessonId(progressMap)
 
-        setEditorLanguage(inferMonacoLanguage(languageHint))
+        setEditorLanguage(resolvePreferredLanguage(resolvedCourseName, languageHint, ''))
       }
 
       const { data: checkpointsData, error: checkpointsError } = await supabase
@@ -516,13 +690,17 @@ export default function LessonViewer() {
         setCurrentCheckpoint(first)
         const starter = first.starter_code || ''
         setCode(starter)
-        setEditorLanguage(inferMonacoLanguage(`${starter}\n${resolvedCourseLanguage}`))
+        const resolved = resolvePreferredLanguage(resolvedCourseName || courseTitle, resolvedCourseLanguage, starter)
+        setPreferredLanguage(resolved)
+        setEditorLanguage(resolved)
       } else {
         setCurrentCheckpoint(null)
         setCode('')
       }
 
       setActiveSectionIndex(0)
+      setQuizAnswers({})
+      setQuizSubmitted(false)
     } catch (err: unknown) {
       console.error('[v0] Error loading lesson:', err)
     } finally {
@@ -631,7 +809,11 @@ export default function LessonViewer() {
   function switchCheckpoint(checkpoint: Checkpoint) {
     setCurrentCheckpoint(checkpoint)
     setCode(checkpoint.starter_code || '')
-    setEditorLanguage(inferMonacoLanguage(`${checkpoint.starter_code || ''}\n${courseLanguage}`))
+    const resolved = resolvePreferredLanguage(courseTitle, courseLanguage, checkpoint.starter_code || '')
+    setPreferredLanguage(resolved)
+    setEditorLanguage(resolved)
+    setQuizAnswers({})
+    setQuizSubmitted(false)
     setTestResults(null)
   }
 
@@ -711,7 +893,7 @@ export default function LessonViewer() {
 
       <main className="mx-auto w-full max-w-[1800px] px-4 py-4 lg:px-6 lg:py-6">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <aside className={sidebarCollapsed ? 'xl:col-span-2' : 'xl:col-span-3'}>
+          <aside className={sidebarCollapsed ? 'xl:col-span-1' : 'xl:col-span-3'}>
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
                 <p className="text-sm font-medium text-slate-200">Lessons</p>
@@ -792,7 +974,7 @@ export default function LessonViewer() {
             </div>
           </aside>
 
-          <section className="xl:col-span-6">
+          <section className={sidebarCollapsed ? 'xl:col-span-8' : 'xl:col-span-6'}>
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
                 <p className="text-sm font-medium text-slate-200">Code Editor</p>
@@ -802,6 +984,59 @@ export default function LessonViewer() {
               <div className="flex-1 overflow-y-auto px-5 py-5">
                 {currentCheckpoint ? (
                   <div className="space-y-5">
+                    {isApcspCourse && (
+                      <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-cyan-100">AP CSP Learn First Flow</p>
+                          <Badge className={canStartCoding ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-amber-500/40 bg-amber-500/20 text-amber-100'}>
+                            {canStartCoding ? 'Coding Unlocked' : 'Complete Learn + Quiz'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-cyan-50">
+                          Step 1: Read Notes. Step 2: Pass quick check (80%+). Step 3: Start coding in Python.
+                        </p>
+                        {quickQuiz.length > 0 && (
+                          <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
+                            {quickQuiz.map((item, index) => (
+                              <div key={item.id} className="text-sm text-slate-100">
+                                <p className="mb-2 font-medium">Q{index + 1}. {item.question}</p>
+                                <div className="grid gap-1">
+                                  {item.options.map((option, optionIndex) => (
+                                    <label key={`${item.id}-${optionIndex}`} className="flex items-center gap-2 text-slate-200">
+                                      <input
+                                        type="radio"
+                                        name={`quick-${item.id}`}
+                                        checked={quizAnswers[item.id] === optionIndex}
+                                        onChange={() => setQuizAnswers((prev) => ({ ...prev, [item.id]: optionIndex }))}
+                                      />
+                                      <span>{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                                {quizSubmitted && (
+                                  <p className={`mt-1 text-xs ${quizAnswers[item.id] === item.correctIndex ? 'text-emerald-300' : 'text-orange-300'}`}>
+                                    {quizAnswers[item.id] === item.correctIndex ? 'Correct' : `Review: ${item.rationale}`}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="border-cyan-500/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
+                                onClick={() => setQuizSubmitted(true)}
+                              >
+                                Check Answers
+                              </Button>
+                              <p className="text-xs text-slate-300">Score: {quizScore}% (need 80%+)</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <h4 className="flex items-center gap-2 text-base font-semibold text-white">
@@ -853,18 +1088,9 @@ export default function LessonViewer() {
                                 className="h-7 w-auto"
                               />
                             </div>
-                            <select
-                              id="editor-language"
-                              value={editorLanguage}
-                              onChange={(event) => setEditorLanguage(event.target.value as MonacoLanguage)}
-                              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
-                            >
-                              {LANGUAGE_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
+                            <Badge className="border-slate-700 bg-slate-900 text-slate-200">
+                              {getLanguageLabel(editorLanguage)}
+                            </Badge>
                           </div>
                         </div>
 
@@ -876,6 +1102,7 @@ export default function LessonViewer() {
                           onChange={(value) => setCode(value ?? '')}
                           theme="vs-dark"
                           options={{
+                            readOnly: !canStartCoding,
                             minimap: { enabled: true },
                             fontSize: 15,
                             lineNumbers: 'on',
@@ -896,6 +1123,7 @@ export default function LessonViewer() {
                         <div className="flex items-center justify-between border-t border-slate-700 bg-[#111a33] px-3 py-2 text-xs text-slate-300">
                           <div className="flex items-center gap-4">
                             <span>{getLanguageLabel(editorLanguage)}</span>
+                            <span>Target: {getLanguageLabel(preferredLanguage)}</span>
                             <span>UTF-8</span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -925,10 +1153,10 @@ export default function LessonViewer() {
                       <div className="mt-4 flex gap-2">
                         <Button
                           onClick={() => void handleRunTests()}
-                          disabled={submitting}
+                          disabled={submitting || !canStartCoding}
                           className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
                         >
-                          <PlayCircle className="mr-2 h-4 w-4" />
+                          {!canStartCoding ? <Lock className="mr-2 h-4 w-4" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                           {submitting ? 'Running Tests...' : 'Run Tests'}
                         </Button>
                         {testResults?.passed && (
@@ -1027,6 +1255,17 @@ export default function LessonViewer() {
                       </h3>
                       <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
                     </div>
+                    {isApcspCourse && pseudocodeGuide.length > 0 && (
+                      <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">Pseudocode Plan</p>
+                        <ul className="mt-2 space-y-1 text-sm text-indigo-100">
+                          {pseudocodeGuide.map((step, index) => (
+                            <li key={`pseudo-${index}`}>{index + 1}. {step}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-xs text-indigo-200">Translate these steps into Python in the editor.</p>
+                      </div>
+                    )}
                     <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                         {checkpointMarkdown || 'No assignment instructions provided.'}

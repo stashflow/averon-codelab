@@ -27,6 +27,7 @@ type Assignment = {
   due_date: string | null
   classroom_id: string
   starter_code: string | null
+  test_cases: unknown
 }
 
 type Submission = {
@@ -49,6 +50,18 @@ type JudgePayload = {
   passed: boolean
   score: number
   results: JudgeResult[]
+}
+
+type QuizQuestion = {
+  prompt: string
+  options: string[]
+  correctIndex: number
+  explanation?: string
+  points?: number
+}
+
+type QuizSubmissionPayload = {
+  answers?: number[]
 }
 
 const LANGUAGE_BADGE_SRC: Record<MonacoLanguage, string> = {
@@ -137,6 +150,27 @@ function normalizeMarkdown(raw: string | null | undefined): string {
   }
 }
 
+function parseQuizQuestions(testCases: unknown): QuizQuestion[] {
+  if (!Array.isArray(testCases)) return []
+  return testCases
+    .map((item: any) => ({
+      prompt: String(item?.prompt || ''),
+      options: Array.isArray(item?.options) ? item.options.map((option: unknown) => String(option || '')) : [],
+      correctIndex: Number.isFinite(Number(item?.correctIndex)) ? Number(item.correctIndex) : 0,
+      explanation: String(item?.explanation || ''),
+      points: Number.isFinite(Number(item?.points)) ? Number(item.points) : 1,
+    }))
+    .filter((item) => item.prompt && item.options.length >= 2)
+}
+
+function parseQuizSubmission(code: string | null | undefined): QuizSubmissionPayload {
+  try {
+    return JSON.parse(String(code || '{}')) as QuizSubmissionPayload
+  } catch {
+    return {}
+  }
+}
+
 export const dynamic = 'force-dynamic'
 
 export default function AssignmentPage() {
@@ -154,6 +188,7 @@ export default function AssignmentPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [editorLanguage, setEditorLanguage] = useState<MonacoLanguage>('python')
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 })
+  const [quizAnswers, setQuizAnswers] = useState<number[]>([])
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
@@ -164,6 +199,19 @@ export default function AssignmentPage() {
 
   const assignmentMarkdown = useMemo(() => normalizeMarkdown(assignment?.description), [assignment?.description])
   const feedbackMarkdown = useMemo(() => normalizeMarkdown(submission?.feedback), [submission?.feedback])
+  const isQuizAssignment = assignment?.language === 'quiz'
+  const quizQuestions = useMemo(() => parseQuizQuestions(assignment?.test_cases), [assignment?.test_cases])
+  const quizPreviewScore = useMemo(() => {
+    if (!isQuizAssignment || quizQuestions.length === 0) return 0
+    let earned = 0
+    let possible = 0
+    quizQuestions.forEach((question, index) => {
+      const points = Math.max(1, Number(question.points) || 1)
+      possible += points
+      if (quizAnswers[index] === question.correctIndex) earned += points
+    })
+    return possible > 0 ? Math.round((earned / possible) * 100) : 0
+  }, [isQuizAssignment, quizAnswers, quizQuestions])
 
   async function loadData() {
     const supabase = createClient()
@@ -210,6 +258,10 @@ export default function AssignmentPage() {
       setAssignment(normalizedAssignment)
       setEditorLanguage(resolveMonacoLanguage(normalizedAssignment.language))
       setCode(normalizedAssignment.starter_code || '')
+      if (normalizedAssignment.language === 'quiz') {
+        const questions = parseQuizQuestions(normalizedAssignment.test_cases)
+        setQuizAnswers(new Array(questions.length).fill(-1))
+      }
 
       const { data: submissionData, error: submissionError } = await supabase
         .from('submissions')
@@ -225,7 +277,14 @@ export default function AssignmentPage() {
       if (submissionData) {
         const normalizedSubmission = submissionData as Submission
         setSubmission(normalizedSubmission)
-        setCode(normalizedSubmission.code || normalizedAssignment.starter_code || '')
+        if (normalizedAssignment.language === 'quiz') {
+          const payload = parseQuizSubmission(normalizedSubmission.code)
+          if (Array.isArray(payload.answers)) {
+            setQuizAnswers(payload.answers.map((answer) => (Number.isFinite(Number(answer)) ? Number(answer) : -1)))
+          }
+        } else {
+          setCode(normalizedSubmission.code || normalizedAssignment.starter_code || '')
+        }
       }
     } catch (err: any) {
       console.error('[v0] Error loading assignment page data:', err)
@@ -306,17 +365,24 @@ export default function AssignmentPage() {
   }
 
   async function handleSubmit() {
-    if (!code.trim() || !userId) return
+    if (!userId) return
+    if (!isQuizAssignment && !code.trim()) return
 
     setSubmitting(true)
     const supabase = createClient()
 
     try {
+      const submissionCode = isQuizAssignment
+        ? JSON.stringify({
+            answers: quizAnswers.map((answer) => (Number.isFinite(Number(answer)) ? Number(answer) : -1)),
+          })
+        : code
+
       if (submission) {
         const { error } = await supabase
           .from('submissions')
           .update({
-            code,
+            code: submissionCode,
             status: 'submitted',
             submitted_at: new Date().toISOString(),
           })
@@ -329,7 +395,7 @@ export default function AssignmentPage() {
           .insert({
             assignment_id: assignmentId,
             student_id: userId,
-            code,
+            code: submissionCode,
             status: 'submitted',
             submitted_at: new Date().toISOString(),
           })
@@ -436,152 +502,207 @@ export default function AssignmentPage() {
 
           <section className="lg:col-span-8">
             <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl p-6 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Code2 className="w-5 h-5 text-cyan-300" />
-                  Code Editor
-                </h3>
-                <div className="flex items-center gap-2">
-                  <div className="overflow-hidden rounded-md border border-slate-700 bg-slate-900">
-                    <Image
-                      src={LANGUAGE_BADGE_SRC[editorLanguage]}
-                      alt={`${getLanguageLabel(editorLanguage)} language`}
-                      width={160}
-                      height={56}
-                      className="h-7 w-auto"
-                    />
-                  </div>
-                  <Badge className="border-slate-700 bg-slate-900 text-slate-200">{editorLanguage}</Badge>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                    onClick={handleFormatCode}
-                  >
-                    <Braces className="mr-1 h-4 w-4" />
-                    Format
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                    onClick={() => setCode(assignment.starter_code || '')}
-                  >
-                    Reset
-                  </Button>
-                </div>
-              </div>
+              {isQuizAssignment ? (
+                <>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                    Quiz Questions
+                  </h3>
 
-              <div className="overflow-hidden rounded-lg border border-slate-700 bg-[#0b1020]">
-                <div className="flex items-center justify-between border-b border-slate-700 bg-[#111a33] px-3 py-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
-                      <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                    </div>
-                    <div className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-200">
-                      {editorFileName()}
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-300">{getLanguageLabel(editorLanguage)}</p>
-                </div>
-
-                <MonacoEditor
-                  height="460px"
-                  language={editorLanguage}
-                  value={code}
-                  onMount={onEditorMount}
-                  onChange={(value) => setCode(value ?? '')}
-                  theme="vs-dark"
-                  options={{
-                    minimap: { enabled: true },
-                    fontSize: 14,
-                    lineNumbers: 'on',
-                    automaticLayout: true,
-                    tabSize: 2,
-                    wordWrap: 'on',
-                    formatOnType: true,
-                    formatOnPaste: true,
-                    cursorSmoothCaretAnimation: 'on',
-                    smoothScrolling: true,
-                    bracketPairColorization: { enabled: true },
-                    guides: { bracketPairs: true, indentation: true },
-                  }}
-                />
-
-                <div className="flex items-center justify-between border-t border-slate-700 bg-[#111a33] px-3 py-2 text-xs text-slate-300">
-                  <div className="flex items-center gap-4">
-                    <span>{getLanguageLabel(editorLanguage)}</span>
-                    <span>UTF-8</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span>Ln {cursorPosition.line}</span>
-                    <span>Col {cursorPosition.column}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={handleRunTests}
-                  variant="outline"
-                  className="gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                  disabled={testingCode || !code.trim()}
-                >
-                  <Play className="w-4 h-4" />
-                  {testingCode ? 'Running Tests...' : 'Run Tests'}
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-0 gap-2"
-                  disabled={submitting || !code.trim()}
-                >
-                  <Send className="w-4 h-4" />
-                  {submitting ? 'Submitting...' : 'Submit Solution'}
-                </Button>
-              </div>
-
-              {testResults && (
-                <div className={`rounded-xl border p-4 ${testResults.passed ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-orange-500/40 bg-orange-500/10'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-base font-semibold text-white">Test Results</h4>
-                    <p className="text-cyan-200 font-semibold">Score: {Math.round(testResults.score)}%</p>
-                  </div>
-                  <p className="text-sm text-slate-200 mb-3">
-                    {passedCount} of {totalCount} tests passed
-                  </p>
-                  <div className="space-y-2">
-                    {testResults.results.map((test, idx) => (
-                      <div key={`${idx}-${test.name || 'test'}`} className="flex items-start gap-3 rounded-md border border-slate-700 bg-slate-950/60 p-3">
-                        <div className="mt-0.5">
-                          {test.passed ? (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-red-400" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0 text-sm">
-                          <p className="font-medium text-white">{test.name || `Test ${idx + 1}`}</p>
-                          {!test.passed && (
-                            <div className="text-slate-300 mt-1 space-y-1">
-                              {test.expected !== undefined && <p>Expected: <span className="font-mono text-slate-100">{test.expected}</span></p>}
-                              {test.actual !== undefined && <p>Actual: <span className="font-mono text-slate-100">{test.actual}</span></p>}
-                              {test.error && (
-                                <p className="text-red-300 flex items-start gap-1">
-                                  <AlertCircle className="w-4 h-4 mt-0.5" />
-                                  <span>{test.error}</span>
-                                </p>
-                              )}
-                            </div>
-                          )}
+                  <div className="space-y-3">
+                    {quizQuestions.map((question, index) => (
+                      <div key={`quiz-question-${index}`} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <p className="text-sm font-semibold text-white mb-2">
+                          {index + 1}. {question.prompt}
+                        </p>
+                        <div className="space-y-2">
+                          {question.options.map((option, optionIndex) => (
+                            <label key={`quiz-${index}-option-${optionIndex}`} className="flex items-center gap-2 text-sm text-slate-200">
+                              <input
+                                type="radio"
+                                name={`quiz-q-${index}`}
+                                checked={quizAnswers[index] === optionIndex}
+                                onChange={() => {
+                                  setQuizAnswers((prev) => {
+                                    const next = [...prev]
+                                    next[index] = optionIndex
+                                    return next
+                                  })
+                                }}
+                              />
+                              <span>{option}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+
+                  <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-3">
+                    <p className="text-sm text-cyan-100">Current practice score: {quizPreviewScore}%</p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={handleSubmit}
+                      className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-0 gap-2"
+                      disabled={submitting}
+                    >
+                      <Send className="w-4 h-4" />
+                      {submitting ? 'Submitting...' : 'Submit Quiz'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Code2 className="w-5 h-5 text-cyan-300" />
+                      Code Editor
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <div className="overflow-hidden rounded-md border border-slate-700 bg-slate-900">
+                        <Image
+                          src={LANGUAGE_BADGE_SRC[editorLanguage]}
+                          alt={`${getLanguageLabel(editorLanguage)} language`}
+                          width={160}
+                          height={56}
+                          className="h-7 w-auto"
+                        />
+                      </div>
+                      <Badge className="border-slate-700 bg-slate-900 text-slate-200">{editorLanguage}</Badge>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                        onClick={handleFormatCode}
+                      >
+                        <Braces className="mr-1 h-4 w-4" />
+                        Format
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                        onClick={() => setCode(assignment.starter_code || '')}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-slate-700 bg-[#0b1020]">
+                    <div className="flex items-center justify-between border-b border-slate-700 bg-[#111a33] px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                          <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                        </div>
+                        <div className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-slate-200">
+                          {editorFileName()}
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-300">{getLanguageLabel(editorLanguage)}</p>
+                    </div>
+
+                    <MonacoEditor
+                      height="460px"
+                      language={editorLanguage}
+                      value={code}
+                      onMount={onEditorMount}
+                      onChange={(value) => setCode(value ?? '')}
+                      theme="vs-dark"
+                      options={{
+                        minimap: { enabled: true },
+                        fontSize: 14,
+                        lineNumbers: 'on',
+                        automaticLayout: true,
+                        tabSize: 2,
+                        wordWrap: 'on',
+                        formatOnType: true,
+                        formatOnPaste: true,
+                        cursorSmoothCaretAnimation: 'on',
+                        smoothScrolling: true,
+                        bracketPairColorization: { enabled: true },
+                        guides: { bracketPairs: true, indentation: true },
+                      }}
+                    />
+
+                    <div className="flex items-center justify-between border-t border-slate-700 bg-[#111a33] px-3 py-2 text-xs text-slate-300">
+                      <div className="flex items-center gap-4">
+                        <span>{getLanguageLabel(editorLanguage)}</span>
+                        <span>UTF-8</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span>Ln {cursorPosition.line}</span>
+                        <span>Col {cursorPosition.column}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={handleRunTests}
+                      variant="outline"
+                      className="gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                      disabled={testingCode || !code.trim()}
+                    >
+                      <Play className="w-4 h-4" />
+                      {testingCode ? 'Running Tests...' : 'Run Tests'}
+                    </Button>
+                    <Button
+                      onClick={handleSubmit}
+                      className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-0 gap-2"
+                      disabled={submitting || !code.trim()}
+                    >
+                      <Send className="w-4 h-4" />
+                      {submitting ? 'Submitting...' : 'Submit Solution'}
+                    </Button>
+                  </div>
+
+                  {testResults && (
+                    <div className={`rounded-xl border p-4 ${testResults.passed ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-orange-500/40 bg-orange-500/10'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-base font-semibold text-white">Test Results</h4>
+                        <p className="text-cyan-200 font-semibold">Score: {Math.round(testResults.score)}%</p>
+                      </div>
+                      <p className="text-sm text-slate-200 mb-3">
+                        {passedCount} of {totalCount} tests passed
+                      </p>
+                      <div className="space-y-2">
+                        {testResults.results.map((test, idx) => (
+                          <div key={`${idx}-${test.name || 'test'}`} className="flex items-start gap-3 rounded-md border border-slate-700 bg-slate-950/60 p-3">
+                            <div className="mt-0.5">
+                              {test.passed ? (
+                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                              ) : (
+                                <XCircle className="w-5 h-5 text-red-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0 text-sm">
+                              <p className="font-medium text-white">{test.name || `Test ${idx + 1}`}</p>
+                              {!test.passed && (
+                                <div className="text-slate-300 mt-1 space-y-1">
+                                  {test.expected !== undefined && <p>Expected: <span className="font-mono text-slate-100">{test.expected}</span></p>}
+                                  {test.actual !== undefined && <p>Actual: <span className="font-mono text-slate-100">{test.actual}</span></p>}
+                                  {test.error && (
+                                    <p className="text-red-300 flex items-start gap-1">
+                                      <AlertCircle className="w-4 h-4 mt-0.5" />
+                                      <span>{test.error}</span>
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {submission?.status === 'graded' && (

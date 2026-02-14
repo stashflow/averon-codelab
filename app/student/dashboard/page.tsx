@@ -6,7 +6,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
@@ -19,7 +18,21 @@ import {
   mergePreferences,
   type UserFeaturePreferences,
 } from '@/lib/user-preferences'
-import { BookOpen, Trophy, Flame, Award, LogOut, ArrowRight, Plus, Settings, Users, Bell, AlertCircle } from 'lucide-react'
+import {
+  BookOpen,
+  Award,
+  LogOut,
+  ArrowRight,
+  Plus,
+  Settings,
+  Users,
+  Bell,
+  AlertCircle,
+  CheckCircle2,
+  Target,
+  Star,
+  Trophy,
+} from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +53,6 @@ interface ClassroomEnrollment {
     name: string
     code: string
     teacher_id: string
-    profiles?: { full_name: string | null; email: string | null } | null
   } | null
 }
 
@@ -61,13 +73,32 @@ interface ClassroomCodeLookup {
   code: string
 }
 
+type ProgressRow = {
+  status: string | null
+  score: number | null
+}
+
+type SubmissionRow = {
+  status: string | null
+  score: number | null
+}
+
+type AchievementBadge = {
+  id: string
+  title: string
+  description: string
+  icon: 'award' | 'check' | 'target' | 'star' | 'trophy'
+  earned: boolean
+}
+
 export default function StudentDashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([])
   const [classEnrollments, setClassEnrollments] = useState<ClassroomEnrollment[]>([])
   const [badges, setBadges] = useState<any[]>([])
-  const [streak, setStreak] = useState<any>(null)
+  const [progressRows, setProgressRows] = useState<ProgressRow[]>([])
+  const [submissionRows, setSubmissionRows] = useState<SubmissionRow[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [joinCode, setJoinCode] = useState('')
@@ -79,10 +110,92 @@ export default function StudentDashboard() {
   const [leavingClassroomId, setLeavingClassroomId] = useState<string | null>(null)
   const router = useRouter()
 
+  const completedLessons = useMemo(() => progressRows.filter((row) => row.status === 'completed').length, [progressRows])
+  const inProgressLessons = useMemo(() => progressRows.filter((row) => row.status === 'in_progress').length, [progressRows])
+  const gradedSubmissions = useMemo(() => submissionRows.filter((row) => row.status === 'graded').length, [submissionRows])
+  const submittedSubmissions = useMemo(
+    () => submissionRows.filter((row) => row.status === 'submitted' || row.status === 'graded').length,
+    [submissionRows],
+  )
+  const averageGrade = useMemo(() => {
+    const scores = submissionRows
+      .map((row) => row.score)
+      .filter((score): score is number => typeof score === 'number')
+    if (scores.length === 0) return 0
+    return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+  }, [submissionRows])
+
+  const achievementBadges = useMemo<AchievementBadge[]>(() => {
+    const badgeTypeSet = new Set((badges || []).map((badge: any) => String(badge.badge_type || '').toLowerCase()))
+    const badgeNameSet = new Set((badges || []).map((badge: any) => String(badge.badge_name || '').toLowerCase()))
+    const hasExistingBadge = (keys: string[]) => keys.some((key) => badgeTypeSet.has(key) || badgeNameSet.has(key))
+
+    return [
+      {
+        id: 'first-lesson',
+        title: 'First Lesson Complete',
+        description: 'Complete your first lesson.',
+        icon: 'check',
+        earned: completedLessons >= 1 || hasExistingBadge(['first_lesson', 'first lesson complete']),
+      },
+      {
+        id: 'lesson-5',
+        title: 'Momentum Builder',
+        description: 'Complete 5 lessons.',
+        icon: 'target',
+        earned: completedLessons >= 5 || hasExistingBadge(['momentum_builder', 'momentum builder']),
+      },
+      {
+        id: 'lesson-15',
+        title: 'Unit Finisher',
+        description: 'Complete 15 lessons.',
+        icon: 'award',
+        earned: completedLessons >= 15 || hasExistingBadge(['unit_finisher', 'unit finisher']),
+      },
+      {
+        id: 'first-submit',
+        title: 'First Submission',
+        description: 'Submit your first assignment.',
+        icon: 'star',
+        earned: submittedSubmissions >= 1 || hasExistingBadge(['first_submission', 'first submission']),
+      },
+      {
+        id: 'graded-5',
+        title: 'Feedback Ready',
+        description: 'Receive 5 graded submissions.',
+        icon: 'award',
+        earned: gradedSubmissions >= 5 || hasExistingBadge(['feedback_ready', 'feedback ready']),
+      },
+      {
+        id: 'high-score',
+        title: 'High Performer',
+        description: 'Maintain an average grade of 90 or higher.',
+        icon: 'trophy',
+        earned: (gradedSubmissions >= 3 && averageGrade >= 90) || hasExistingBadge(['high_performer', 'high performer']),
+      },
+      {
+        id: 'class-joiner',
+        title: 'Class Collaborator',
+        description: 'Join at least one classroom.',
+        icon: 'check',
+        earned: classEnrollments.length >= 1 || hasExistingBadge(['class_collaborator', 'class collaborator']),
+      },
+      {
+        id: 'deep-practice',
+        title: 'Deep Practice',
+        description: 'Keep 10+ lessons in progress or completed.',
+        icon: 'target',
+        earned: completedLessons + inProgressLessons >= 10 || hasExistingBadge(['deep_practice', 'deep practice']),
+      },
+    ]
+  }, [averageGrade, badges, classEnrollments.length, completedLessons, gradedSubmissions, inProgressLessons, submittedSubmissions])
+
+  const earnedBadgeCount = useMemo(() => achievementBadges.filter((badge) => badge.earned).length, [achievementBadges])
+
   const overallCourseProgress = useMemo(() => {
-    if (enrolledCourses.length === 0) return 0
-    return Math.min(100, Math.round((badges.length / Math.max(1, enrolledCourses.length * 2)) * 100))
-  }, [badges.length, enrolledCourses.length])
+    const targetLessons = Math.max(10, enrolledCourses.length * 8)
+    return Math.min(100, Math.round((completedLessons / targetLessons) * 100))
+  }, [completedLessons, enrolledCourses.length])
 
   const prefsStorageKey = useMemo(() => (profile?.id ? getUserPreferencesStorageKey(profile.id) : ''), [profile])
   const joinDraftKey = useMemo(() => (profile?.id ? `acl:join-code-draft:${profile.id}` : ''), [profile])
@@ -142,15 +255,16 @@ export default function StudentDashboard() {
 
       setUser(authUser)
 
-      const [{ data: profileData }, { data: enrollmentData }, { data: classEnrollmentData }, { data: streakData }, { data: badgeData }] = await Promise.all([
+      const [{ data: profileData }, { data: enrollmentData }, { data: classEnrollmentData }, { data: badgeData }, { data: progressData }, { data: submissionsData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', authUser.id).single(),
         supabase.from('course_enrollments').select('id, course_id, courses(*)').eq('student_id', authUser.id).eq('is_active', true),
         supabase
           .from('enrollments')
           .select('id, classroom_id, classrooms(id, name, code, teacher_id)')
           .eq('student_id', authUser.id),
-        supabase.from('student_streaks').select('*').eq('student_id', authUser.id).single(),
-        supabase.from('badges').select('*').eq('student_id', authUser.id).order('earned_at', { ascending: false }).limit(6),
+        supabase.from('badges').select('*').eq('student_id', authUser.id).order('earned_at', { ascending: false }).limit(20),
+        supabase.from('student_lesson_progress').select('status, score').eq('student_id', authUser.id),
+        supabase.from('submissions').select('status, score').eq('student_id', authUser.id),
       ])
 
       setProfile(profileData)
@@ -166,13 +280,13 @@ export default function StudentDashboard() {
       setEnrolledCourses(
         (enrollmentData || [])
           .map((e: any) => (e.courses ? { ...e.courses, enrollment_id: e.id } : null))
-          .filter(Boolean)
+          .filter(Boolean),
       )
       setClassEnrollments((classEnrollmentData as any) || [])
-      setStreak(streakData || { current_streak: 0, longest_streak: 0 })
       setBadges(badgeData || [])
+      setProgressRows((progressData as ProgressRow[]) || [])
+      setSubmissionRows((submissionsData as SubmissionRow[]) || [])
 
-      // Load announcements for all enrolled classes
       if (classEnrollmentData && classEnrollmentData.length > 0) {
         const classroomIds = classEnrollmentData.map((e: any) => e.classroom_id)
         const { data: announcementsData } = await supabase
@@ -341,30 +455,7 @@ export default function StudentDashboard() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">Welcome back, {profile?.full_name || 'Student'}</h1>
           <p className="text-slate-400 mt-1">Track your progress, join classes, and keep learning.</p>
-          {preferences.keyboard_shortcuts && (
-            <p className="text-xs text-cyan-300 mt-2">Keyboard shortcuts: press <span className="font-mono">C</span> for courses, <span className="font-mono">S</span> for settings.</p>
-          )}
         </div>
-
-        {preferences.quick_actions_bar && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Link href="/courses">
-              <Button className="w-full justify-start gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white">
-                <BookOpen className="w-4 h-4 text-cyan-300" /> Explore Courses
-              </Button>
-            </Link>
-            <Link href="/settings">
-              <Button className="w-full justify-start gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white">
-                <Settings className="w-4 h-4 text-cyan-300" /> Update Preferences
-              </Button>
-            </Link>
-            <Link href="/student/dashboard">
-              <Button className="w-full justify-start gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white">
-                <Users className="w-4 h-4 text-cyan-300" /> Review Progress
-              </Button>
-            </Link>
-          </div>
-        )}
 
         {announcements.length > 0 && (
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-xl border border-blue-400/20 shadow-2xl shadow-blue-500/20 p-6">
@@ -375,20 +466,11 @@ export default function StudentDashboard() {
               </div>
               <div className="space-y-2">
                 {announcements.map((announcement) => (
-                  <div
-                    key={announcement.id}
-                    className="flex items-start gap-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4"
-                  >
-                    {announcement.priority === 'urgent' && (
-                      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    )}
+                  <div key={announcement.id} className="flex items-start gap-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4">
+                    {announcement.priority === 'urgent' && <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />}
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm leading-relaxed">
-                        {announcement.message}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-2">
-                        - {announcement.teacher?.full_name || 'Teacher'}
-                      </p>
+                      <p className="text-white text-sm leading-relaxed">{announcement.message}</p>
+                      <p className="text-xs text-slate-500 mt-2">- {announcement.teacher?.full_name || 'Teacher'}</p>
                     </div>
                   </div>
                 ))}
@@ -398,16 +480,15 @@ export default function StudentDashboard() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-orange-500/10 p-5">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-blue-500/10 p-5">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-slate-300">Current Streak</p>
-                <Flame className="w-5 h-5 text-orange-400" />
+                <p className="text-sm font-medium text-slate-300">Completed Lessons</p>
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{streak?.current_streak || 0}</p>
-              <p className="text-sm text-slate-400 mt-1">days</p>
+              <p className="text-4xl font-bold text-white">{completedLessons}</p>
+              <p className="text-sm text-slate-400 mt-1">done</p>
             </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent" />
           </div>
 
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-blue-500/10 p-5">
@@ -419,7 +500,6 @@ export default function StudentDashboard() {
               <p className="text-4xl font-bold text-white">{enrolledCourses.length}</p>
               <p className="text-sm text-slate-400 mt-1">active</p>
             </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent" />
           </div>
 
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-emerald-500/10 p-5">
@@ -428,22 +508,20 @@ export default function StudentDashboard() {
                 <p className="text-sm font-medium text-slate-300">Badges Earned</p>
                 <Award className="w-5 h-5 text-emerald-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{badges.length}</p>
-              <p className="text-sm text-slate-400 mt-1">recent</p>
+              <p className="text-4xl font-bold text-white">{earnedBadgeCount}</p>
+              <p className="text-sm text-slate-400 mt-1">unlocked</p>
             </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
           </div>
 
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-yellow-500/10 p-5">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-slate-300">Longest Streak</p>
+                <p className="text-sm font-medium text-slate-300">Average Grade</p>
                 <Trophy className="w-5 h-5 text-yellow-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{streak?.longest_streak || 0}</p>
-              <p className="text-sm text-slate-400 mt-1">days</p>
+              <p className="text-4xl font-bold text-white">{averageGrade}%</p>
+              <p className="text-sm text-slate-400 mt-1">graded work</p>
             </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent" />
           </div>
         </div>
 
@@ -455,14 +533,38 @@ export default function StudentDashboard() {
                 Joined <span className="text-cyan-300 font-medium">{classEnrollments.length}</span> active classroom(s).
               </div>
               <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
-                Earned <span className="text-cyan-300 font-medium">{badges.length}</span> recent badge(s).
+                Completed <span className="text-cyan-300 font-medium">{completedLessons}</span> lesson(s).
               </div>
               <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
-                Current streak: <span className="text-cyan-300 font-medium">{streak?.current_streak || 0}</span> day(s).
+                Submitted <span className="text-cyan-300 font-medium">{submittedSubmissions}</span> assignment(s), with <span className="text-cyan-300 font-medium">{gradedSubmissions}</span> graded.
               </div>
             </div>
           </div>
         )}
+
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="relative z-10 space-y-4">
+            <div>
+              <h3 className="text-xl font-semibold text-white">Achievement Badges</h3>
+              <p className="text-sm text-slate-400 mt-1">Badges unlock from real completed work and graded performance.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {achievementBadges.map((badge) => {
+                const Icon = badge.icon === 'check' ? CheckCircle2 : badge.icon === 'target' ? Target : badge.icon === 'star' ? Star : badge.icon === 'trophy' ? Trophy : Award
+                return (
+                  <div key={badge.id} className={`rounded-xl border p-4 ${badge.earned ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-white/5 border-white/10'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-white">{badge.title}</p>
+                      <Icon className={`w-4 h-4 ${badge.earned ? 'text-emerald-300' : 'text-slate-500'}`} />
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1">{badge.description}</p>
+                    <p className={`text-xs mt-2 ${badge.earned ? 'text-emerald-300' : 'text-slate-500'}`}>{badge.earned ? 'Earned' : 'Locked'}</p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
@@ -474,20 +576,9 @@ export default function StudentDashboard() {
               <div className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="join-code" className="text-slate-300">Class Code</Label>
-                  <Input
-                    id="join-code"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                    placeholder="ABC123"
-                    maxLength={12}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
-                  />
+                  <Input id="join-code" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={12} className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20" />
                 </div>
-                <Button 
-                  onClick={joinClassByCode} 
-                  disabled={joining || !joinCode.trim()} 
-                  className="w-full gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0"
-                >
+                <Button onClick={joinClassByCode} disabled={joining || !joinCode.trim()} className="w-full gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0">
                   <Plus className="w-4 h-4" />
                   {joining ? 'Joining...' : 'Join Class'}
                 </Button>
@@ -509,21 +600,11 @@ export default function StudentDashboard() {
                   <div key={enrollment.id} className="flex items-center justify-between rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
                     <div>
                       <p className="font-medium text-white">{enrollment.classrooms?.name || 'Class'}</p>
-                      <p className="text-sm text-slate-400">
-                        Code: <span className="font-mono text-cyan-400">{enrollment.classrooms?.code}</span>
-                      </p>
+                      <p className="text-sm text-slate-400">Code: <span className="font-mono text-cyan-400">{enrollment.classrooms?.code}</span></p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
-                        <Users className="w-3 h-3" /> Enrolled
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleLeaveClass(enrollment.id)}
-                        disabled={leavingClassroomId === enrollment.id}
-                        className="border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent"
-                      >
+                      <Badge variant="secondary" className="gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30"><Users className="w-3 h-3" /> Enrolled</Badge>
+                      <Button size="sm" variant="outline" onClick={() => handleLeaveClass(enrollment.id)} disabled={leavingClassroomId === enrollment.id} className="border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent">
                         {leavingClassroomId === enrollment.id ? 'Leaving...' : 'Leave Class'}
                       </Button>
                     </div>
@@ -586,12 +667,12 @@ export default function StudentDashboard() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
-                    <p className="text-xs text-slate-400">Classes Joined</p>
-                    <p className="text-3xl font-semibold text-white mt-1">{classEnrollments.length}</p>
+                    <p className="text-xs text-slate-400">Lessons Completed</p>
+                    <p className="text-3xl font-semibold text-white mt-1">{completedLessons}</p>
                   </div>
                   <div className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
-                    <p className="text-xs text-slate-400">Recent Badges</p>
-                    <p className="text-3xl font-semibold text-white mt-1">{badges.length}</p>
+                    <p className="text-xs text-slate-400">Assignments Graded</p>
+                    <p className="text-3xl font-semibold text-white mt-1">{gradedSubmissions}</p>
                   </div>
                 </div>
               </div>

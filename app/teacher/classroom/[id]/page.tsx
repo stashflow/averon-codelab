@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, Users } from 'lucide-react'
+import { ArrowLeft, Plus, Users, ClipboardCheck, BarChart3 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,23 @@ type UnitRow = {
     order_index: number | null
     title: string
   }>
+}
+
+type StudentPerformance = {
+  lessonsCompleted: number
+  lessonsInProgress: number
+  assignmentsSubmitted: number
+  assignmentsGraded: number
+  averageScore: number
+}
+
+type QuizQuestion = {
+  id: string
+  prompt: string
+  options: string[]
+  correctIndex: number
+  explanation: string
+  points: number
 }
 
 export default function TeacherClassroomPage() {
@@ -39,6 +57,17 @@ export default function TeacherClassroomPage() {
     description: '',
     language: 'python',
     starterCode: '',
+    assignmentType: 'coding' as 'coding' | 'quiz',
+    quizQuestions: [
+      {
+        id: crypto.randomUUID(),
+        prompt: '',
+        options: ['', '', '', ''],
+        correctIndex: 0,
+        explanation: '',
+        points: 1,
+      } satisfies QuizQuestion,
+    ] as QuizQuestion[],
   })
   const [creatingAssignment, setCreatingAssignment] = useState(false)
   const [userId, setUserId] = useState<string>('')
@@ -56,6 +85,7 @@ export default function TeacherClassroomPage() {
   const [portionAssignments, setPortionAssignments] = useState<any[]>([])
   const [removingPortionId, setRemovingPortionId] = useState<string | null>(null)
   const [bulkPortionAction, setBulkPortionAction] = useState<string | null>(null)
+  const [studentPerformanceById, setStudentPerformanceById] = useState<Record<string, StudentPerformance>>({})
 
   const activeOfferingCourses = useMemo(
     () => courses.filter((course) => offeringsByCourseId[course.id]?.is_active),
@@ -152,7 +182,7 @@ export default function TeacherClassroomPage() {
         supabase.from('classroom_course_offerings').select('id, course_id, is_active').eq('classroom_id', classroomId),
         supabase
           .from('lesson_assignments')
-          .select('id, assigned_at, due_date, instructions, lesson:lesson_id(id, title, lesson_number, unit:unit_id(id, title, unit_number, course:course_id(id, name)))')
+          .select('id, lesson_id, assigned_at, due_date, instructions, lesson:lesson_id(id, title, lesson_number, unit:unit_id(id, title, unit_number, course:course_id(id, name)))')
           .eq('classroom_id', classroomId)
           .order('assigned_at', { ascending: false }),
       ])
@@ -177,6 +207,63 @@ export default function TeacherClassroomPage() {
       setCourses(courseData || [])
       setPortionAssignments(portionAssignmentsData || [])
 
+      const assignedLessonIds = Array.from(new Set((portionAssignmentsData || []).map((row: any) => row.lesson_id).filter(Boolean)))
+      const assignmentIds = (assignmentData || []).map((row: any) => row.id).filter(Boolean)
+
+      const [progressResponse, submissionResponse] = await Promise.all([
+        studentIds.length > 0 && assignedLessonIds.length > 0
+          ? supabase
+              .from('student_lesson_progress')
+              .select('student_id, lesson_id, status')
+              .in('student_id', studentIds)
+              .in('lesson_id', assignedLessonIds)
+          : Promise.resolve({ data: [] as any[] }),
+        studentIds.length > 0 && assignmentIds.length > 0
+          ? supabase
+              .from('submissions')
+              .select('student_id, assignment_id, status, score')
+              .in('student_id', studentIds)
+              .in('assignment_id', assignmentIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ])
+
+      const byStudent: Record<string, StudentPerformance> = {}
+      studentIds.forEach((studentId) => {
+        byStudent[studentId] = {
+          lessonsCompleted: 0,
+          lessonsInProgress: 0,
+          assignmentsSubmitted: 0,
+          assignmentsGraded: 0,
+          averageScore: 0,
+        }
+      })
+
+      ;(progressResponse.data || []).forEach((row: any) => {
+        if (!byStudent[row.student_id]) return
+        if (row.status === 'completed') byStudent[row.student_id].lessonsCompleted += 1
+        if (row.status === 'in_progress') byStudent[row.student_id].lessonsInProgress += 1
+      })
+
+      const scoreSums: Record<string, { total: number; count: number }> = {}
+      ;(submissionResponse.data || []).forEach((row: any) => {
+        if (!byStudent[row.student_id]) return
+        if (row.status === 'submitted' || row.status === 'graded') byStudent[row.student_id].assignmentsSubmitted += 1
+        if (row.status === 'graded') byStudent[row.student_id].assignmentsGraded += 1
+        if (typeof row.score === 'number') {
+          const current = scoreSums[row.student_id] || { total: 0, count: 0 }
+          current.total += row.score
+          current.count += 1
+          scoreSums[row.student_id] = current
+        }
+      })
+
+      Object.keys(scoreSums).forEach((studentId) => {
+        const total = scoreSums[studentId].total
+        const count = scoreSums[studentId].count
+        byStudent[studentId].averageScore = count > 0 ? Math.round(total / count) : 0
+      })
+      setStudentPerformanceById(byStudent)
+
       const mapped: Record<string, { id: string; is_active: boolean }> = {}
       ;(offeringsData || []).forEach((offering: any) => {
         mapped[offering.course_id] = { id: offering.id, is_active: offering.is_active }
@@ -195,15 +282,34 @@ export default function TeacherClassroomPage() {
 
     const supabase = createClient()
     try {
+      const isQuiz = newAssignmentData.assignmentType === 'quiz'
+      const normalizedQuizQuestions = (newAssignmentData.quizQuestions || [])
+        .map((question) => ({
+          id: question.id,
+          prompt: question.prompt.trim(),
+          options: question.options.map((option) => option.trim()),
+          correctIndex: question.correctIndex,
+          explanation: question.explanation.trim(),
+          points: Math.max(1, Number(question.points) || 1),
+          type: 'multiple_choice',
+        }))
+        .filter((question) => question.prompt && question.options.filter(Boolean).length >= 2)
+
+      if (isQuiz && normalizedQuizQuestions.length === 0) {
+        alert('Add at least one valid quiz question with 2+ options.')
+        setCreatingAssignment(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from('assignments')
         .insert({
           classroom_id: classroom.id,
           title: newAssignmentData.title,
           description: newAssignmentData.description,
-          starter_code: newAssignmentData.starterCode,
-          language: newAssignmentData.language,
-          test_cases: [],
+          starter_code: isQuiz ? '' : newAssignmentData.starterCode,
+          language: isQuiz ? 'quiz' : newAssignmentData.language,
+          test_cases: isQuiz ? normalizedQuizQuestions : [],
         })
         .select()
 
@@ -215,6 +321,17 @@ export default function TeacherClassroomPage() {
         description: '',
         language: 'python',
         starterCode: '',
+        assignmentType: 'coding',
+        quizQuestions: [
+          {
+            id: crypto.randomUUID(),
+            prompt: '',
+            options: ['', '', '', ''],
+            correctIndex: 0,
+            explanation: '',
+            points: 1,
+          },
+        ],
       })
       setShowNewAssignment(false)
     } catch (err: any) {
@@ -402,6 +519,40 @@ export default function TeacherClassroomPage() {
     }
     setPortionAssignments((prev) => prev.filter((item) => item.id !== assignmentId))
     setRemovingPortionId(null)
+  }
+
+  function addQuizQuestion() {
+    setNewAssignmentData((prev) => ({
+      ...prev,
+      quizQuestions: [
+        ...prev.quizQuestions,
+        {
+          id: crypto.randomUUID(),
+          prompt: '',
+          options: ['', '', '', ''],
+          correctIndex: 0,
+          explanation: '',
+          points: 1,
+        },
+      ],
+    }))
+  }
+
+  function removeQuizQuestion(questionId: string) {
+    setNewAssignmentData((prev) => {
+      if (prev.quizQuestions.length <= 1) return prev
+      return {
+        ...prev,
+        quizQuestions: prev.quizQuestions.filter((question) => question.id !== questionId),
+      }
+    })
+  }
+
+  function updateQuizQuestion(questionId: string, updater: (question: QuizQuestion) => QuizQuestion) {
+    setNewAssignmentData((prev) => ({
+      ...prev,
+      quizQuestions: prev.quizQuestions.map((question) => (question.id === questionId ? updater(question) : question)),
+    }))
   }
 
   if (loading) {
@@ -629,6 +780,41 @@ export default function TeacherClassroomPage() {
             Enrolled Students ({students.length})
           </h2>
 
+          {students.length > 0 && (
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <Card className="border-white/10 bg-white/5">
+                <CardContent className="pt-5">
+                  <p className="text-xs text-slate-400">Lessons Completed</p>
+                  <p className="text-2xl font-semibold text-white">
+                    {students.reduce((total, student) => total + (studentPerformanceById[student.student_id]?.lessonsCompleted || 0), 0)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-white/10 bg-white/5">
+                <CardContent className="pt-5">
+                  <p className="text-xs text-slate-400">Assignments Submitted</p>
+                  <p className="text-2xl font-semibold text-white">
+                    {students.reduce((total, student) => total + (studentPerformanceById[student.student_id]?.assignmentsSubmitted || 0), 0)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-white/10 bg-white/5">
+                <CardContent className="pt-5">
+                  <p className="text-xs text-slate-400">Class Avg Grade</p>
+                  <p className="text-2xl font-semibold text-white">
+                    {students.length > 0
+                      ? Math.round(
+                          students.reduce((total, student) => total + (studentPerformanceById[student.student_id]?.averageScore || 0), 0) /
+                            students.length,
+                        )
+                      : 0}
+                    %
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {students.length === 0 ? (
             <Card className="border-dashed border-2 border-muted">
               <CardContent className="flex items-center justify-center py-8">
@@ -642,6 +828,20 @@ export default function TeacherClassroomPage() {
                   <CardContent className="pt-6">
                     <p className="font-medium text-white">{student.profiles?.full_name || 'Student'}</p>
                     <p className="text-sm text-slate-300">{student.profiles?.email || 'No email'}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge className="border-cyan-500/40 bg-cyan-500/15 text-cyan-200">
+                        <ClipboardCheck className="mr-1 h-3.5 w-3.5" />
+                        Lessons: {studentPerformanceById[student.student_id]?.lessonsCompleted || 0}
+                      </Badge>
+                      <Badge className="border-blue-500/40 bg-blue-500/15 text-blue-200">
+                        <BarChart3 className="mr-1 h-3.5 w-3.5" />
+                        Avg: {studentPerformanceById[student.student_id]?.averageScore || 0}%
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-2">
+                      Submitted: {studentPerformanceById[student.student_id]?.assignmentsSubmitted || 0} | Graded:{' '}
+                      {studentPerformanceById[student.student_id]?.assignmentsGraded || 0}
+                    </p>
                     <p className="text-xs text-slate-400 mt-2">
                       Enrolled: {new Date(student.enrolled_at).toLocaleDateString()}
                     </p>
@@ -695,32 +895,146 @@ export default function TeacherClassroomPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="language">Programming Language</Label>
+                  <Label htmlFor="assignment-type">Assignment Type</Label>
                   <select
-                    id="language"
-                    value={newAssignmentData.language}
-                    onChange={(e) => setNewAssignmentData({ ...newAssignmentData, language: e.target.value })}
+                    id="assignment-type"
+                    value={newAssignmentData.assignmentType}
+                    onChange={(e) =>
+                      setNewAssignmentData({
+                        ...newAssignmentData,
+                        assignmentType: e.target.value as 'coding' | 'quiz',
+                      })
+                    }
                     disabled={creatingAssignment}
                     className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="python">Python</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="java">Java</option>
+                    <option value="coding">Coding Assignment</option>
+                    <option value="quiz">Quiz (Multiple Choice)</option>
                   </select>
                 </div>
 
-                <div>
-                  <Label htmlFor="starter">Starter Code (optional)</Label>
-                  <textarea
-                    id="starter"
-                    placeholder="# def solve():..."
-                    value={newAssignmentData.starterCode}
-                    onChange={(e) => setNewAssignmentData({ ...newAssignmentData, starterCode: e.target.value })}
-                    disabled={creatingAssignment}
-                    className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-                    rows={6}
-                  />
-                </div>
+                {newAssignmentData.assignmentType === 'coding' ? (
+                  <>
+                    <div>
+                      <Label htmlFor="language">Programming Language</Label>
+                      <select
+                        id="language"
+                        value={newAssignmentData.language}
+                        onChange={(e) => setNewAssignmentData({ ...newAssignmentData, language: e.target.value })}
+                        disabled={creatingAssignment}
+                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="java">Java</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="starter">Starter Code (optional)</Label>
+                      <textarea
+                        id="starter"
+                        placeholder="# def solve():..."
+                        value={newAssignmentData.starterCode}
+                        onChange={(e) => setNewAssignmentData({ ...newAssignmentData, starterCode: e.target.value })}
+                        disabled={creatingAssignment}
+                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                        rows={6}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-slate-100">Quiz Questions</p>
+                      <Button type="button" size="sm" variant="outline" onClick={addQuizQuestion} disabled={creatingAssignment}>
+                        Add Question
+                      </Button>
+                    </div>
+
+                    {newAssignmentData.quizQuestions.map((question, questionIndex) => (
+                      <div key={question.id} className="rounded-md border border-white/10 bg-black/20 p-3 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm text-slate-300">Question {questionIndex + 1}</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => removeQuizQuestion(question.id)}
+                            disabled={creatingAssignment || newAssignmentData.quizQuestions.length === 1}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                        <Input
+                          value={question.prompt}
+                          onChange={(e) => updateQuizQuestion(question.id, (prev) => ({ ...prev, prompt: e.target.value }))}
+                          placeholder="Question prompt"
+                          disabled={creatingAssignment}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {question.options.map((option, optionIndex) => (
+                            <Input
+                              key={`${question.id}-option-${optionIndex}`}
+                              value={option}
+                              onChange={(e) =>
+                                updateQuizQuestion(question.id, (prev) => {
+                                  const options = [...prev.options]
+                                  options[optionIndex] = e.target.value
+                                  return { ...prev, options }
+                                })
+                              }
+                              placeholder={`Option ${optionIndex + 1}`}
+                              disabled={creatingAssignment}
+                            />
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div>
+                            <Label className="mb-1 block">Correct Option</Label>
+                            <select
+                              value={question.correctIndex}
+                              onChange={(e) =>
+                                updateQuizQuestion(question.id, (prev) => ({
+                                  ...prev,
+                                  correctIndex: Number(e.target.value),
+                                }))
+                              }
+                              className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                            >
+                              <option value={0}>Option 1</option>
+                              <option value={1}>Option 2</option>
+                              <option value={2}>Option 3</option>
+                              <option value={3}>Option 4</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="mb-1 block">Points</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={20}
+                              value={question.points}
+                              onChange={(e) =>
+                                updateQuizQuestion(question.id, (prev) => ({
+                                  ...prev,
+                                  points: Math.max(1, Number(e.target.value) || 1),
+                                }))
+                              }
+                              disabled={creatingAssignment}
+                            />
+                          </div>
+                        </div>
+                        <Input
+                          value={question.explanation}
+                          onChange={(e) => updateQuizQuestion(question.id, (prev) => ({ ...prev, explanation: e.target.value }))}
+                          placeholder="Explanation (shown in grading view)"
+                          disabled={creatingAssignment}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <Button
@@ -752,9 +1066,13 @@ export default function TeacherClassroomPage() {
                         <CardDescription className="text-slate-300">{assignment.description}</CardDescription>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-400">
-                          {assignment.language?.charAt(0).toUpperCase() + assignment.language?.slice(1)}
-                        </p>
+                        {assignment.language === 'quiz' ? (
+                          <Badge className="border-emerald-500/40 bg-emerald-500/15 text-emerald-200">Quiz</Badge>
+                        ) : (
+                          <p className="text-xs text-slate-400">
+                            {assignment.language?.charAt(0).toUpperCase() + assignment.language?.slice(1)}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardHeader>

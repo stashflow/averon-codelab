@@ -1,15 +1,48 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, Sparkles } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
+
+type QuizQuestion = {
+  prompt: string
+  options: string[]
+  correctIndex: number
+  explanation?: string
+  points?: number
+}
+
+type QuizSubmissionPayload = {
+  answers?: number[]
+}
+
+function parseQuizQuestions(testCases: unknown): QuizQuestion[] {
+  if (!Array.isArray(testCases)) return []
+  return testCases
+    .map((item: any) => ({
+      prompt: String(item?.prompt || ''),
+      options: Array.isArray(item?.options) ? item.options.map((option: unknown) => String(option || '')) : [],
+      correctIndex: Number.isFinite(Number(item?.correctIndex)) ? Number(item.correctIndex) : 0,
+      explanation: String(item?.explanation || ''),
+      points: Number.isFinite(Number(item?.points)) ? Number(item.points) : 1,
+    }))
+    .filter((item) => item.prompt && item.options.length >= 2)
+}
+
+function parseQuizSubmission(code: string | null | undefined): QuizSubmissionPayload {
+  try {
+    return JSON.parse(String(code || '{}')) as QuizSubmissionPayload
+  } catch {
+    return {}
+  }
+}
 
 export default function TeacherAssignmentPage() {
   const router = useRouter()
@@ -52,7 +85,7 @@ export default function TeacherAssignmentPage() {
         // Load assignment
         const { data: assignmentData } = await supabase
           .from('assignments')
-          .select('*, classroom:classroom_id(teacher_id)')
+          .select('*, classroom:classroom_id(teacher_id), test_cases, language')
           .eq('id', assignmentId)
           .single()
 
@@ -87,21 +120,61 @@ export default function TeacherAssignmentPage() {
     loadData()
   }, [assignmentId])
 
+  const gradingStats = useMemo(() => {
+    const graded = submissions.filter((submission) => submission.status === 'graded')
+    const pending = submissions.filter((submission) => submission.status !== 'graded')
+    const gradeScores = graded
+      .map((submission) => submission.score)
+      .filter((score: unknown): score is number => typeof score === 'number')
+    const average = gradeScores.length > 0 ? Math.round(gradeScores.reduce((sum, score) => sum + score, 0) / gradeScores.length) : 0
+    return { graded: graded.length, pending: pending.length, average }
+  }, [submissions])
+
+  const isQuizAssignment = assignment?.language === 'quiz'
+  const quizQuestions = useMemo(() => parseQuizQuestions(assignment?.test_cases), [assignment?.test_cases])
+
+  function autoGradeQuiz(submission: any): { score: number; feedback: string } | null {
+    if (!isQuizAssignment || quizQuestions.length === 0) return null
+    const payload = parseQuizSubmission(submission?.code)
+    const answers = Array.isArray(payload.answers) ? payload.answers : []
+    let earned = 0
+    let possible = 0
+
+    const lineItems = quizQuestions.map((question, index) => {
+      const points = Math.max(1, Number(question.points) || 1)
+      possible += points
+      const selected = Number.isFinite(Number(answers[index])) ? Number(answers[index]) : -1
+      const correct = selected === question.correctIndex
+      if (correct) earned += points
+      return `${correct ? 'Correct' : 'Incorrect'} Q${index + 1}`
+    })
+
+    const score = possible > 0 ? Math.round((earned / possible) * 100) : 0
+    const feedback = `Auto-graded quiz. ${lineItems.join(' | ')}`
+    return { score, feedback }
+  }
+
   async function handleGradeSubmission() {
-    if (!selectedSubmission || !gradeScore) return
+    if (!selectedSubmission) return
 
     setSaving(true)
 
     const supabase = createClient()
     try {
+      const auto = autoGradeQuiz(selectedSubmission)
       const parsedScore = Number(gradeScore)
-      const normalizedScore = Number.isFinite(parsedScore) ? Math.max(0, Math.min(100, Math.round(parsedScore))) : 0
+      const normalizedScore = auto
+        ? auto.score
+        : Number.isFinite(parsedScore)
+          ? Math.max(0, Math.min(100, Math.round(parsedScore)))
+          : 0
+      const normalizedFeedback = auto ? auto.feedback : gradeFeedback
 
       const { error } = await supabase
         .from('submissions')
         .update({
           score: normalizedScore,
-          feedback: gradeFeedback,
+          feedback: normalizedFeedback,
           status: 'graded',
           graded_at: new Date().toISOString(),
         })
@@ -113,7 +186,7 @@ export default function TeacherAssignmentPage() {
       setSelectedSubmission({
         ...selectedSubmission,
         score: normalizedScore,
-        feedback: gradeFeedback,
+        feedback: normalizedFeedback,
         status: 'graded',
       })
 
@@ -124,13 +197,15 @@ export default function TeacherAssignmentPage() {
             ? {
                 ...s,
                 score: normalizedScore,
-                feedback: gradeFeedback,
+                feedback: normalizedFeedback,
                 status: 'graded',
               }
             : s
         )
       )
 
+      setGradeScore(String(normalizedScore))
+      setGradeFeedback(normalizedFeedback)
       alert('Grade saved successfully!')
     } catch (err: any) {
       alert('Error saving grade: ' + err.message)
@@ -162,6 +237,27 @@ export default function TeacherAssignmentPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <Card className="border-white/10 bg-white/5">
+            <CardContent className="pt-5">
+              <p className="text-xs text-slate-400">Pending Grading</p>
+              <p className="text-2xl font-semibold text-white">{gradingStats.pending}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-white/10 bg-white/5">
+            <CardContent className="pt-5">
+              <p className="text-xs text-slate-400">Graded</p>
+              <p className="text-2xl font-semibold text-white">{gradingStats.graded}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-white/10 bg-white/5">
+            <CardContent className="pt-5">
+              <p className="text-xs text-slate-400">Assignment Average</p>
+              <p className="text-2xl font-semibold text-white">{gradingStats.average}%</p>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Submissions List */}
           <div className="lg:col-span-1">
@@ -214,6 +310,25 @@ export default function TeacherAssignmentPage() {
                     <pre className="bg-slate-950/50 p-4 rounded-lg overflow-auto max-h-96 text-sm font-mono text-slate-200 border border-white/10">
                       {selectedSubmission.code}
                     </pre>
+                    {isQuizAssignment && quizQuestions.length > 0 && (
+                      <div className="rounded-lg border border-white/10 bg-slate-950/40 p-4 space-y-2">
+                        <p className="text-sm font-medium text-white">Quiz Response Review</p>
+                        {quizQuestions.map((question, index) => {
+                          const payload = parseQuizSubmission(selectedSubmission.code)
+                          const selected = Array.isArray(payload.answers) ? Number(payload.answers[index]) : -1
+                          const isCorrect = selected === question.correctIndex
+                          return (
+                            <div key={`review-${index}`} className="text-sm text-slate-200">
+                              <p className="font-medium">Q{index + 1}: {question.prompt}</p>
+                              <p className={isCorrect ? 'text-emerald-300' : 'text-orange-300'}>
+                                Selected: {selected >= 0 ? question.options[selected] || `Option ${selected + 1}` : 'No answer'}
+                              </p>
+                              <p className="text-cyan-200">Correct: {question.options[question.correctIndex] || `Option ${question.correctIndex + 1}`}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -221,6 +336,12 @@ export default function TeacherAssignmentPage() {
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold text-white">Grade Submission</h3>
+                    {isQuizAssignment && (
+                      <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Quiz assignment detected. Save Grade will auto-grade from answer key.
+                      </div>
+                    )}
                     <div>
                       <Label htmlFor="score" className="text-slate-300">Score (0-100)</Label>
                       <Input
@@ -251,7 +372,7 @@ export default function TeacherAssignmentPage() {
                     <Button
                       onClick={handleGradeSubmission}
                       className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0"
-                      disabled={saving || gradeScore === ''}
+                      disabled={saving || (!isQuizAssignment && gradeScore === '')}
                     >
                       {saving ? 'Saving...' : 'Save Grade'}
                     </Button>
