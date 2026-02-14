@@ -18,7 +18,6 @@ import {
   PlayCircle,
   Trophy,
   AlertCircle,
-  Lock,
   Code2,
   Braces,
   FileCode2,
@@ -357,6 +356,59 @@ function normalizeLanguageHint(source: string): MonacoLanguage | null {
   return null
 }
 
+function extractCodeFromMarkdown(source: string, preferred: MonacoLanguage): string | null {
+  const input = String(source || '')
+  const fencedRegex = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)```/g
+  const blocks: Array<{ lang: string; code: string }> = []
+
+  let match: RegExpExecArray | null
+  while ((match = fencedRegex.exec(input)) !== null) {
+    blocks.push({ lang: String(match[1] || '').toLowerCase(), code: String(match[2] || '').trim() })
+  }
+
+  if (blocks.length === 0) return null
+  const exact = blocks.find((block) => block.lang.includes(preferred))
+  if (exact?.code) return exact.code
+
+  const pythonish = blocks.find((block) => block.lang.includes('python') || block.lang === 'py')
+  if (preferred === 'python' && pythonish?.code) return pythonish.code
+
+  return blocks[0]?.code || null
+}
+
+function looksLikePython(source: string): boolean {
+  const input = String(source || '')
+  if (!input.trim()) return false
+  return /(def\s+\w+\(|import\s+\w+|from\s+\w+\s+import|print\(|if\s+.+:|for\s+.+:|while\s+.+:|return\s+.+)/.test(input)
+}
+
+function defaultStarterForLanguage(language: MonacoLanguage): string {
+  if (language === 'python') return 'def solve():\n    # TODO: write your solution\n    return None\n'
+  if (language === 'javascript') return 'function solve() {\n  // TODO: write your solution\n  return null;\n}\n'
+  if (language === 'typescript') return 'function solve(): unknown {\n  // TODO: write your solution\n  return null;\n}\n'
+  if (language === 'java') return 'class Main {\n  static Object solve() {\n    // TODO: write your solution\n    return null;\n  }\n}\n'
+  if (language === 'cpp') return '#include <iostream>\n\nint main() {\n  // TODO: write your solution\n  return 0;\n}\n'
+  if (language === 'c') return '#include <stdio.h>\n\nint main(void) {\n  // TODO: write your solution\n  return 0;\n}\n'
+  return '{}\n'
+}
+
+function normalizeStarterCode(rawStarter: string, preferred: MonacoLanguage): string {
+  const direct = String(rawStarter || '').trim()
+  const extracted = extractCodeFromMarkdown(direct, preferred)
+  const candidate = (extracted || direct).trim()
+
+  if (!candidate) return defaultStarterForLanguage(preferred)
+
+  if (preferred === 'python') {
+    if (looksLikePython(candidate)) return `${candidate}\n`
+    const inferred = inferMonacoLanguage(candidate)
+    if (inferred !== 'python') return defaultStarterForLanguage('python')
+    return `${candidate}\n`
+  }
+
+  return `${candidate}\n`
+}
+
 function resolvePreferredLanguage(courseTitle: string, courseLanguageHint: string, starterCode: string): MonacoLanguage {
   const title = courseTitle.toLowerCase()
   if (title.includes('ap computer science principles') || title.includes('ap csp')) return 'python'
@@ -660,7 +712,7 @@ export default function LessonViewer() {
     if (responses.length === 0) return true
     return responses.some((value) => value.length >= 8)
   }, [questionResponses])
-  const canStartCoding = useMemo(() => {
+  const learningCheckPassed = useMemo(() => {
     if (!isApcspCourse) return true
     if (!quizSubmitted) return false
     return quizScore >= 80 && hasMinimumNotesResponse
@@ -775,9 +827,9 @@ export default function LessonViewer() {
       if (list.length > 0) {
         const first = list[0]
         setCurrentCheckpoint(first)
-        const starter = first.starter_code || ''
+        const resolved = resolvePreferredLanguage(resolvedCourseName || courseTitle, resolvedCourseLanguage, first.starter_code || '')
+        const starter = normalizeStarterCode(first.starter_code || '', resolved)
         setCode(starter)
-        const resolved = resolvePreferredLanguage(resolvedCourseName || courseTitle, resolvedCourseLanguage, starter)
         setPreferredLanguage(resolved)
         setEditorLanguage(resolved)
       } else {
@@ -818,7 +870,7 @@ export default function LessonViewer() {
         body: JSON.stringify({
           checkpointId: currentCheckpoint.id,
           code,
-          starterCode: currentCheckpoint.starter_code,
+          starterCode: normalizeStarterCode(currentCheckpoint.starter_code || '', editorLanguage),
           language: editorLanguage,
         }),
       })
@@ -895,8 +947,8 @@ export default function LessonViewer() {
 
   function switchCheckpoint(checkpoint: Checkpoint) {
     setCurrentCheckpoint(checkpoint)
-    setCode(checkpoint.starter_code || '')
     const resolved = resolvePreferredLanguage(courseTitle, courseLanguage, checkpoint.starter_code || '')
+    setCode(normalizeStarterCode(checkpoint.starter_code || '', resolved))
     setPreferredLanguage(resolved)
     setEditorLanguage(resolved)
     setQuizAnswers({})
@@ -1075,8 +1127,8 @@ export default function LessonViewer() {
                       <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-cyan-100">AP CSP Learn First Flow</p>
-                          <Badge className={canStartCoding ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-amber-500/40 bg-amber-500/20 text-amber-100'}>
-                            {canStartCoding ? 'Coding Unlocked' : 'Complete Learn + Quiz'}
+                          <Badge className={learningCheckPassed ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-amber-500/40 bg-amber-500/20 text-amber-100'}>
+                            {learningCheckPassed ? 'Learning Check Passed' : 'Learning Check Recommended'}
                           </Badge>
                         </div>
                         <p className="text-sm text-cyan-50">
@@ -1136,7 +1188,7 @@ export default function LessonViewer() {
                             size="sm"
                             variant="outline"
                             className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                            onClick={() => setCode(currentCheckpoint.starter_code || '')}
+                            onClick={() => setCode(normalizeStarterCode(currentCheckpoint.starter_code || '', editorLanguage))}
                           >
                             Reset
                           </Button>
@@ -1189,7 +1241,6 @@ export default function LessonViewer() {
                           onChange={(value) => setCode(value ?? '')}
                           theme="vs-dark"
                           options={{
-                            readOnly: !canStartCoding,
                             minimap: { enabled: true },
                             fontSize: 15,
                             lineNumbers: 'on',
@@ -1240,10 +1291,10 @@ export default function LessonViewer() {
                       <div className="mt-4 flex gap-2">
                         <Button
                           onClick={() => void handleRunTests()}
-                          disabled={submitting || !canStartCoding}
+                          disabled={submitting}
                           className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
                         >
-                          {!canStartCoding ? <Lock className="mr-2 h-4 w-4" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                          <PlayCircle className="mr-2 h-4 w-4" />
                           {submitting ? 'Running Tests...' : 'Run Tests'}
                         </Button>
                         {testResults?.passed && (
