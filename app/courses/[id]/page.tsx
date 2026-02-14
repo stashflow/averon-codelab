@@ -16,9 +16,17 @@ import rehypeRaw from 'rehype-raw'
 
 interface Lesson {
   order_index: number
+  duration_minutes?: number | null
 }
 
 export const dynamic = 'force-dynamic'
+
+const LEARNING_METHODS = [
+  { title: 'Spaced Repetition', cue: 'Restate the prior concept before coding.' },
+  { title: 'Active Recall', cue: 'Predict one output before running tests.' },
+  { title: 'Interleaving', cue: 'Connect this lesson to another unit.' },
+  { title: 'Deliberate Practice', cue: 'Revise one part after feedback.' },
+]
 
 function repairInlineMarkdown(input: string): string {
   let source = String(input || '').replace(/\r\n/g, '\n')
@@ -253,6 +261,14 @@ export default function CourseDetailPage() {
                 <BookOpen className="w-4 h-4" />
                 <span>{units.length} units</span>
               </div>
+              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+                {LEARNING_METHODS.map((method) => (
+                  <div key={method.title} className="rounded-lg border border-slate-700/70 bg-slate-950/60 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">{method.title}</p>
+                    <p className="text-xs text-slate-300">{method.cue}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -300,6 +316,9 @@ export default function CourseDetailPage() {
                           <div className="flex-1">
                             <div className="text-white font-semibold group-hover:text-cyan-300 transition-colors">
                               {lessonIndex + 1}. {lesson.title}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-400">
+                              {lesson.duration_minutes ? `${lesson.duration_minutes} min` : '45 min'} · Notes + Checkpoint
                             </div>
                           </div>
                           {status === 'completed' && (

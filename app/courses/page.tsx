@@ -13,6 +13,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export const dynamic = 'force-dynamic'
 
+const LEARNING_METHODS = [
+  { title: 'Spaced Repetition', tagline: 'Reinforce prior concepts every lesson.' },
+  { title: 'Active Recall', tagline: 'Predict outputs before running tests.' },
+  { title: 'Interleaving', tagline: 'Connect ideas across units.' },
+  { title: 'Deliberate Practice', tagline: 'Revise with targeted improvements.' },
+]
+
 interface CourseCategory {
   id: string
   name: string
@@ -335,6 +342,23 @@ export default function CoursesPage() {
     }
   }
 
+  const getCategoryAccentStyles = (color: string) => {
+    const value = (color || '').toLowerCase()
+    if (value.includes('green') || value.includes('emerald')) {
+      return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+    }
+    if (value.includes('orange') || value.includes('amber') || value.includes('yellow')) {
+      return 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+    }
+    if (value.includes('rose') || value.includes('red') || value.includes('pink')) {
+      return 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+    }
+    if (value.includes('purple') || value.includes('violet')) {
+      return 'bg-violet-500/10 text-violet-300 border-violet-500/30'
+    }
+    return 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+  }
+
   const getDifficultyColor = (level: string) => {
     switch (level) {
       case 'beginner':
@@ -406,9 +430,28 @@ export default function CoursesPage() {
             Choose Your Course
           </h1>
           <p className="text-xl text-white/60 font-light">
-            Start learning with our comprehensive programming courses
+            AP-style coding courses with structured notes, methods, and checkpoint practice.
           </p>
         </div>
+
+        <Card className="mb-10 border border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 via-slate-900/70 to-blue-500/10 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-white text-xl">How Learning Works Here</CardTitle>
+            <CardDescription className="text-slate-300">
+              Every lesson uses the same four-method loop so progress stays consistent and measurable.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {LEARNING_METHODS.map((method) => (
+                <div key={method.title} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-3">
+                  <p className="text-sm font-semibold text-cyan-200">{method.title}</p>
+                  <p className="text-xs text-slate-300">{method.tagline}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {!hasClassroomEnrollment && (
           <Alert className="mb-8 border-yellow-500/20 bg-yellow-500/10">
@@ -426,7 +469,7 @@ export default function CoursesPage() {
           return (
             <div key={category.id} className="mb-16">
               <div className="flex items-center gap-3 mb-6">
-                <div className={`w-12 h-12 rounded-xl bg-${category.color}-500/10 flex items-center justify-center`}>
+                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center ${getCategoryAccentStyles(category.color)}`}>
                   {getCategoryIcon(category.icon_name)}
                 </div>
                 <div>
@@ -466,6 +509,13 @@ export default function CoursesPage() {
                           <div className="flex items-center gap-2 text-sm text-white/50">
                             <BookOpen className="w-4 h-4" />
                             <span>{course.language}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {LEARNING_METHODS.map((method) => (
+                              <span key={`${course.id}-${method.title}`} className="rounded-full border border-slate-700 bg-slate-950/70 px-2 py-1 text-[11px] text-slate-300">
+                                {method.title}
+                              </span>
+                            ))}
                           </div>
 
                           {enrolled && enrollment && (

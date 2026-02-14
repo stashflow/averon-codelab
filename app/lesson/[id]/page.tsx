@@ -76,6 +76,8 @@ type StaticIssue = {
   message: string
 }
 
+type LearningMethodKey = 'spaced_repetition' | 'active_recall' | 'interleaving' | 'deliberate_practice'
+
 const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
   { value: 'python', label: 'Python' },
   { value: 'javascript', label: 'JavaScript' },
@@ -98,19 +100,27 @@ const LANGUAGE_BADGE_SRC: Record<MonacoLanguage, string> = {
 
 const LEARNING_METHODS = [
   {
+    key: 'spaced_repetition' as LearningMethodKey,
     title: 'Spaced Repetition',
+    focusLabel: 'Recall prior concept',
     prompt: 'Restate one concept from the previous lesson before writing code.',
   },
   {
+    key: 'active_recall' as LearningMethodKey,
     title: 'Active Recall',
+    focusLabel: 'Predict before run',
     prompt: 'Predict output for one test case before running the checker.',
   },
   {
+    key: 'interleaving' as LearningMethodKey,
     title: 'Interleaving',
+    focusLabel: 'Connect across units',
     prompt: 'Connect this task to a concept from a different unit.',
   },
   {
+    key: 'deliberate_practice' as LearningMethodKey,
     title: 'Deliberate Practice',
+    focusLabel: 'Revise with intent',
     prompt: 'Revise one part of your solution after feedback to improve clarity.',
   },
 ]
@@ -396,6 +406,27 @@ function runStaticChecks(code: string, language: MonacoLanguage): StaticIssue[] 
   return issues
 }
 
+function normalizeMethodName(input: string): LearningMethodKey | null {
+  const value = input.toLowerCase()
+  if (value.includes('spaced')) return 'spaced_repetition'
+  if (value.includes('active')) return 'active_recall'
+  if (value.includes('interleav')) return 'interleaving'
+  if (value.includes('deliberate')) return 'deliberate_practice'
+  return null
+}
+
+function detectPrimaryMethod(markdown: string): LearningMethodKey {
+  const lines = markdown.split('\n')
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    const match = line.match(/primary method:\s*(.+)$/i)
+    if (!match?.[1]) continue
+    const normalized = normalizeMethodName(match[1])
+    if (normalized) return normalized
+  }
+  return 'active_recall'
+}
+
 export const dynamic = 'force-dynamic'
 
 export default function LessonViewer() {
@@ -425,6 +456,7 @@ export default function LessonViewer() {
 
   const [activeSectionIndex, setActiveSectionIndex] = useState(0)
   const [questionResponses, setQuestionResponses] = useState<Record<string, string>>({})
+  const [methodChecksBySection, setMethodChecksBySection] = useState<Record<string, Record<LearningMethodKey, boolean>>>({})
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const router = useRouter()
@@ -447,6 +479,25 @@ export default function LessonViewer() {
     () => normalizeLessonMarkdown(currentCheckpoint?.problem_description || ''),
     [currentCheckpoint?.problem_description],
   )
+  const primaryMethod = useMemo(() => detectPrimaryMethod(markdownSource), [markdownSource])
+  const methodStorageKey = useMemo(() => `acl:lesson-methods:${lessonId}`, [lessonId])
+  const methodChecks = useMemo(() => {
+    const raw = methodChecksBySection[String(activeSectionIndex)]
+    return {
+      spaced_repetition: raw?.spaced_repetition || false,
+      active_recall: raw?.active_recall || false,
+      interleaving: raw?.interleaving || false,
+      deliberate_practice: raw?.deliberate_practice || false,
+    }
+  }, [activeSectionIndex, methodChecksBySection])
+  const completedMethodCount = useMemo(
+    () => Object.values(methodChecks).filter(Boolean).length,
+    [methodChecks],
+  )
+  const primaryMethodMeta = useMemo(
+    () => LEARNING_METHODS.find((method) => method.key === primaryMethod) || LEARNING_METHODS[0],
+    [primaryMethod],
+  )
 
   const filteredUnits = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase()
@@ -462,6 +513,23 @@ export default function LessonViewer() {
   }, [courseUnits, lessonSearch])
 
   const staticIssues = useMemo(() => runStaticChecks(code, editorLanguage), [code, editorLanguage])
+
+  useEffect(() => {
+    if (!methodStorageKey) return
+    try {
+      const raw = localStorage.getItem(methodStorageKey)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Record<string, Record<LearningMethodKey, boolean>>
+      if (parsed && typeof parsed === 'object') setMethodChecksBySection(parsed)
+    } catch {
+      // Ignore malformed local method state.
+    }
+  }, [methodStorageKey])
+
+  useEffect(() => {
+    if (!methodStorageKey) return
+    localStorage.setItem(methodStorageKey, JSON.stringify(methodChecksBySection))
+  }, [methodChecksBySection, methodStorageKey])
 
   async function loadLessonData() {
     const supabase = createClient()
@@ -684,6 +752,25 @@ export default function LessonViewer() {
     return `${slug}.${languageExtension(editorLanguage)}`
   }
 
+  function toggleMethodCheck(method: LearningMethodKey) {
+    setMethodChecksBySection((prev) => {
+      const sectionKey = String(activeSectionIndex)
+      const current = prev[sectionKey] || {
+        spaced_repetition: false,
+        active_recall: false,
+        interleaving: false,
+        deliberate_practice: false,
+      }
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...current,
+          [method]: !current[method],
+        },
+      }
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950">
@@ -808,13 +895,40 @@ export default function LessonViewer() {
               </div>
 
               <div className="border-b border-slate-800 p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Four Method Workflow</p>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Four Method Workflow</p>
+                  <Badge className="border-slate-700 bg-slate-900 text-slate-200">
+                    {completedMethodCount} / 4 complete
+                  </Badge>
+                </div>
                 <div className="grid grid-cols-1 gap-2">
                   {LEARNING_METHODS.map((method) => (
-                    <div key={method.title} className="rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2">
-                      <p className="text-xs font-semibold text-cyan-200">{method.title}</p>
+                    <button
+                      key={method.title}
+                      type="button"
+                      onClick={() => toggleMethodCheck(method.key)}
+                      className={`rounded-md border px-3 py-2 text-left transition ${
+                        methodChecks[method.key]
+                          ? 'border-emerald-500/40 bg-emerald-500/10'
+                          : method.key === primaryMethod
+                            ? 'border-cyan-500/40 bg-cyan-500/10'
+                            : 'border-slate-700 bg-slate-950/60 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-cyan-200">{method.title}</p>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                            methodChecks[method.key]
+                              ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100'
+                              : 'border-slate-600 text-slate-300'
+                          }`}
+                        >
+                          {methodChecks[method.key] ? 'Done' : 'Mark'}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-300">{method.prompt}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -923,6 +1037,10 @@ export default function LessonViewer() {
                           {currentCheckpoint.title}
                         </h3>
                         <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
+                      </div>
+                      <div className="mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Method Focus</p>
+                        <p className="text-sm text-cyan-100">{primaryMethodMeta.title}: {primaryMethodMeta.prompt}</p>
                       </div>
                       <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
                         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
