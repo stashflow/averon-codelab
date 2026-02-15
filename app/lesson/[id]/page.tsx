@@ -279,6 +279,190 @@ function buildFallbackLessonMarkdown(title: string, description: string): string
   return `# ${title}\n\n## Notes Page 1: Core Idea\n${description || 'This lesson is being updated. Use this page to summarize the core concept in your own words.'}\n\n## Notes Page 2: Guided Steps\n1. Read the lesson goal and restate it in one sentence.\n2. Predict what the sample code should do.\n3. Implement the checkpoint task and test iteratively.\n\n## Quick Questions\n- Q: What input does the function require?\n- Q: What output format must your code return?\n- Q: Which edge case could break your first draft?`
 }
 
+type ConcreteLessonPlan = {
+  heading: string
+  idea: string
+  problem: string
+  constraint: string
+  pseudocode: string[]
+  python: string[]
+  tryIt: string
+}
+
+function inferConcretePlan(lessonTitle: string): ConcreteLessonPlan {
+  const title = lessonTitle.toLowerCase()
+
+  if (title.includes('problem') || title.includes('constraint')) {
+    return {
+      heading: 'Problem Statements and Constraints',
+      idea: 'Say what the program must do before writing syntax.',
+      problem: 'Greet a student by name.',
+      constraint: 'Output must be exactly `Hello, <name>!`.',
+      pseudocode: ['READ name', 'greeting <- "Hello, " + name + "!"', 'OUTPUT greeting'],
+      python: ['name = "Ava"', 'greeting = "Hello, " + name + "!"', 'print(greeting)'],
+      tryIt: 'Write pseudocode for: read a city name and output `Welcome to <city>!`.',
+    }
+  }
+
+  if (title.includes('algorithm') || title.includes('step') || title.includes('plan')) {
+    return {
+      heading: 'Algorithms as Clear Steps',
+      idea: 'An algorithm is just a finite list of clear actions.',
+      problem: 'Classify a number as even or odd.',
+      constraint: 'Output must be exactly `even` or `odd`.',
+      pseudocode: ['READ number', 'IF number MOD 2 = 0 THEN OUTPUT "even"', 'ELSE OUTPUT "odd"'],
+      python: ['number = 7', 'if number % 2 == 0:', '    print("even")', 'else:', '    print("odd")'],
+      tryIt: 'Write 3 pseudocode lines for checking if a number is positive or negative.',
+    }
+  }
+
+  if (title.includes('input') || title.includes('output') || title.includes('print')) {
+    return {
+      heading: 'Input and Output',
+      idea: 'Programs read input, process it, then show output.',
+      problem: 'Read a name and age, then print one sentence.',
+      constraint: 'Output format must be exactly `Name: <name>, Age: <age>`.',
+      pseudocode: ['READ name', 'READ age', 'OUTPUT "Name: " + name + ", Age: " + age'],
+      python: ['name = "Mia"', 'age = 16', 'print(f"Name: {name}, Age: {age}")'],
+      tryIt: 'Write pseudocode for reading two numbers and outputting their sum.',
+    }
+  }
+
+  if (title.includes('condition') || title.includes('if') || title.includes('decision')) {
+    return {
+      heading: 'Conditionals (if / else)',
+      idea: 'Conditionals pick one path based on a true/false check.',
+      problem: 'Classify a score as pass/fail.',
+      constraint: 'Pass is score >= 70; otherwise fail.',
+      pseudocode: ['READ score', 'IF score >= 70 THEN OUTPUT "pass"', 'ELSE OUTPUT "fail"'],
+      python: ['score = 84', 'if score >= 70:', '    print("pass")', 'else:', '    print("fail")'],
+      tryIt: 'Write pseudocode to label temperature as cold/warm/hot.',
+    }
+  }
+
+  if (title.includes('loop') || title.includes('repeat') || title.includes('while') || title.includes('for')) {
+    return {
+      heading: 'Loops (Repeat Work)',
+      idea: 'Loops repeat a step without duplicating code.',
+      problem: 'Print numbers from 1 to 5.',
+      constraint: 'Each number appears once, in order.',
+      pseudocode: ['SET n <- 1', 'WHILE n <= 5: OUTPUT n, then n <- n + 1', 'END WHILE'],
+      python: ['n = 1', 'while n <= 5:', '    print(n)', '    n += 1'],
+      tryIt: 'Write pseudocode to print even numbers from 2 to 10.',
+    }
+  }
+
+  if (title.includes('function') || title.includes('def')) {
+    return {
+      heading: 'Functions (Reusable Blocks)',
+      idea: 'A function groups logic so you can reuse it safely.',
+      problem: 'Create a function that doubles a number.',
+      constraint: 'Function must return the result, not print it.',
+      pseudocode: ['DEFINE double(x)', 'RETURN x * 2', 'END DEFINE'],
+      python: ['def double(x):', '    return x * 2', '', 'print(double(6))'],
+      tryIt: 'Write pseudocode for a function that returns `Hello, <name>!`.',
+    }
+  }
+
+  if (title.includes('list') || title.includes('array')) {
+    return {
+      heading: 'Lists (Many Values Together)',
+      idea: 'Lists store many related values in one variable.',
+      problem: 'Find the largest value in a list.',
+      constraint: 'Return one number: the max value.',
+      pseudocode: ['SET max <- first item', 'FOR each item: if item > max then max <- item', 'RETURN max'],
+      python: ['nums = [4, 9, 2, 7]', 'max_num = nums[0]', 'for n in nums:', '    if n > max_num:', '        max_num = n', 'print(max_num)'],
+      tryIt: 'Write pseudocode to count how many numbers are greater than 10.',
+    }
+  }
+
+  if (title.includes('string') || title.includes('text')) {
+    return {
+      heading: 'Strings (Working With Text)',
+      idea: 'Strings are text values you can clean and transform.',
+      problem: 'Normalize a name with extra spaces.',
+      constraint: 'Output must be title case with single spaces.',
+      pseudocode: ['READ raw_name', 'TRIM spaces and collapse repeats', 'OUTPUT title-cased result'],
+      python: ['raw_name = "  aVa   jOhNsOn  "', 'clean = " ".join(raw_name.split())', 'print(clean.title())'],
+      tryIt: 'Write pseudocode to count vowels in a word.',
+    }
+  }
+
+  if (title.includes('debug') || title.includes('error')) {
+    return {
+      heading: 'Debugging Basics',
+      idea: 'Debugging means finding where expected and actual behavior differ.',
+      problem: 'Fix code that should add two numbers.',
+      constraint: 'Result must be numeric addition, not text concatenation.',
+      pseudocode: ['READ a and b as numbers', 'sum <- a + b', 'OUTPUT sum'],
+      python: ['a = int("5")', 'b = int("7")', 'print(a + b)'],
+      tryIt: 'Write pseudocode for 3 debugging checks before submitting code.',
+    }
+  }
+
+  return {
+    heading: 'Core Programming Steps',
+    idea: 'Solve one clear problem using one clear algorithm.',
+    problem: 'Read input and produce a correctly formatted output.',
+    constraint: 'Follow the exact output format every time.',
+    pseudocode: ['READ input', 'APPLY the algorithm step-by-step', 'OUTPUT final answer'],
+    python: ['value = "example"', 'result = value', 'print(result)'],
+    tryIt: 'Write a 3-step algorithm for a small task you choose.',
+  }
+}
+
+function buildConcreteApcspLessonMarkdown(lessonTitle: string, learnerName: string): string {
+  const plan = inferConcretePlan(lessonTitle)
+  const pseudocodeBlock = ['START', ...plan.pseudocode, 'END'].join('\n')
+  const pythonBlock = plan.python.join('\n')
+
+  return `# ${plan.heading}
+
+## What This Means (Super Simple)
+${learnerName}, ${plan.idea}
+
+## Concrete Example
+- Problem: ${plan.problem}
+- Constraint: ${plan.constraint}
+
+## Pseudocode
+\`\`\`
+${pseudocodeBlock}
+\`\`\`
+
+## Python Example
+\`\`\`python
+${pythonBlock}
+\`\`\`
+
+## Your Turn
+${plan.tryIt}
+`
+}
+
+function buildConcreteApcspCheckpointMarkdown(lessonTitle: string): string {
+  const plan = inferConcretePlan(lessonTitle)
+  const pseudocodeBlock = ['START', ...plan.pseudocode, 'END'].join('\n')
+
+  return `## Goal
+Solve one tiny problem clearly.
+
+## Task
+Problem: ${plan.problem}
+Constraint: ${plan.constraint}
+
+Pseudocode:
+\`\`\`
+${pseudocodeBlock}
+\`\`\`
+
+Python reference:
+\`\`\`python
+${plan.python.join('\n')}
+\`\`\`
+`
+}
+
 function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
   const source = (markdown || '').replace(/\r\n/g, '\n').trim()
   if (!source) return [{ title: 'Overview', body: 'Lesson content is coming soon.' }]
@@ -807,8 +991,14 @@ export default function LessonViewer() {
   const isCourseIntroMode = viewMode === 'course-intro'
   const isUnitIntroMode = viewMode === 'unit-intro'
   const isIntroMode = isCourseIntroMode || isUnitIntroMode
+  const isApcspCourse = useMemo(() => /ap computer science principles|ap csp/i.test(courseTitle), [courseTitle])
+  const useConcreteApcspLesson = isApcspCourse && !isIntroMode
 
-  const lessonSections = useMemo(() => splitMarkdownIntoSections(markdownSource), [markdownSource])
+  const lessonSourceForDisplay = useMemo(() => {
+    if (!useConcreteApcspLesson) return markdownSource
+    return buildConcreteApcspLessonMarkdown(lesson?.title || '', formatLearnerName(learnerName))
+  }, [useConcreteApcspLesson, markdownSource, lesson?.title, learnerName])
+  const lessonSections = useMemo(() => splitMarkdownIntoSections(lessonSourceForDisplay), [lessonSourceForDisplay])
   const currentUnit = useMemo(() => {
     const currentLessonId = lesson?.id
     if (!currentLessonId) return null
@@ -816,10 +1006,9 @@ export default function LessonViewer() {
   }, [courseUnits, lesson?.id])
   const currentUnitTitle = currentUnit?.title || 'Unit'
 
-  const isApcspCourse = useMemo(() => /ap computer science principles|ap csp/i.test(courseTitle), [courseTitle])
   const vocabSection = useMemo(
-    () => (isApcspCourse && !isIntroMode ? buildVocabSection(lesson?.title || '') : null),
-    [isApcspCourse, isIntroMode, lesson?.title],
+    () => (isApcspCourse && !isIntroMode && !useConcreteApcspLesson ? buildVocabSection(lesson?.title || '') : null),
+    [isApcspCourse, isIntroMode, lesson?.title, useConcreteApcspLesson],
   )
   const lessonSectionsWithVocab = useMemo(
     () => (vocabSection ? [...lessonSections, vocabSection] : lessonSections),
@@ -842,11 +1031,14 @@ export default function LessonViewer() {
 
   const activeSection = sections[Math.min(activeSectionIndex, Math.max(0, sections.length - 1))]
   const sectionQuestions = useMemo(() => extractQuestions(activeSection?.body || ''), [activeSection])
-  const checkpointMarkdown = useMemo(
-    () => normalizeLessonMarkdown(currentCheckpoint?.problem_description || ''),
-    [currentCheckpoint?.problem_description],
-  )
-  const pseudocodeGuide = useMemo(() => buildPseudocodeGuide(currentCheckpoint), [currentCheckpoint])
+  const checkpointMarkdown = useMemo(() => {
+    if (useConcreteApcspLesson) return buildConcreteApcspCheckpointMarkdown(lesson?.title || '')
+    return normalizeLessonMarkdown(currentCheckpoint?.problem_description || '')
+  }, [useConcreteApcspLesson, lesson?.title, currentCheckpoint?.problem_description])
+  const pseudocodeGuide = useMemo(() => {
+    if (useConcreteApcspLesson) return inferConcretePlan(lesson?.title || '').pseudocode
+    return buildPseudocodeGuide(currentCheckpoint)
+  }, [useConcreteApcspLesson, lesson?.title, currentCheckpoint])
   const fallbackLessonNotions = useMemo(
     () => (isApcspCourse && !isIntroMode ? buildApcspQuiz(lesson?.title || '') : []),
     [isApcspCourse, isIntroMode, lesson?.title],
@@ -861,6 +1053,7 @@ export default function LessonViewer() {
     [currentUnitTitle, introUnit?.title, isCourseIntroMode, isUnitIntroMode],
   )
   const notions = useMemo(() => {
+    if (useConcreteApcspLesson) return []
     if (isCourseIntroMode || isUnitIntroMode) return introNotions
     if (persistedNotions.length > 0) {
       return persistedNotions.map((item) => ({
@@ -872,7 +1065,7 @@ export default function LessonViewer() {
       }))
     }
     return fallbackLessonNotions
-  }, [fallbackLessonNotions, introNotions, isCourseIntroMode, isUnitIntroMode, persistedNotions])
+  }, [fallbackLessonNotions, introNotions, isCourseIntroMode, isUnitIntroMode, persistedNotions, useConcreteApcspLesson])
   const quizScore = useMemo(() => {
     if (notions.length === 0) return 100
     const answered = notions.filter((item) => Number.isFinite(quizAnswers[item.id]))
@@ -887,9 +1080,10 @@ export default function LessonViewer() {
   }, [questionResponses])
   const learningCheckPassed = useMemo(() => {
     if (!isApcspCourse) return true
+    if (notions.length === 0) return true
     if (!quizSubmitted) return false
     return quizScore >= 80 && hasMinimumNotesResponse
-  }, [hasMinimumNotesResponse, isApcspCourse, quizScore, quizSubmitted])
+  }, [hasMinimumNotesResponse, isApcspCourse, notions.length, quizScore, quizSubmitted])
 
   const filteredUnits = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase()
@@ -1462,7 +1656,7 @@ export default function LessonViewer() {
                         {isCourseIntroMode ? 'Start Here: AP CSP Course Intro' : `${introUnit?.title || currentUnitTitle} Intro`}
                       </h3>
                       <p className="mt-2 text-sm text-cyan-50">
-                        Read these notes in order, then complete the notions check before moving ahead.
+                        Read these notes in order, then move to the first lesson.
                       </p>
                     </div>
 
@@ -1471,9 +1665,7 @@ export default function LessonViewer() {
                         <article
                           key={`intro-step-${section.title}-${index}`}
                           data-note-step={index}
-                          className={`rounded-lg border border-slate-700 bg-slate-900/70 p-4 transition-all duration-700 ${
-                            visibleNarrativeSteps[index] ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-30'
-                          }`}
+                          className="rounded-lg border border-slate-700 bg-slate-900/85 p-4 transition-all duration-300"
                         >
                           <p className="text-xs uppercase tracking-wide text-cyan-300">Notes {index + 1}</p>
                           <h4 className="mt-1 text-base font-semibold text-white">{section.title}</h4>
@@ -1549,15 +1741,15 @@ export default function LessonViewer() {
                           </Badge>
                         </div>
                         <p className="text-sm text-cyan-50">
-                          Learn first, then quick check, then code. Notes below animate as you scroll to keep the explanation conversational.
+                          {useConcreteApcspLesson
+                            ? 'Read the concrete example, follow the pseudocode, then run the tiny Python example.'
+                            : 'Learn first, then quick check, then code.'}
                         </p>
 
                         <div ref={lessonFlowRef} className="max-h-72 space-y-3 overflow-y-auto rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
                           <div
                             data-note-step={0}
-                            className={`rounded-lg border border-slate-700 bg-slate-900/70 p-3 transition-all duration-500 ${
-                              visibleNarrativeSteps[0] ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-40'
-                            }`}
+                            className="rounded-lg border border-slate-700 bg-slate-900/85 p-3 transition-all duration-300"
                           >
                             <p className="text-xs uppercase tracking-wide text-cyan-300">Intro Notes</p>
                             <p className="mt-1 text-sm text-slate-100">
@@ -1568,9 +1760,7 @@ export default function LessonViewer() {
                             <div
                               key={`narrative-${section.title}-${index}`}
                               data-note-step={index}
-                              className={`rounded-lg border border-slate-700 bg-slate-900/70 p-3 transition-all duration-500 ${
-                                visibleNarrativeSteps[index] ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-40'
-                              }`}
+                              className="rounded-lg border border-slate-700 bg-slate-900/85 p-3 transition-all duration-300"
                             >
                               <p className="text-xs uppercase tracking-wide text-cyan-300">Notes {index + 1}</p>
                               <p className="mt-1 text-sm font-semibold text-white">{section.title}</p>
@@ -1878,7 +2068,7 @@ export default function LessonViewer() {
                       </h3>
                       <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
                     </div>
-                    {isApcspCourse && frameworkTag && (
+                    {isApcspCourse && !useConcreteApcspLesson && frameworkTag && (
                       <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">AP CSP Alignment</p>
                         <p className="mt-1 text-sm text-cyan-100">{frameworkTag.unitLabel}</p>
@@ -1897,7 +2087,7 @@ export default function LessonViewer() {
                         <p className="mt-2 text-xs text-indigo-200">Translate these steps into Python in the editor.</p>
                       </div>
                     )}
-                    {isApcspCourse && frameworkOverview.length > 0 && (
+                    {isApcspCourse && !useConcreteApcspLesson && frameworkOverview.length > 0 && (
                       <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 space-y-2">
                         {frameworkOverview.map((group) => (
                           <div key={group.label}>
