@@ -675,8 +675,10 @@ export default function LessonViewer() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({})
   const [quizSubmitted, setQuizSubmitted] = useState(false)
+  const [visibleNarrativeSteps, setVisibleNarrativeSteps] = useState<Record<number, boolean>>({})
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const lessonFlowRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -743,8 +745,42 @@ export default function LessonViewer() {
     [currentUnitTitle, isApcspCourse, lesson?.title],
   )
   const frameworkOverview = useMemo(() => (isApcspCourse ? apcspFrameworkOverview() : []), [isApcspCourse])
+  const hasViewedAllNarrativeSteps = useMemo(() => {
+    if (sections.length === 0) return true
+    return sections.every((_, index) => visibleNarrativeSteps[index])
+  }, [sections, visibleNarrativeSteps])
 
   const staticIssues = useMemo(() => runStaticChecks(code, editorLanguage), [code, editorLanguage])
+
+  useEffect(() => {
+    setVisibleNarrativeSteps({})
+  }, [lessonId, sections.length])
+
+  useEffect(() => {
+    const root = lessonFlowRef.current
+    if (!root) return
+
+    const elements = Array.from(root.querySelectorAll<HTMLElement>('[data-note-step]'))
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setVisibleNarrativeSteps((previous) => {
+          const next = { ...previous }
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue
+            const index = Number((entry.target as HTMLElement).dataset.noteStep || -1)
+            if (Number.isFinite(index) && index >= 0) next[index] = true
+          }
+          return next
+        })
+      },
+      { threshold: 0.35 },
+    )
+
+    elements.forEach((element) => observer.observe(element))
+    return () => observer.disconnect()
+  }, [sections])
 
   async function loadLessonData() {
     const supabase = createClient()
@@ -1124,53 +1160,92 @@ export default function LessonViewer() {
                 {currentCheckpoint ? (
                   <div className="space-y-5">
                     {isApcspCourse && (
-                      <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-3">
+                      <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-4">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-cyan-100">AP CSP Learn First Flow</p>
+                          <p className="text-sm font-semibold text-cyan-100">AP CSP Guided Lesson Flow</p>
                           <Badge className={learningCheckPassed ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200' : 'border-amber-500/40 bg-amber-500/20 text-amber-100'}>
-                            {learningCheckPassed ? 'Learning Check Passed' : 'Learning Check Recommended'}
+                            {learningCheckPassed ? 'Learning Check Passed' : 'In Progress'}
                           </Badge>
                         </div>
                         <p className="text-sm text-cyan-50">
-                          Step 1: Read Notes. Step 2: Pass quick check (80%+). Step 3: Start coding in Python.
+                          Learn first, then quick check, then code. Notes below animate as you scroll to keep the explanation conversational.
                         </p>
+
+                        <div ref={lessonFlowRef} className="max-h-72 space-y-3 overflow-y-auto rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
+                          <div
+                            data-note-step={0}
+                            className={`rounded-lg border border-slate-700 bg-slate-900/70 p-3 transition-all duration-500 ${
+                              visibleNarrativeSteps[0] ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-40'
+                            }`}
+                          >
+                            <p className="text-xs uppercase tracking-wide text-cyan-300">Intro Notes</p>
+                            <p className="mt-1 text-sm text-slate-100">
+                              In this lesson, we will connect AP CSP concepts to one small, testable Python function before moving to larger problems.
+                            </p>
+                          </div>
+                          {sections.map((section, index) => (
+                            <div
+                              key={`narrative-${section.title}-${index}`}
+                              data-note-step={index}
+                              className={`rounded-lg border border-slate-700 bg-slate-900/70 p-3 transition-all duration-500 ${
+                                visibleNarrativeSteps[index] ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-40'
+                              }`}
+                            >
+                              <p className="text-xs uppercase tracking-wide text-cyan-300">Notes {index + 1}</p>
+                              <p className="mt-1 text-sm font-semibold text-white">{section.title}</p>
+                              <div className="mt-2 text-sm text-slate-200 max-h-24 overflow-hidden">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                  {section.body}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
                         {quickQuiz.length > 0 && (
                           <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
-                            {quickQuiz.map((item, index) => (
-                              <div key={item.id} className="text-sm text-slate-100">
-                                <p className="mb-2 font-medium">Q{index + 1}. {item.question}</p>
-                                <div className="grid gap-1">
-                                  {item.options.map((option, optionIndex) => (
-                                    <label key={`${item.id}-${optionIndex}`} className="flex items-center gap-2 text-slate-200">
-                                      <input
-                                        type="radio"
-                                        name={`quick-${item.id}`}
-                                        checked={quizAnswers[item.id] === optionIndex}
-                                        onChange={() => setQuizAnswers((prev) => ({ ...prev, [item.id]: optionIndex }))}
-                                      />
-                                      <span>{option}</span>
-                                    </label>
-                                  ))}
+                            {!hasViewedAllNarrativeSteps && (
+                              <p className="text-xs text-amber-300">Scroll through all notes cards first to unlock the quick check.</p>
+                            )}
+                            {hasViewedAllNarrativeSteps && (
+                              <>
+                                {quickQuiz.map((item, index) => (
+                                  <div key={item.id} className="text-sm text-slate-100">
+                                    <p className="mb-2 font-medium">Q{index + 1}. {item.question}</p>
+                                    <div className="grid gap-1">
+                                      {item.options.map((option, optionIndex) => (
+                                        <label key={`${item.id}-${optionIndex}`} className="flex items-center gap-2 text-slate-200">
+                                          <input
+                                            type="radio"
+                                            name={`quick-${item.id}`}
+                                            checked={quizAnswers[item.id] === optionIndex}
+                                            onChange={() => setQuizAnswers((prev) => ({ ...prev, [item.id]: optionIndex }))}
+                                          />
+                                          <span>{option}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                    {quizSubmitted && (
+                                      <p className={`mt-1 text-xs ${quizAnswers[item.id] === item.correctIndex ? 'text-emerald-300' : 'text-orange-300'}`}>
+                                        {quizAnswers[item.id] === item.correctIndex ? 'Correct' : `Review: ${item.rationale}`}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-cyan-500/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
+                                    onClick={() => setQuizSubmitted(true)}
+                                  >
+                                    Check Answers
+                                  </Button>
+                                  <p className="text-xs text-slate-300">Score: {quizScore}%</p>
                                 </div>
-                                {quizSubmitted && (
-                                  <p className={`mt-1 text-xs ${quizAnswers[item.id] === item.correctIndex ? 'text-emerald-300' : 'text-orange-300'}`}>
-                                    {quizAnswers[item.id] === item.correctIndex ? 'Correct' : `Review: ${item.rationale}`}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="border-cyan-500/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
-                                onClick={() => setQuizSubmitted(true)}
-                              >
-                                Check Answers
-                              </Button>
-                              <p className="text-xs text-slate-300">Score: {quizScore}% (need 80%+)</p>
-                            </div>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>

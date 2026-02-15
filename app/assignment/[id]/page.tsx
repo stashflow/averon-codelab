@@ -36,6 +36,9 @@ type Submission = {
   status: string | null
   score: number | null
   feedback: string | null
+  submitted_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 type JudgeResult = {
@@ -189,6 +192,9 @@ export default function AssignmentPage() {
   const [editorLanguage, setEditorLanguage] = useState<MonacoLanguage>('python')
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 })
   const [quizAnswers, setQuizAnswers] = useState<number[]>([])
+  const [draftSaving, setDraftSaving] = useState(false)
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState<string | null>(null)
+  const [lastAutosavedPayload, setLastAutosavedPayload] = useState('')
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
@@ -212,6 +218,16 @@ export default function AssignmentPage() {
     })
     return possible > 0 ? Math.round((earned / possible) * 100) : 0
   }, [isQuizAssignment, quizAnswers, quizQuestions])
+
+  const draftPayload = useMemo(
+    () =>
+      isQuizAssignment
+        ? JSON.stringify({
+            answers: quizAnswers.map((answer) => (Number.isFinite(Number(answer)) ? Number(answer) : -1)),
+          })
+        : code,
+    [code, isQuizAssignment, quizAnswers],
+  )
 
   async function loadData() {
     const supabase = createClient()
@@ -277,6 +293,7 @@ export default function AssignmentPage() {
       if (submissionData) {
         const normalizedSubmission = submissionData as Submission
         setSubmission(normalizedSubmission)
+        setLastAutosavedPayload(normalizedSubmission.code || '')
         if (normalizedAssignment.language === 'quiz') {
           const payload = parseQuizSubmission(normalizedSubmission.code)
           if (Array.isArray(payload.answers)) {
@@ -372,11 +389,7 @@ export default function AssignmentPage() {
     const supabase = createClient()
 
     try {
-      const submissionCode = isQuizAssignment
-        ? JSON.stringify({
-            answers: quizAnswers.map((answer) => (Number.isFinite(Number(answer)) ? Number(answer) : -1)),
-          })
-        : code
+      const submissionCode = draftPayload
 
       if (submission) {
         const { error } = await supabase
@@ -389,6 +402,16 @@ export default function AssignmentPage() {
           .eq('id', submission.id)
 
         if (error) throw error
+        setSubmission((prev) =>
+          prev
+            ? {
+                ...prev,
+                code: submissionCode,
+                status: 'submitted',
+                submitted_at: new Date().toISOString(),
+              }
+            : prev,
+        )
       } else {
         const { data, error } = await supabase
           .from('submissions')
@@ -405,6 +428,8 @@ export default function AssignmentPage() {
         setSubmission(data?.[0] || null)
       }
 
+      setLastAutosavedPayload(submissionCode)
+
       alert('Submission successful. Your teacher can now review it.')
     } catch (err: any) {
       alert('Error submitting: ' + (err.message || 'Unknown error'))
@@ -419,6 +444,55 @@ export default function AssignmentPage() {
       await action.run()
     }
   }
+
+  useEffect(() => {
+    if (!assignment || !userId || loading || submitting) return
+    if (!draftPayload.trim()) return
+    if (submission?.status === 'graded') return
+    if (draftPayload === lastAutosavedPayload) return
+
+    const timeoutId = window.setTimeout(async () => {
+      const supabase = createClient()
+      setDraftSaving(true)
+      try {
+        if (submission) {
+          const { error } = await supabase
+            .from('submissions')
+            .update({
+              code: draftPayload,
+              status: 'pending',
+              submitted_at: null,
+            })
+            .eq('id', submission.id)
+
+          if (error) throw error
+          setSubmission((prev) => (prev ? { ...prev, code: draftPayload, status: 'pending' } : prev))
+        } else {
+          const { data, error } = await supabase
+            .from('submissions')
+            .insert({
+              assignment_id: assignmentId,
+              student_id: userId,
+              code: draftPayload,
+              status: 'pending',
+            })
+            .select()
+            .single()
+
+          if (error) throw error
+          setSubmission((data as Submission) || null)
+        }
+        setLastAutosavedPayload(draftPayload)
+        setLastDraftSavedAt(new Date().toISOString())
+      } catch (error) {
+        console.error('[v0] draft autosave failed', error)
+      } finally {
+        setDraftSaving(false)
+      }
+    }, 1200)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [assignment, assignmentId, draftPayload, lastAutosavedPayload, loading, submission, submitting, userId])
 
   if (loading) {
     return (
@@ -483,10 +557,19 @@ export default function AssignmentPage() {
                 <Badge className="bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
                   {submission?.status === 'graded'
                     ? 'Graded'
+                    : submission?.status === 'pending'
+                      ? 'In Progress'
                     : submission?.status === 'submitted'
                       ? 'Submitted'
                       : 'Not Submitted'}
                 </Badge>
+                <p className="mt-2 text-xs text-slate-400">
+                  {draftSaving
+                    ? 'Saving draft...'
+                    : lastDraftSavedAt
+                      ? `Draft saved ${new Date(lastDraftSavedAt).toLocaleTimeString()}`
+                      : 'Draft auto-save is on'}
+                </p>
               </div>
 
               {submission?.feedback && (

@@ -101,7 +101,7 @@ export default function TeacherAssignmentPage() {
           .from('submissions')
           .select('*, profiles(email, full_name)')
           .eq('assignment_id', assignmentId)
-          .order('submitted_at', { ascending: false })
+          .order('created_at', { ascending: false })
 
         setSubmissions(submissionData || [])
 
@@ -118,16 +118,32 @@ export default function TeacherAssignmentPage() {
     }
 
     loadData()
+    const intervalId = window.setInterval(() => {
+      void loadData()
+    }, 15000)
+
+    return () => window.clearInterval(intervalId)
   }, [assignmentId])
 
   const gradingStats = useMemo(() => {
     const graded = submissions.filter((submission) => submission.status === 'graded')
-    const pending = submissions.filter((submission) => submission.status !== 'graded')
+    const working = submissions.filter((submission) => submission.status === 'pending')
+    const pending = submissions.filter((submission) => submission.status === 'submitted' || submission.status === 'pending')
     const gradeScores = graded
       .map((submission) => submission.score)
       .filter((score: unknown): score is number => typeof score === 'number')
     const average = gradeScores.length > 0 ? Math.round(gradeScores.reduce((sum, score) => sum + score, 0) / gradeScores.length) : 0
-    return { graded: graded.length, pending: pending.length, average }
+    return { graded: graded.length, pending: pending.length, working: working.length, average }
+  }, [submissions])
+
+  const orderedSubmissions = useMemo(() => {
+    const rank = (status: string | null | undefined) => {
+      if (status === 'pending') return 0
+      if (status === 'submitted') return 1
+      if (status === 'graded') return 2
+      return 3
+    }
+    return [...submissions].sort((a, b) => rank(a.status) - rank(b.status))
   }, [submissions])
 
   const isQuizAssignment = assignment?.language === 'quiz'
@@ -237,11 +253,17 @@ export default function TeacherAssignmentPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
           <Card className="border-white/10 bg-white/5">
             <CardContent className="pt-5">
               <p className="text-xs text-slate-400">Pending Grading</p>
               <p className="text-2xl font-semibold text-white">{gradingStats.pending}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-white/10 bg-white/5">
+            <CardContent className="pt-5">
+              <p className="text-xs text-slate-400">Currently Working</p>
+              <p className="text-2xl font-semibold text-white">{gradingStats.working}</p>
             </CardContent>
           </Card>
           <Card className="border-white/10 bg-white/5">
@@ -264,10 +286,10 @@ export default function TeacherAssignmentPage() {
             <div className="sticky top-24">
               <h2 className="text-lg font-semibold text-white mb-3">Submissions</h2>
               <div className="space-y-2">
-                {submissions.length === 0 ? (
+                {orderedSubmissions.length === 0 ? (
                   <p className="text-sm text-slate-400">No submissions yet</p>
                 ) : (
-                  submissions.map((submission) => (
+                  orderedSubmissions.map((submission) => (
                     <div
                       key={submission.id}
                       className={`cursor-pointer transition-colors rounded-2xl backdrop-blur-xl border p-4 ${selectedSubmission?.id === submission.id ? 'border-blue-400/50 bg-gradient-to-br from-blue-500/20 to-blue-500/10' : 'border-white/10 bg-gradient-to-br from-white/10 to-white/5 hover:border-blue-400/30'}`}
@@ -286,7 +308,15 @@ export default function TeacherAssignmentPage() {
                           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                         )}
                         {submission.status === 'submitted' && <Clock className="w-4 h-4 text-yellow-400 flex-shrink-0" />}
+                        {submission.status === 'pending' && <Clock className="w-4 h-4 text-cyan-400 flex-shrink-0" />}
                       </div>
+                      <p className="mt-2 text-xs text-slate-400">
+                        {submission.status === 'pending'
+                          ? 'Currently working'
+                          : submission.status === 'submitted'
+                            ? 'Ready to grade'
+                            : 'Graded'}
+                      </p>
                     </div>
                   ))
                 )}
@@ -304,7 +334,7 @@ export default function TeacherAssignmentPage() {
                     <div>
                       <h3 className="text-xl font-semibold text-white">Student Code</h3>
                       <p className="text-sm text-slate-400 mt-1">
-                        Submitted: {new Date(selectedSubmission.submitted_at).toLocaleString()}
+                        Last activity: {new Date(selectedSubmission.submitted_at || selectedSubmission.updated_at || selectedSubmission.created_at).toLocaleString()}
                       </p>
                     </div>
                     <pre className="bg-slate-950/50 p-4 rounded-lg overflow-auto max-h-96 text-sm font-mono text-slate-200 border border-white/10">
@@ -320,10 +350,29 @@ export default function TeacherAssignmentPage() {
                           return (
                             <div key={`review-${index}`} className="text-sm text-slate-200">
                               <p className="font-medium">Q{index + 1}: {question.prompt}</p>
+                              <div className="mt-1 space-y-1">
+                                {question.options.map((option, optionIndex) => (
+                                  <p
+                                    key={`review-opt-${index}-${optionIndex}`}
+                                    className={
+                                      optionIndex === question.correctIndex
+                                        ? 'text-emerald-300'
+                                        : optionIndex === selected
+                                          ? 'text-orange-300'
+                                          : 'text-slate-300'
+                                    }
+                                  >
+                                    {optionIndex + 1}. {option}
+                                    {optionIndex === question.correctIndex ? ' (correct)' : ''}
+                                    {optionIndex === selected ? ' (selected)' : ''}
+                                  </p>
+                                ))}
+                              </div>
                               <p className={isCorrect ? 'text-emerald-300' : 'text-orange-300'}>
                                 Selected: {selected >= 0 ? question.options[selected] || `Option ${selected + 1}` : 'No answer'}
                               </p>
                               <p className="text-cyan-200">Correct: {question.options[question.correctIndex] || `Option ${question.correctIndex + 1}`}</p>
+                              {question.explanation && <p className="text-xs text-slate-400">Explanation: {question.explanation}</p>}
                             </div>
                           )
                         })}
