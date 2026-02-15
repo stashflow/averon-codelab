@@ -88,6 +88,15 @@ type QuickQuizItem = {
   rationale: string
 }
 
+type PersistedNotionQuestion = {
+  id: string
+  prompt: string
+  options: string[]
+  correctIndex: number
+  rationale: string
+  orderIndex: number
+}
+
 type ApcspFrameworkTag = {
   unitLabel: string
   bigIdeas: string[]
@@ -452,6 +461,31 @@ function buildPseudocodeGuide(checkpoint: Checkpoint | null): string[] {
 
 function buildApcspQuiz(lessonTitle: string): QuickQuizItem[] {
   const normalizedTitle = lessonTitle.toLowerCase()
+  if (normalizedTitle.includes('course intro') || normalizedTitle.includes('unit intro') || normalizedTitle.includes(' intro')) {
+    return [
+      {
+        id: 'q1',
+        question: 'What is pseudocode?',
+        options: ['A programming language run by Python', 'A plain-language plan for code steps', 'A database table', 'A grading rubric'],
+        correctIndex: 1,
+        rationale: 'Pseudocode is a plain-language plan before real syntax.',
+      },
+      {
+        id: 'q2',
+        question: 'What does IDE stand for?',
+        options: ['Integrated Development Environment', 'Internal Debug Engine', 'Internet Data Exchange', 'Input Design Endpoint'],
+        correctIndex: 0,
+        rationale: 'IDE means Integrated Development Environment.',
+      },
+      {
+        id: 'q3',
+        question: 'Best first move when solving a new coding problem:',
+        options: ['Guess random code', 'Write steps first, then code', 'Skip instructions', 'Change function names'],
+        correctIndex: 1,
+        rationale: 'Writing steps first reduces mistakes and confusion.',
+      },
+    ]
+  }
   if (normalizedTitle.includes('first function') || normalizedTitle.includes('greet')) {
     return [
       {
@@ -674,36 +708,6 @@ function buildVocabSection(lessonTitle: string): MarkdownSection | null {
   }
 }
 
-function buildNotions(isCourseIntroMode: boolean, isUnitIntroMode: boolean, lessonTitle: string): string[] {
-  if (isCourseIntroMode) {
-    return [
-      'In your own words, what is an algorithm?',
-      'What part of coding feels most new to you right now?',
-      'What is one question you want answered in this course?',
-    ]
-  }
-  if (isUnitIntroMode) {
-    return [
-      'What should you do before writing code?',
-      'What does IDE stand for?',
-      'Why might pseudocode reduce mistakes?',
-    ]
-  }
-  const lower = lessonTitle.toLowerCase()
-  if (lower.includes('constraint')) {
-    return [
-      'What is one non-negotiable constraint in this lesson?',
-      'How would you explain “output format” to a friend?',
-      'What mistake could happen if constraints are ignored?',
-    ]
-  }
-  return [
-    'What is the goal of this lesson in one sentence?',
-    'What output should your solution produce?',
-    'What one step in your algorithm is most important?',
-  ]
-}
-
 function runStaticChecks(code: string, language: MonacoLanguage): StaticIssue[] {
   const issues: StaticIssue[] = []
 
@@ -779,6 +783,8 @@ export default function LessonViewer() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({})
   const [quizSubmitted, setQuizSubmitted] = useState(false)
+  const [quizSaving, setQuizSaving] = useState(false)
+  const [persistedNotions, setPersistedNotions] = useState<PersistedNotionQuestion[]>([])
   const [visibleNarrativeSteps, setVisibleNarrativeSteps] = useState<Record<number, boolean>>({})
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
@@ -836,26 +842,44 @@ export default function LessonViewer() {
 
   const activeSection = sections[Math.min(activeSectionIndex, Math.max(0, sections.length - 1))]
   const sectionQuestions = useMemo(() => extractQuestions(activeSection?.body || ''), [activeSection])
-  const notionPrompts = useMemo(
-    () => buildNotions(isCourseIntroMode, isUnitIntroMode, lesson?.title || ''),
-    [isCourseIntroMode, isUnitIntroMode, lesson?.title],
-  )
   const checkpointMarkdown = useMemo(
     () => normalizeLessonMarkdown(currentCheckpoint?.problem_description || ''),
     [currentCheckpoint?.problem_description],
   )
   const pseudocodeGuide = useMemo(() => buildPseudocodeGuide(currentCheckpoint), [currentCheckpoint])
-  const quickQuiz = useMemo(
+  const fallbackLessonNotions = useMemo(
     () => (isApcspCourse && !isIntroMode ? buildApcspQuiz(lesson?.title || '') : []),
     [isApcspCourse, isIntroMode, lesson?.title],
   )
+  const introNotions = useMemo(
+    () =>
+      isCourseIntroMode
+        ? buildApcspQuiz('course intro')
+        : isUnitIntroMode
+          ? buildApcspQuiz(`${introUnit?.title || currentUnitTitle} intro`)
+          : [],
+    [currentUnitTitle, introUnit?.title, isCourseIntroMode, isUnitIntroMode],
+  )
+  const notions = useMemo(() => {
+    if (isCourseIntroMode || isUnitIntroMode) return introNotions
+    if (persistedNotions.length > 0) {
+      return persistedNotions.map((item) => ({
+        id: item.id,
+        question: item.prompt,
+        options: item.options,
+        correctIndex: item.correctIndex,
+        rationale: item.rationale,
+      }))
+    }
+    return fallbackLessonNotions
+  }, [fallbackLessonNotions, introNotions, isCourseIntroMode, isUnitIntroMode, persistedNotions])
   const quizScore = useMemo(() => {
-    if (quickQuiz.length === 0) return 100
-    const answered = quickQuiz.filter((item) => Number.isFinite(quizAnswers[item.id]))
+    if (notions.length === 0) return 100
+    const answered = notions.filter((item) => Number.isFinite(quizAnswers[item.id]))
     if (answered.length === 0) return 0
-    const correct = quickQuiz.filter((item) => quizAnswers[item.id] === item.correctIndex).length
-    return Math.round((correct / quickQuiz.length) * 100)
-  }, [quickQuiz, quizAnswers])
+    const correct = notions.filter((item) => quizAnswers[item.id] === item.correctIndex).length
+    return Math.round((correct / notions.length) * 100)
+  }, [notions, quizAnswers])
   const hasMinimumNotesResponse = useMemo(() => {
     const responses = Object.values(questionResponses).map((value) => value.trim()).filter(Boolean)
     if (responses.length === 0) return true
@@ -863,10 +887,9 @@ export default function LessonViewer() {
   }, [questionResponses])
   const learningCheckPassed = useMemo(() => {
     if (!isApcspCourse) return true
-    if (isIntroMode) return true
     if (!quizSubmitted) return false
     return quizScore >= 80 && hasMinimumNotesResponse
-  }, [hasMinimumNotesResponse, isApcspCourse, isIntroMode, quizScore, quizSubmitted])
+  }, [hasMinimumNotesResponse, isApcspCourse, quizScore, quizSubmitted])
 
   const filteredUnits = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase()
@@ -953,6 +976,7 @@ export default function LessonViewer() {
         .single()
       if (lessonError || !lessonData) throw lessonError
       setLesson(lessonData as Lesson)
+      setQuizAnswers({})
 
       const { data: unitData } = await supabase.from('units').select('id, course_id').eq('id', lessonData.unit_id).single()
       const resolvedCourseId = unitData?.course_id || null
@@ -1019,8 +1043,40 @@ export default function LessonViewer() {
         setCode('')
       }
 
+      const { data: notionData } = await supabase
+        .from('notion_questions')
+        .select('id, prompt, options, correct_index, rationale, order_index')
+        .eq('lesson_id', lessonId)
+        .order('order_index', { ascending: true })
+
+      const normalizedNotions = ((notionData || []) as any[]).map((row) => ({
+        id: String(row.id),
+        prompt: String(row.prompt || ''),
+        options: Array.isArray(row.options) ? row.options.map((option: unknown) => String(option || '')) : [],
+        correctIndex: Number.isFinite(Number(row.correct_index)) ? Number(row.correct_index) : 0,
+        rationale: String(row.rationale || ''),
+        orderIndex: Number.isFinite(Number(row.order_index)) ? Number(row.order_index) : 0,
+      }))
+      setPersistedNotions(normalizedNotions)
+
+      if (normalizedNotions.length > 0) {
+        const notionIds = normalizedNotions.map((item) => item.id)
+        const { data: priorSubmissions } = await supabase
+          .from('notion_submissions')
+          .select('question_id, selected_index')
+          .eq('student_id', authUser.id)
+          .in('question_id', notionIds)
+
+        if (Array.isArray(priorSubmissions) && priorSubmissions.length > 0) {
+          const mapped: Record<string, number> = {}
+          priorSubmissions.forEach((row: any) => {
+            mapped[String(row.question_id)] = Number.isFinite(Number(row.selected_index)) ? Number(row.selected_index) : -1
+          })
+          setQuizAnswers(mapped)
+        }
+      }
+
       setActiveSectionIndex(0)
-      setQuizAnswers({})
       setQuizSubmitted(false)
     } catch (err: unknown) {
       console.error('[v0] Error loading lesson:', err)
@@ -1125,6 +1181,60 @@ export default function LessonViewer() {
   async function handleFormatCode() {
     const action = editorRef.current?.getAction('editor.action.formatDocument')
     if (action) await action.run()
+  }
+
+  async function handleSubmitNotions() {
+    setQuizSubmitted(true)
+    if (!user?.id || !lesson || notions.length === 0) return
+
+    setQuizSaving(true)
+    const supabase = createClient()
+    try {
+      const { data: enrollmentRows } = await supabase
+        .from('enrollments')
+        .select('classroom_id')
+        .eq('student_id', user.id)
+
+      const classroomIds = (enrollmentRows || []).map((row: any) => row.classroom_id).filter(Boolean)
+      let resolvedClassroomId: string | null = null
+      if (classroomIds.length > 0) {
+        const { data: assignedRow } = await supabase
+          .from('lesson_assignments')
+          .select('classroom_id')
+          .eq('lesson_id', lesson.id)
+          .in('classroom_id', classroomIds)
+          .limit(1)
+          .maybeSingle()
+        resolvedClassroomId = (assignedRow as any)?.classroom_id || null
+      }
+
+      const payload = notions
+        .map((item) => {
+          const selected = Number.isFinite(quizAnswers[item.id]) ? Number(quizAnswers[item.id]) : -1
+          if (selected < 0) return null
+          const correct = selected === item.correctIndex
+          return {
+            question_id: item.id,
+            student_id: user.id,
+            classroom_id: resolvedClassroomId,
+            selected_index: selected,
+            is_correct: correct,
+            score: correct ? 100 : 0,
+            answered_at: new Date().toISOString(),
+          }
+        })
+        .filter(Boolean)
+
+      if (payload.length > 0) {
+        await supabase
+          .from('notion_submissions')
+          .upsert(payload as any[], { onConflict: 'question_id,student_id,classroom_id' })
+      }
+    } catch (error) {
+      console.error('[v0] notion submission save failed', error)
+    } finally {
+      setQuizSaving(false)
+    }
   }
 
   function switchCheckpoint(checkpoint: Checkpoint) {
@@ -1352,7 +1462,7 @@ export default function LessonViewer() {
                         {isCourseIntroMode ? 'Start Here: AP CSP Course Intro' : `${introUnit?.title || currentUnitTitle} Intro`}
                       </h3>
                       <p className="mt-2 text-sm text-cyan-50">
-                        Read these notes in order. They are designed to feel like a live coach walking you through the course.
+                        Read these notes in order, then complete the notions check before moving ahead.
                       </p>
                     </div>
 
@@ -1378,23 +1488,45 @@ export default function LessonViewer() {
 
                     <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4">
                       <p className="text-sm font-semibold text-indigo-100">Notions</p>
-                      <p className="text-xs text-indigo-200 mt-1">Short reflection checks to make sure the ideas make sense.</p>
+                      <p className="text-xs text-indigo-200 mt-1">Answer each multiple-choice notion and grade your understanding.</p>
                       <div className="mt-3 space-y-3">
-                        {notionPrompts.map((notion, index) => {
-                          const key = `${lessonId}:notion:${isCourseIntroMode ? 'course' : isUnitIntroMode ? 'unit' : 'lesson'}:${index}`
+                        {notions.map((item, index) => {
                           return (
-                            <div key={key}>
-                              <p className="text-sm text-white">N{index + 1}. {notion}</p>
-                              <textarea
-                                rows={2}
-                                value={questionResponses[key] || ''}
-                                onChange={(event) => setQuestionResponses((prev) => ({ ...prev, [key]: event.target.value }))}
-                                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
-                                placeholder="Type your answer..."
-                              />
+                            <div key={item.id}>
+                              <p className="text-sm text-white">N{index + 1}. {item.question}</p>
+                              <div className="mt-2 grid gap-1">
+                                {item.options.map((option, optionIndex) => (
+                                  <label key={`${item.id}-${optionIndex}`} className="flex items-center gap-2 text-sm text-slate-100">
+                                    <input
+                                      type="radio"
+                                      name={`intro-notion-${item.id}`}
+                                      checked={quizAnswers[item.id] === optionIndex}
+                                      onChange={() => setQuizAnswers((prev) => ({ ...prev, [item.id]: optionIndex }))}
+                                    />
+                                    <span>{option}</span>
+                                  </label>
+                                ))}
+                              </div>
+                              {quizSubmitted && (
+                                <p className={`mt-1 text-xs ${quizAnswers[item.id] === item.correctIndex ? 'text-emerald-300' : 'text-orange-300'}`}>
+                                  {quizAnswers[item.id] === item.correctIndex ? 'Correct' : `Review: ${item.rationale}`}
+                                </p>
+                              )}
                             </div>
                           )
                         })}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-indigo-400/40 bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
+                            onClick={() => void handleSubmitNotions()}
+                          >
+                            {quizSaving ? 'Saving...' : 'Grade Notions'}
+                          </Button>
+                          <p className="text-xs text-indigo-100">Notions Score: {quizScore}%</p>
+                        </div>
                       </div>
                     </div>
 
@@ -1451,14 +1583,14 @@ export default function LessonViewer() {
                           ))}
                         </div>
 
-                        {quickQuiz.length > 0 && (
+                        {notions.length > 0 && (
                           <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
                             {!hasViewedAllNarrativeSteps && (
-                              <p className="text-xs text-amber-300">Scroll through all notes cards first to unlock the quick check.</p>
+                              <p className="text-xs text-amber-300">Scroll through all notes cards first to unlock Notions.</p>
                             )}
                             {hasViewedAllNarrativeSteps && (
                               <>
-                                {quickQuiz.map((item, index) => (
+                                {notions.map((item, index) => (
                                   <div key={item.id} className="text-sm text-slate-100">
                                     <p className="mb-2 font-medium">Q{index + 1}. {item.question}</p>
                                     <div className="grid gap-1">
@@ -1487,11 +1619,11 @@ export default function LessonViewer() {
                                     size="sm"
                                     variant="outline"
                                     className="border-cyan-500/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
-                                    onClick={() => setQuizSubmitted(true)}
+                                    onClick={() => void handleSubmitNotions()}
                                   >
-                                    Check Answers
+                                    {quizSaving ? 'Saving...' : 'Grade Notions'}
                                   </Button>
-                                  <p className="text-xs text-slate-300">Score: {quizScore}%</p>
+                                  <p className="text-xs text-slate-300">Notions Score: {quizScore}%</p>
                                 </div>
                               </>
                             )}
@@ -1731,8 +1863,8 @@ export default function LessonViewer() {
                     <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">Notions (Quick Reflection)</p>
                       <ul className="mt-2 space-y-2 text-sm text-indigo-100">
-                        {notionPrompts.map((notion, index) => (
-                          <li key={`side-notion-${index}`}>N{index + 1}. {notion}</li>
+                        {notions.map((item, index) => (
+                          <li key={`side-notion-${item.id}`}>N{index + 1}. {item.question}</li>
                         ))}
                       </ul>
                     </div>

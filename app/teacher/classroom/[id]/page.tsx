@@ -86,6 +86,7 @@ export default function TeacherClassroomPage() {
   const [removingPortionId, setRemovingPortionId] = useState<string | null>(null)
   const [bulkPortionAction, setBulkPortionAction] = useState<string | null>(null)
   const [studentPerformanceById, setStudentPerformanceById] = useState<Record<string, StudentPerformance>>({})
+  const [notionSubmissions, setNotionSubmissions] = useState<any[]>([])
 
   const activeOfferingCourses = useMemo(
     () => courses.filter((course) => offeringsByCourseId[course.id]?.is_active),
@@ -163,7 +164,7 @@ export default function TeacherClassroomPage() {
 
       const { data: classData } = await supabase
         .from('classrooms')
-        .select('id, name, code, allow_non_related_courses')
+        .select('id, name, code, allow_non_related_courses, grade_notions')
         .eq('id', classroomId)
         .eq('teacher_id', authUser.id)
         .single()
@@ -264,6 +265,19 @@ export default function TeacherClassroomPage() {
       })
       setStudentPerformanceById(byStudent)
 
+      if (studentIds.length > 0) {
+        const { data: notionRows } = await supabase
+          .from('notion_submissions')
+          .select('id, student_id, selected_index, is_correct, score, answered_at, question:notion_questions(prompt, options, correct_index, lesson:lesson_id(title))')
+          .eq('classroom_id', classroomId)
+          .in('student_id', studentIds)
+          .order('answered_at', { ascending: false })
+          .limit(80)
+        setNotionSubmissions(notionRows || [])
+      } else {
+        setNotionSubmissions([])
+      }
+
       const mapped: Record<string, { id: string; is_active: boolean }> = {}
       ;(offeringsData || []).forEach((offering: any) => {
         mapped[offering.course_id] = { id: offering.id, is_active: offering.is_active }
@@ -357,6 +371,25 @@ export default function TeacherClassroomPage() {
     }
 
     setClassroom((prev: any) => ({ ...prev, allow_non_related_courses: value }))
+    setSavingAccess(false)
+  }
+
+  async function setGradeNotions(value: boolean) {
+    if (!classroom) return
+    setSavingAccess(true)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('classrooms')
+      .update({ grade_notions: value })
+      .eq('id', classroom.id)
+
+    if (error) {
+      alert(error.message)
+      setSavingAccess(false)
+      return
+    }
+
+    setClassroom((prev: any) => ({ ...prev, grade_notions: value }))
     setSavingAccess(false)
   }
 
@@ -608,6 +641,28 @@ export default function TeacherClassroomPage() {
               </div>
             </div>
 
+            <div>
+              <Label className="mb-2 block">Teacher Grading for Notions</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={classroom?.grade_notions ? 'default' : 'outline'}
+                  disabled={savingAccess}
+                  onClick={() => setGradeNotions(true)}
+                >
+                  Enabled
+                </Button>
+                <Button
+                  type="button"
+                  variant={!classroom?.grade_notions ? 'default' : 'outline'}
+                  disabled={savingAccess}
+                  onClick={() => setGradeNotions(false)}
+                >
+                  Auto-Grade Only
+                </Button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {courses.map((course) => {
                 const offered = offeringsByCourseId[course.id]?.is_active || false
@@ -851,6 +906,46 @@ export default function TeacherClassroomPage() {
             </div>
           )}
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Notion Responses</CardTitle>
+            <CardDescription>
+              Student multiple-choice notion answers from notes lessons.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {notionSubmissions.length === 0 ? (
+              <p className="text-sm text-slate-300">No notion responses yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {notionSubmissions.map((row) => {
+                  const student = students.find((item) => item.student_id === row.student_id)
+                  const options = Array.isArray(row.question?.options) ? row.question.options : []
+                  const selectedIndex = Number.isFinite(Number(row.selected_index)) ? Number(row.selected_index) : -1
+                  const correctIndex = Number.isFinite(Number(row.question?.correct_index)) ? Number(row.question.correct_index) : -1
+                  return (
+                    <div key={row.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <p className="text-sm text-white font-medium">
+                        {student?.profiles?.full_name || student?.profiles?.email || 'Student'} - {row.question?.lesson?.title || 'Lesson'}
+                      </p>
+                      <p className="text-sm text-slate-200 mt-1">{row.question?.prompt || 'Notion question'}</p>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Selected: {selectedIndex >= 0 ? options[selectedIndex] || `Option ${selectedIndex + 1}` : 'No answer'}
+                      </p>
+                      <p className="text-xs text-slate-300">
+                        Correct: {correctIndex >= 0 ? options[correctIndex] || `Option ${correctIndex + 1}` : 'N/A'}
+                      </p>
+                      <p className={`text-xs mt-1 ${row.is_correct ? 'text-emerald-300' : 'text-orange-300'}`}>
+                        {row.is_correct ? 'Correct' : 'Needs review'} - Score: {row.score ?? 0}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div>
           <div className="flex items-center justify-between mb-4">

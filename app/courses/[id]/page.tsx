@@ -202,6 +202,11 @@ export default function CourseDetailPage() {
   }
 
   const progressPercent = calculateCourseProgress()
+  const isApcspCourse = /ap computer science principles|ap csp/i.test(String(course?.name || ''))
+  const firstLessonId =
+    units
+      .flatMap((unit) => unit.lessons || [])
+      .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))[0]?.id || null
 
   return (
     <div className="min-h-screen bg-black">
@@ -264,6 +269,16 @@ export default function CourseDetailPage() {
                 <span className="text-white font-semibold">{progressPercent}%</span>
               </div>
               <Progress value={progressPercent} className="h-2" />
+            </div>
+          )}
+
+          {isApcspCourse && firstLessonId && (
+            <div className="mt-6 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
+              <p className="text-sm font-semibold text-cyan-200">Start Here</p>
+              <p className="text-sm text-cyan-100 mt-1">Open Lesson 1.0 course intro notes before Lesson 1.1.</p>
+              <Link href={`/lesson/${firstLessonId}?view=course-intro`}>
+                <Button className="mt-3 bg-cyan-500 text-slate-950 hover:bg-cyan-400">Open 1.0 Course Intro</Button>
+              </Link>
             </div>
           )}
         </div>
