@@ -3,7 +3,7 @@
 import nextDynamic from 'next/dynamic'
 import type { OnMount } from '@monaco-editor/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
@@ -602,6 +602,108 @@ function apcspFrameworkOverview(): Array<{ label: string; items: string[] }> {
   ]
 }
 
+function formatLearnerName(fullName: string | null): string {
+  if (!fullName) return 'there'
+  const first = fullName.trim().split(/\s+/)[0]
+  return first || 'there'
+}
+
+function buildCourseIntroSections(learnerName: string): MarkdownSection[] {
+  return [
+    {
+      title: '1.0 Course Welcome',
+      body: `Welcome to AP Computer Science Principles, ${learnerName}.\n\nYou are starting from zero, and that is exactly where this course is designed to begin.\n\n> “Programming isn’t about what you know; it’s about what you can figure out.”\n\nIn this course, we will build confidence first, then skill, then speed.`,
+    },
+    {
+      title: 'How This Course Works',
+      body: `You will follow a simple rhythm:\n\n1. Learn the idea in plain language.\n2. Try a short check question.\n3. Write a small piece of code.\n4. Improve it with feedback.\n\nEvery step is short on purpose so it never feels overwhelming.`,
+    },
+    {
+      title: 'First Vocabulary Stop',
+      body: `**Word:** Algorithm\n\nAn algorithm is just a step-by-step plan to solve a problem.\n\nExample:\n1. Read a name.\n2. Build a greeting.\n3. Return the greeting.\n\nThat is already an algorithm.`,
+    },
+  ]
+}
+
+function buildUnitIntroSections(unitTitle: string, learnerName: string): MarkdownSection[] {
+  return [
+    {
+      title: `${unitTitle}: Quick Intro`,
+      body: `${learnerName}, this unit is about building a strong foundation.\n\nYou do not need to be fast. You need to be clear.\n\nWe will move from plain-language reasoning to pseudocode, then to Python.`,
+    },
+    {
+      title: 'Before You Code',
+      body: `Use this checklist:\n\n- Can I explain the goal in one sentence?\n- Can I write the steps in pseudocode?\n- Do I know the exact output format?\n\nIf yes, coding becomes much easier.`,
+    },
+    {
+      title: 'Vocabulary Stop: IDE',
+      body: `**Word:** IDE (Integrated Development Environment)\n\nAn IDE is the coding workspace where you write code, run tests, and debug mistakes.\n\nThink of it like a player’s training facility: tools, feedback, and practice in one place.`,
+    },
+  ]
+}
+
+function buildVocabSection(lessonTitle: string): MarkdownSection | null {
+  const title = lessonTitle.toLowerCase()
+  if (title.includes('problem') || title.includes('constraint')) {
+    return {
+      title: 'Vocabulary Stop: Constraint',
+      body: `A **constraint** is a rule your solution must follow.\n\nExample: “Output must match this exact format.”\n\nNotion: Why does exact formatting matter in programming?`,
+    }
+  }
+  if (title.includes('pseudo')) {
+    return {
+      title: 'Vocabulary Stop: Pseudocode',
+      body: `**Pseudocode** is plain-language logic that looks like code steps.\n\nIt helps you think before syntax.\n\nNotion: Write 3 pseudocode steps for making a sandwich.`,
+    }
+  }
+  if (title.includes('print') || title.includes('output')) {
+    return {
+      title: 'Vocabulary Stop: Output',
+      body: `**Output** is the result your program produces.\n\nIn Python, \`print()\` shows output.\n\nNotion: What is the output of \`print(\"Hi\")\`?`,
+    }
+  }
+  if (title.includes('function')) {
+    return {
+      title: 'Vocabulary Stop: Function',
+      body: `A **function** is a reusable block of code with a name.\n\nYou give it input, and it returns output.\n\nNotion: Why are reusable functions helpful in bigger programs?`,
+    }
+  }
+  return {
+    title: 'Vocabulary Stop: IDE',
+    body: `An **IDE** is your coding workspace.\n\nIt helps you write, run, and fix code faster.\n\nNotion: What IDE feature helps you catch mistakes quickly?`,
+  }
+}
+
+function buildNotions(isCourseIntroMode: boolean, isUnitIntroMode: boolean, lessonTitle: string): string[] {
+  if (isCourseIntroMode) {
+    return [
+      'In your own words, what is an algorithm?',
+      'What part of coding feels most new to you right now?',
+      'What is one question you want answered in this course?',
+    ]
+  }
+  if (isUnitIntroMode) {
+    return [
+      'What should you do before writing code?',
+      'What does IDE stand for?',
+      'Why might pseudocode reduce mistakes?',
+    ]
+  }
+  const lower = lessonTitle.toLowerCase()
+  if (lower.includes('constraint')) {
+    return [
+      'What is one non-negotiable constraint in this lesson?',
+      'How would you explain “output format” to a friend?',
+      'What mistake could happen if constraints are ignored?',
+    ]
+  }
+  return [
+    'What is the goal of this lesson in one sentence?',
+    'What output should your solution produce?',
+    'What one step in your algorithm is most important?',
+  ]
+}
+
 function runStaticChecks(code: string, language: MonacoLanguage): StaticIssue[] {
   const issues: StaticIssue[] = []
 
@@ -645,6 +747,7 @@ export const dynamic = 'force-dynamic'
 
 export default function LessonViewer() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const lessonId = params?.id as string
 
   const [lesson, setLesson] = useState<Lesson | null>(null)
@@ -667,6 +770,7 @@ export default function LessonViewer() {
   const [submitting, setSubmitting] = useState(false)
 
   const [user, setUser] = useState<{ id: string } | null>(null)
+  const [learnerName, setLearnerName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [activeSectionIndex, setActiveSectionIndex] = useState(0)
@@ -692,16 +796,59 @@ export default function LessonViewer() {
     return normalized || fallback
   }, [lesson?.content_body, lesson?.description, lesson?.title])
 
-  const sections = useMemo(() => splitMarkdownIntoSections(markdownSource), [markdownSource])
+  const viewMode = searchParams.get('view') || ''
+  const viewUnitId = searchParams.get('unit') || ''
+  const isCourseIntroMode = viewMode === 'course-intro'
+  const isUnitIntroMode = viewMode === 'unit-intro'
+  const isIntroMode = isCourseIntroMode || isUnitIntroMode
+
+  const lessonSections = useMemo(() => splitMarkdownIntoSections(markdownSource), [markdownSource])
+  const currentUnit = useMemo(() => {
+    const currentLessonId = lesson?.id
+    if (!currentLessonId) return null
+    return courseUnits.find((unit) => unit.lessons.some((entry) => entry.id === currentLessonId)) || null
+  }, [courseUnits, lesson?.id])
+  const currentUnitTitle = currentUnit?.title || 'Unit'
+
+  const isApcspCourse = useMemo(() => /ap computer science principles|ap csp/i.test(courseTitle), [courseTitle])
+  const vocabSection = useMemo(
+    () => (isApcspCourse && !isIntroMode ? buildVocabSection(lesson?.title || '') : null),
+    [isApcspCourse, isIntroMode, lesson?.title],
+  )
+  const lessonSectionsWithVocab = useMemo(
+    () => (vocabSection ? [...lessonSections, vocabSection] : lessonSections),
+    [lessonSections, vocabSection],
+  )
+  const introUnit = useMemo(() => {
+    if (!isUnitIntroMode) return null
+    return courseUnits.find((unit) => unit.id === viewUnitId) || currentUnit
+  }, [courseUnits, currentUnit, isUnitIntroMode, viewUnitId])
+  const introSections = useMemo(() => {
+    if (!isApcspCourse || !isIntroMode) return [] as MarkdownSection[]
+    const name = formatLearnerName(learnerName)
+    if (isCourseIntroMode) return buildCourseIntroSections(name)
+    return buildUnitIntroSections(introUnit?.title || currentUnitTitle, name)
+  }, [currentUnitTitle, introUnit?.title, isApcspCourse, isCourseIntroMode, isIntroMode, learnerName])
+  const sections = useMemo(
+    () => (isIntroMode ? introSections : lessonSectionsWithVocab),
+    [introSections, isIntroMode, lessonSectionsWithVocab],
+  )
+
   const activeSection = sections[Math.min(activeSectionIndex, Math.max(0, sections.length - 1))]
   const sectionQuestions = useMemo(() => extractQuestions(activeSection?.body || ''), [activeSection])
+  const notionPrompts = useMemo(
+    () => buildNotions(isCourseIntroMode, isUnitIntroMode, lesson?.title || ''),
+    [isCourseIntroMode, isUnitIntroMode, lesson?.title],
+  )
   const checkpointMarkdown = useMemo(
     () => normalizeLessonMarkdown(currentCheckpoint?.problem_description || ''),
     [currentCheckpoint?.problem_description],
   )
-  const isApcspCourse = useMemo(() => /ap computer science principles|ap csp/i.test(courseTitle), [courseTitle])
   const pseudocodeGuide = useMemo(() => buildPseudocodeGuide(currentCheckpoint), [currentCheckpoint])
-  const quickQuiz = useMemo(() => (isApcspCourse ? buildApcspQuiz(lesson?.title || '') : []), [isApcspCourse, lesson?.title])
+  const quickQuiz = useMemo(
+    () => (isApcspCourse && !isIntroMode ? buildApcspQuiz(lesson?.title || '') : []),
+    [isApcspCourse, isIntroMode, lesson?.title],
+  )
   const quizScore = useMemo(() => {
     if (quickQuiz.length === 0) return 100
     const answered = quickQuiz.filter((item) => Number.isFinite(quizAnswers[item.id]))
@@ -716,9 +863,10 @@ export default function LessonViewer() {
   }, [questionResponses])
   const learningCheckPassed = useMemo(() => {
     if (!isApcspCourse) return true
+    if (isIntroMode) return true
     if (!quizSubmitted) return false
     return quizScore >= 80 && hasMinimumNotesResponse
-  }, [hasMinimumNotesResponse, isApcspCourse, quizScore, quizSubmitted])
+  }, [hasMinimumNotesResponse, isApcspCourse, isIntroMode, quizScore, quizSubmitted])
 
   const filteredUnits = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase()
@@ -732,14 +880,6 @@ export default function LessonViewer() {
       })
       .filter((unit) => unit.lessons.length > 0 || unit.title.toLowerCase().includes(query))
   }, [courseUnits, lessonSearch])
-  const currentUnitTitle = useMemo(() => {
-    const currentLessonId = lesson?.id
-    if (!currentLessonId) return 'Unit'
-    for (const unit of courseUnits) {
-      if (unit.lessons.some((entry) => entry.id === currentLessonId)) return unit.title || 'Unit'
-    }
-    return 'Unit'
-  }, [courseUnits, lesson?.id])
   const frameworkTag = useMemo(
     () => (isApcspCourse ? inferApcspFrameworkTag(currentUnitTitle, lesson?.title || '') : null),
     [currentUnitTitle, isApcspCourse, lesson?.title],
@@ -775,7 +915,7 @@ export default function LessonViewer() {
           return next
         })
       },
-      { threshold: 0.35 },
+      { root, threshold: 0.35 },
     )
 
     elements.forEach((element) => observer.observe(element))
@@ -799,6 +939,12 @@ export default function LessonViewer() {
       }
 
       setUser({ id: authUser.id })
+      const { data: viewerProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', authUser.id)
+        .maybeSingle()
+      setLearnerName((viewerProfile as { full_name?: string | null } | null)?.full_name || null)
 
       const { data: lessonData, error: lessonError } = await supabase
         .from('lessons')
@@ -1009,6 +1155,9 @@ export default function LessonViewer() {
     return `${slug}.${languageExtension(editorLanguage)}`
   }
 
+  const firstCourseLessonId =
+    courseUnits.flatMap((unit) => unit.lessons)[0]?.id || lesson?.id || ''
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950">
@@ -1025,6 +1174,12 @@ export default function LessonViewer() {
     )
   }
 
+  const pageTitle = isCourseIntroMode
+    ? 'Lesson 1.0: Course Introduction'
+    : isUnitIntroMode
+      ? `Unit Intro: ${introUnit?.title || currentUnitTitle}`
+      : lesson.title
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur">
@@ -1037,7 +1192,7 @@ export default function LessonViewer() {
               </Button>
             </Link>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold text-white lg:text-xl">{lesson.title}</h1>
+              <h1 className="truncate text-lg font-semibold text-white lg:text-xl">{pageTitle}</h1>
               <p className="truncate text-sm text-slate-400">{courseTitle}</p>
             </div>
           </div>
@@ -1093,6 +1248,20 @@ export default function LessonViewer() {
 
               <div className="overflow-y-auto p-3">
                 <div className="space-y-4">
+                  {isApcspCourse && (
+                    <Link href={`/lesson/${firstCourseLessonId}?view=course-intro`}>
+                      <div
+                        className={`rounded-lg border px-3 py-2 text-sm transition ${
+                          isCourseIntroMode
+                            ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                            : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        {!sidebarCollapsed ? '1.0 Course Intro Notes' : '1.0'}
+                      </div>
+                    </Link>
+                  )}
+
                   {filteredUnits.map((unit) => (
                     <div key={unit.id} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
                       {!sidebarCollapsed && (
@@ -1105,8 +1274,22 @@ export default function LessonViewer() {
                       )}
 
                       <div className="space-y-2">
+                        {isApcspCourse && (
+                          <Link href={`/lesson/${unit.lessons[0]?.id || lesson.id}?view=unit-intro&unit=${unit.id}`}>
+                            <div
+                              className={`rounded-md px-3 py-2 text-sm transition ${
+                                isUnitIntroMode && introUnit?.id === unit.id
+                                  ? 'border border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                                  : 'border border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+                              }`}
+                            >
+                              {!sidebarCollapsed ? `Unit ${unit.unit_number || unit.order_index || '-'} Intro` : 'U'}
+                            </div>
+                          </Link>
+                        )}
+
                         {unit.lessons.map((entry) => {
-                          const active = entry.id === lesson.id
+                          const active = !isIntroMode && entry.id === lesson.id
                           const status = getLessonStatus(entry.id)
                           return (
                             <Link key={entry.id} href={`/lesson/${entry.id}`}>
@@ -1152,12 +1335,78 @@ export default function LessonViewer() {
           <section className={sidebarCollapsed ? 'xl:col-span-8' : 'xl:col-span-6'}>
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">Code Editor</p>
-                <p className="text-xs text-slate-400">Write and run your solution here</p>
+                <p className="text-sm font-medium text-slate-200">{isIntroMode ? 'Guided Notes' : 'Code Editor'}</p>
+                <p className="text-xs text-slate-400">
+                  {isIntroMode ? 'Read, reflect, and prepare before coding.' : 'Write and run your solution here'}
+                </p>
               </div>
 
               <div className="flex-1 overflow-y-auto px-5 py-5">
-                {currentCheckpoint ? (
+                {isIntroMode ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4">
+                      <p className="text-xs uppercase tracking-wide text-cyan-300">
+                        {isCourseIntroMode ? 'Lesson 1.0' : 'Unit Introduction'}
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold text-white">
+                        {isCourseIntroMode ? 'Start Here: AP CSP Course Intro' : `${introUnit?.title || currentUnitTitle} Intro`}
+                      </h3>
+                      <p className="mt-2 text-sm text-cyan-50">
+                        Read these notes in order. They are designed to feel like a live coach walking you through the course.
+                      </p>
+                    </div>
+
+                    <div ref={lessonFlowRef} className="max-h-[62vh] space-y-3 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+                      {sections.map((section, index) => (
+                        <article
+                          key={`intro-step-${section.title}-${index}`}
+                          data-note-step={index}
+                          className={`rounded-lg border border-slate-700 bg-slate-900/70 p-4 transition-all duration-700 ${
+                            visibleNarrativeSteps[index] ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-30'
+                          }`}
+                        >
+                          <p className="text-xs uppercase tracking-wide text-cyan-300">Notes {index + 1}</p>
+                          <h4 className="mt-1 text-base font-semibold text-white">{section.title}</h4>
+                          <div className="mt-2 text-sm text-slate-200 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                              {section.body}
+                            </ReactMarkdown>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+
+                    <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4">
+                      <p className="text-sm font-semibold text-indigo-100">Notions</p>
+                      <p className="text-xs text-indigo-200 mt-1">Short reflection checks to make sure the ideas make sense.</p>
+                      <div className="mt-3 space-y-3">
+                        {notionPrompts.map((notion, index) => {
+                          const key = `${lessonId}:notion:${isCourseIntroMode ? 'course' : isUnitIntroMode ? 'unit' : 'lesson'}:${index}`
+                          return (
+                            <div key={key}>
+                              <p className="text-sm text-white">N{index + 1}. {notion}</p>
+                              <textarea
+                                rows={2}
+                                value={questionResponses[key] || ''}
+                                onChange={(event) => setQuestionResponses((prev) => ({ ...prev, [key]: event.target.value }))}
+                                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+                                placeholder="Type your answer..."
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Link href={isCourseIntroMode ? `/lesson/${firstCourseLessonId}` : `/lesson/${introUnit?.lessons?.[0]?.id || lesson.id}`}>
+                        <Button className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+                          {isCourseIntroMode ? 'Start Lesson 1.1' : 'Start This Unit'}
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ) : currentCheckpoint ? (
                   <div className="space-y-5">
                     {isApcspCourse && (
                       <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-4">
@@ -1432,34 +1681,63 @@ export default function LessonViewer() {
           <section className="xl:col-span-3">
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">Assignment</p>
-                <p className="text-xs text-slate-400">Checkpoint instructions and points</p>
+                <p className="text-sm font-medium text-slate-200">{isIntroMode ? 'Intro Guide' : 'Assignment'}</p>
+                <p className="text-xs text-slate-400">
+                  {isIntroMode ? 'Overview, standards, and simple focus prompts.' : 'Checkpoint instructions and points'}
+                </p>
               </div>
 
-              <div className="border-b border-slate-800 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {checkpoints.length === 0 && (
-                    <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">No checkpoint for this lesson</Badge>
-                  )}
-                  {checkpoints.map((checkpoint, index) => (
-                    <button
-                      key={checkpoint.id}
-                      type="button"
-                      onClick={() => switchCheckpoint(checkpoint)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                        currentCheckpoint?.id === checkpoint.id
-                          ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/30'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                      }`}
-                    >
-                      {index + 1}. {checkpoint.title}
-                    </button>
-                  ))}
+              {!isIntroMode && (
+                <div className="border-b border-slate-800 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {checkpoints.length === 0 && (
+                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">No checkpoint for this lesson</Badge>
+                    )}
+                    {checkpoints.map((checkpoint, index) => (
+                      <button
+                        key={checkpoint.id}
+                        type="button"
+                        onClick={() => switchCheckpoint(checkpoint)}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                          currentCheckpoint?.id === checkpoint.id
+                            ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/30'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                        }`}
+                      >
+                        {index + 1}. {checkpoint.title}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex-1 overflow-y-auto px-5 py-5">
-                {currentCheckpoint ? (
+                {isIntroMode ? (
+                  <div className="space-y-4">
+                    {isApcspCourse && frameworkOverview.length > 0 && (
+                      <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 space-y-2">
+                        {frameworkOverview.map((group) => (
+                          <div key={group.label}>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">{group.label}</p>
+                            <ul className="mt-1 space-y-1 text-xs text-slate-200">
+                              {group.items.map((item) => (
+                                <li key={item}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">Notions (Quick Reflection)</p>
+                      <ul className="mt-2 space-y-2 text-sm text-indigo-100">
+                        {notionPrompts.map((notion, index) => (
+                          <li key={`side-notion-${index}`}>N{index + 1}. {notion}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : currentCheckpoint ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
@@ -1572,7 +1850,7 @@ export default function LessonViewer() {
               <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-cyan-300" />
-                  <p className="text-sm font-semibold text-white">Notes Questions</p>
+                  <p className="text-sm font-semibold text-white">Notions</p>
                 </div>
 
                 {sectionQuestions.length > 0 ? (
@@ -1594,7 +1872,7 @@ export default function LessonViewer() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400">No explicit questions were found on this notes page yet.</p>
+                  <p className="text-sm text-slate-400">No notion prompts were found on this notes page yet.</p>
                 )}
               </div>
             </div>
