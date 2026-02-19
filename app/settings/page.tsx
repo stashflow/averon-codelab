@@ -14,12 +14,19 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LearnAveronCodeLab } from '@/components/learn-averon-codelab'
 import {
+  defaultCustomThemeColors,
+  getStoredCustomThemeColors,
+  resetStoredCustomThemeColors,
+  setStoredCustomThemeColors,
+  type CustomThemeColors,
+} from '@/lib/color-theme'
+import {
   defaultUserFeaturePreferences,
   getUserPreferencesStorageKey,
   mergePreferences,
   type UserFeaturePreferences,
 } from '@/lib/user-preferences'
-import { CheckCircle2, KeyRound, LogOut, Mail, Save, Settings2, Shield, UserCircle2 } from 'lucide-react'
+import { CheckCircle2, KeyRound, LogOut, Mail, RotateCcw, Save, Settings2, Shield, UserCircle2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,12 +39,14 @@ export default function SettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false)
   const [savingPrefs, setSavingPrefs] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
+  const [savingThemeColors, setSavingThemeColors] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [form, setForm] = useState({ full_name: '', email: '' })
   const [newEmail, setNewEmail] = useState('')
   const [emailStatus, setEmailStatus] = useState<string | null>(null)
   const [passwords, setPasswords] = useState({ newPassword: '', confirmPassword: '' })
   const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
+  const [customColors, setCustomColors] = useState<CustomThemeColors>(defaultCustomThemeColors)
   const router = useRouter()
   const { theme, setTheme } = useTheme()
 
@@ -83,6 +92,7 @@ export default function SettingsPage() {
       const effectiveEmail = data?.email || user.email || ''
       setForm({ full_name: data?.full_name || '', email: effectiveEmail })
       setNewEmail(effectiveEmail)
+      setCustomColors(getStoredCustomThemeColors())
       setLoading(false)
     }
 
@@ -103,6 +113,26 @@ export default function SettingsPage() {
 
   function setFeaturePreference(key: keyof UserFeaturePreferences, value: boolean) {
     setPreferences((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function setCustomColorValue(key: keyof CustomThemeColors, value: string) {
+    setCustomColors((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function applyThemeColors() {
+    setSavingThemeColors(true)
+    const normalized = setStoredCustomThemeColors(customColors)
+    setCustomColors(normalized)
+    setSavingThemeColors(false)
+    setStatusMessage('Custom theme colors applied.')
+  }
+
+  function resetThemeColors() {
+    setSavingThemeColors(true)
+    resetStoredCustomThemeColors()
+    setCustomColors(defaultCustomThemeColors)
+    setSavingThemeColors(false)
+    setStatusMessage('Custom theme colors reset.')
   }
 
   async function saveProfile() {
@@ -198,26 +228,26 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
-        <p className="text-slate-300">Loading settings...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading settings...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 text-white">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/60 backdrop-blur-xl">
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold flex items-center gap-2"><Settings2 className="w-5 h-5 text-cyan-300" /> Settings</h1>
-            <p className="text-sm text-slate-400">Control your account, security, and classroom experience.</p>
+            <h1 className="text-xl font-semibold flex items-center gap-2"><Settings2 className="w-5 h-5 text-primary" /> Settings</h1>
+            <p className="text-sm text-muted-foreground">Control your account, security, and classroom experience.</p>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button asChild variant="outline" className="border-white/15 bg-white/5 text-slate-200 hover:bg-white/10">
+            <Button asChild variant="outline">
               <Link href={dashboardLink}>Back to Dashboard</Link>
             </Button>
-            <Button onClick={signOut} variant="outline" className="border-white/15 bg-white/5 text-slate-200 hover:bg-white/10 gap-2">
+            <Button onClick={signOut} variant="outline" className="gap-2">
               <LogOut className="w-4 h-4" />
               Sign Out
             </Button>
@@ -227,7 +257,7 @@ export default function SettingsPage() {
 
       <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
         {statusMessage && (
-          <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-emerald-200 text-sm flex items-center gap-2">
+          <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-primary text-sm flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
             {statusMessage}
           </div>
@@ -235,32 +265,31 @@ export default function SettingsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="border-white/10 bg-slate-900/60">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2"><UserCircle2 className="w-5 h-5 text-cyan-300" /> Profile</CardTitle>
-                <CardDescription className="text-slate-400">Update your name and theme preferences.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><UserCircle2 className="w-5 h-5 text-primary" /> Profile</CardTitle>
+                <CardDescription>Update your name and theme preferences.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-slate-200">Full Name</Label>
+                  <Label htmlFor="name">Full Name</Label>
                   <Input
                     id="name"
                     value={form.full_name}
                     onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                    className="bg-white/5 border-white/15"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-200">Current Email</Label>
-                  <Input id="email" value={form.email} disabled className="bg-white/5 border-white/15" />
+                  <Label htmlFor="email">Current Email</Label>
+                  <Input id="email" value={form.email} disabled />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="theme-select" className="text-slate-200">Theme</Label>
+                  <Label htmlFor="theme-select">Theme</Label>
                   <select
                     id="theme-select"
                     value={theme || 'dark'}
                     onChange={(e) => setTheme(e.target.value)}
-                    className="h-10 w-full rounded-md border border-white/15 bg-white/5 px-3 text-sm text-white"
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
                   >
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
@@ -274,51 +303,107 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-slate-900/60">
+            {profile?.role === 'student' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Settings2 className="w-5 h-5 text-primary" /> Student Theme Colors</CardTitle>
+                  <CardDescription>Use CSS HSL values to customize your theme. Example: `337 84% 56%`.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="main-color">Main color (`--primary`)</Label>
+                      <Input
+                        id="main-color"
+                        placeholder="337 84% 56%"
+                        value={customColors.primary}
+                        onChange={(e) => setCustomColorValue('primary', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accent-color">Accent color (`--accent`)</Label>
+                      <Input
+                        id="accent-color"
+                        placeholder="24 95% 58%"
+                        value={customColors.accent}
+                        onChange={(e) => setCustomColorValue('accent', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="background-color">Background (`--background`)</Label>
+                      <Input
+                        id="background-color"
+                        placeholder="30 33% 99%"
+                        value={customColors.background}
+                        onChange={(e) => setCustomColorValue('background', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="foreground-color">Text (`--foreground`)</Label>
+                      <Input
+                        id="foreground-color"
+                        placeholder="345 22% 14%"
+                        value={customColors.foreground}
+                        onChange={(e) => setCustomColorValue('foreground', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={applyThemeColors} disabled={savingThemeColors} className="gap-2">
+                      <Save className="w-4 h-4" />
+                      {savingThemeColors ? 'Applying...' : 'Apply Custom Colors'}
+                    </Button>
+                    <Button onClick={resetThemeColors} variant="outline" disabled={savingThemeColors} className="gap-2">
+                      <RotateCcw className="w-4 h-4" />
+                      Reset Colors
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2"><Mail className="w-5 h-5 text-cyan-300" /> Email Address</CardTitle>
-                <CardDescription className="text-slate-400">Change your email and confirm via inbox.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5 text-primary" /> Email Address</CardTitle>
+                <CardDescription>Change your email and confirm via inbox.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="newEmail" className="text-slate-200">New Email</Label>
+                  <Label htmlFor="newEmail">New Email</Label>
                   <Input
                     id="newEmail"
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    className="bg-white/5 border-white/15"
                   />
                 </div>
                 <Button onClick={changeEmail} disabled={savingEmail || !newEmail.trim()}>{savingEmail ? 'Updating...' : 'Change Email'}</Button>
-                {emailStatus && <p className="text-sm text-slate-300">{emailStatus}</p>}
+                {emailStatus && <p className="text-sm text-muted-foreground">{emailStatus}</p>}
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-slate-900/60">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2"><KeyRound className="w-5 h-5 text-cyan-300" /> Security</CardTitle>
-                <CardDescription className="text-slate-400">Update your account password.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><KeyRound className="w-5 h-5 text-primary" /> Security</CardTitle>
+                <CardDescription>Update your account password.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword" className="text-slate-200">New Password</Label>
+                  <Label htmlFor="newPassword">New Password</Label>
                   <Input
                     id="newPassword"
                     type="password"
                     value={passwords.newPassword}
                     onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-                    className="bg-white/5 border-white/15"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-slate-200">Confirm Password</Label>
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
                     value={passwords.confirmPassword}
                     onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
-                    className="bg-white/5 border-white/15"
                   />
                 </div>
                 <Button onClick={updatePassword} disabled={savingPassword}>{savingPassword ? 'Updating...' : 'Update Password'}</Button>
@@ -327,23 +412,23 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-6">
-            <Card className="border-white/10 bg-slate-900/60">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white">Notifications</CardTitle>
-                <CardDescription className="text-slate-400">Control update and reminder behavior.</CardDescription>
+                <CardTitle>Notifications</CardTitle>
+                <CardDescription>Control update and reminder behavior.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-background p-3">
                   <div>
-                    <p className="text-sm font-medium text-white">Email Updates</p>
-                    <p className="text-xs text-slate-400">Product and class activity notifications.</p>
+                    <p className="text-sm font-medium">Email Updates</p>
+                    <p className="text-xs text-muted-foreground">Product and class activity notifications.</p>
                   </div>
                   <Switch checked={preferences.email_updates} onCheckedChange={(checked) => setFeaturePreference('email_updates', checked)} />
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-background p-3">
                   <div>
-                    <p className="text-sm font-medium text-white">Class Reminders</p>
-                    <p className="text-xs text-slate-400">Upcoming class and assignment reminders.</p>
+                    <p className="text-sm font-medium">Class Reminders</p>
+                    <p className="text-xs text-muted-foreground">Upcoming class and assignment reminders.</p>
                   </div>
                   <Switch checked={preferences.class_reminders} onCheckedChange={(checked) => setFeaturePreference('class_reminders', checked)} />
                 </div>
@@ -351,25 +436,25 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-slate-900/60">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2"><Shield className="w-5 h-5 text-cyan-300" /> Account Info</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Account Info</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-400">Role</span>
+                  <span className="text-muted-foreground">Role</span>
                   <Badge variant="secondary" className="capitalize">{profile?.role?.replace('_', ' ') || 'User'}</Badge>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-400">Account ID</span>
-                  <span className="font-mono text-xs text-slate-200 break-all text-right">{authUser?.id}</span>
+                  <span className="text-muted-foreground">Account ID</span>
+                  <span className="font-mono text-xs break-all text-right">{authUser?.id}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-400">Last Sign In</span>
+                  <span className="text-muted-foreground">Last Sign In</span>
                   <span className="text-right">{authUser?.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString() : 'Unknown'}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-400">Session Expires</span>
+                  <span className="text-muted-foreground">Session Expires</span>
                   <span className="text-right">{sessionInfo?.expires_at ? new Date(sessionInfo.expires_at * 1000).toLocaleString() : 'Unknown'}</span>
                 </div>
               </CardContent>

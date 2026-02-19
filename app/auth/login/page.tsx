@@ -10,7 +10,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,7 +78,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex">
+    <div className="min-h-screen bg-gradient-to-br from-white via-rose-50/40 to-orange-50/60 text-slate-900 flex warm-aurora">
       {/* Left Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
@@ -89,20 +88,20 @@ export default function Login() {
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">Welcome Back</h1>
-              <p className="text-slate-400 mt-2">Sign in to continue your learning journey</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome Back</h1>
+              <p className="text-slate-600 mt-2">Sign in to continue your learning journey</p>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-xl p-6 backdrop-blur-sm">
             <div className="space-y-5">
               {showConfirmNotice && (
-                <div className="rounded-lg border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-amber-100 flex items-start justify-between gap-3">
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3">
                   <p>Before signing in, confirm your email from the verification message we sent you.</p>
                   <button
                     type="button"
                     onClick={() => setShowConfirmNotice(false)}
-                    className="text-amber-200/80 hover:text-amber-100 text-xs"
+                    className="text-amber-700 hover:text-amber-900 text-xs"
                   >
                     Dismiss
                   </button>
@@ -110,7 +109,7 @@ export default function Login() {
               )}
               <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-300">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-700">
                     Email Address
                   </Label>
                   <Input
@@ -121,16 +120,16 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
+                    className="h-11 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-pink-500 focus:ring-pink-500/20"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-sm font-medium text-slate-300">
+                    <Label htmlFor="password" className="text-sm font-medium text-slate-700">
                       Password
                     </Label>
-                    <Link href="/auth/forgot-password" className="text-xs text-blue-400 hover:underline">
+                    <Link href="/auth/forgot-password" className="text-xs text-pink-700 hover:text-orange-700 hover:underline">
                       Forgot password?
                     </Link>
                   </div>
@@ -142,19 +141,19 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
+                    className="h-11 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-pink-500 focus:ring-pink-500/20"
                   />
                 </div>
 
                 {error && (
-                  <div className="bg-red-500/20 border border-red-500/40 text-red-300 p-3 rounded-lg text-sm backdrop-blur-sm">
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
                     {error}
                   </div>
                 )}
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0"
+                  className="w-full h-11 bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 hover:from-fuchsia-600 hover:via-pink-600 hover:to-orange-600 text-white shadow-lg shadow-pink-500/25 border-0"
                   disabled={loading}
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
@@ -162,10 +161,10 @@ export default function Login() {
 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/10" />
+                    <div className="w-full border-t border-slate-200" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-slate-950 px-2 text-slate-400">Or continue with</span>
+                    <span className="bg-white px-2 text-slate-500">Or continue with</span>
                   </div>
                 </div>
 
@@ -174,7 +173,7 @@ export default function Login() {
                   variant="outline"
                   onClick={() => handleOAuthLogin('google')}
                   disabled={loading}
-                  className="w-full h-11 bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm"
+                  className="w-full h-11 border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                 >
                   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path
@@ -200,9 +199,9 @@ export default function Login() {
             </div>
           </div>
 
-          <p className="text-sm text-center text-slate-400">
+          <p className="text-sm text-center text-slate-600">
             Don't have an account?{' '}
-            <Link href="/auth/sign-up" className="text-blue-400 hover:underline font-semibold">
+            <Link href="/auth/sign-up" className="text-pink-700 hover:text-orange-700 hover:underline font-semibold">
               Create account
             </Link>
           </p>
@@ -210,15 +209,15 @@ export default function Login() {
       </div>
 
       {/* Right Side - Visual */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-500/10 via-cyan-500/5 to-slate-950 items-center justify-center p-12">
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-white via-rose-50/40 to-orange-50/70 items-center justify-center p-12 border-l border-slate-200/70">
         <div className="max-w-md space-y-6">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-fuchsia-600 via-pink-600 to-orange-600 bg-clip-text text-transparent">
                 Code. Learn. Excel.
               </span>
             </h2>
-            <p className="text-lg text-slate-300 leading-relaxed">
+            <p className="text-lg text-slate-700 leading-relaxed">
               Join thousands of students and teachers using Averon CodeLab to master programming skills and achieve
               their goals.
             </p>
@@ -226,10 +225,10 @@ export default function Login() {
           <div className="space-y-3 pt-4">
             {['Interactive coding environment', 'Real-time feedback', 'Track your progress'].map((item, idx) => (
               <div key={idx} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-blue-400" />
+                <div className="w-6 h-6 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-pink-600" />
                 </div>
-                <span className="text-sm text-slate-400">{item}</span>
+                <span className="text-sm text-slate-600">{item}</span>
               </div>
             ))}
           </div>

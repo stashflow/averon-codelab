@@ -347,6 +347,44 @@ export default function StudentDashboard() {
         return
       }
 
+      const { data: classMeta, error: classMetaError } = await supabase
+        .from('classrooms')
+        .select('teacher_id, school_id')
+        .eq('id', classroom.id)
+        .single()
+
+      if (classMetaError) {
+        throw classMetaError
+      }
+
+      let targetSchoolId: string | null = classMeta?.school_id || null
+      if (classMeta?.teacher_id) {
+        const { data: teacherProfile } = await supabase
+          .from('profiles')
+          .select('school_id')
+          .eq('id', classMeta.teacher_id)
+          .single()
+        targetSchoolId = teacherProfile?.school_id || targetSchoolId
+      }
+
+      const currentStudentSchoolId = profile?.school_id || null
+      if (currentStudentSchoolId && targetSchoolId && currentStudentSchoolId !== targetSchoolId) {
+        setJoinError('This class belongs to a different school than your current account school.')
+        return
+      }
+
+      if (!currentStudentSchoolId && targetSchoolId) {
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .update({ school_id: targetSchoolId })
+          .eq('id', user.id)
+          .eq('role', 'student')
+
+        if (profileUpdateError) {
+          throw profileUpdateError
+        }
+      }
+
       const { error: insertError } = await supabase.from('enrollments').insert({
         classroom_id: classroom.id,
         student_id: user.id,
@@ -416,33 +454,33 @@ export default function StudentDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center">
-        <p className="text-slate-300">Loading dashboard...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading dashboard...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
-      <header className="sticky top-0 z-50 bg-slate-950/40 backdrop-blur-xl border-b border-white/5">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-3">
               <Image src="/ACL.png" alt="ACL Logo" width={40} height={40} className="w-10 h-10 logo-theme-filter" />
               <div className="hidden sm:block">
-                <h1 className="text-sm font-bold text-white leading-tight">Averon CodeLab</h1>
-                <p className="text-xs text-slate-400">Student Dashboard</p>
+                <h1 className="text-sm font-bold text-foreground leading-tight">Averon CodeLab</h1>
+                <p className="text-xs text-muted-foreground">Student Dashboard</p>
               </div>
             </Link>
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <Link href="/settings">
-                <Button variant="outline" className="gap-2 bg-white/5 border-white/10 text-slate-200 hover:bg-white/10 hover:text-white backdrop-blur-sm">
+                <Button variant="outline" className="gap-2">
                   <Settings className="w-4 h-4" />
                   <span className="hidden sm:inline">Settings</span>
                 </Button>
               </Link>
-              <Button onClick={handleSignOut} variant="outline" className="gap-2 bg-white/5 border-white/10 text-slate-200 hover:bg-white/10 hover:text-white backdrop-blur-sm">
+              <Button onClick={handleSignOut} variant="outline" className="gap-2">
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Sign Out</span>
               </Button>
@@ -453,24 +491,24 @@ export default function StudentDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Welcome back, {profile?.full_name || 'Student'}</h1>
-          <p className="text-slate-400 mt-1">Track your progress, join classes, and keep learning.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {profile?.full_name || 'Student'}</h1>
+          <p className="text-muted-foreground mt-1">Track your progress, join classes, and keep learning.</p>
         </div>
 
         {announcements.length > 0 && (
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-xl border border-blue-400/20 shadow-2xl shadow-blue-500/20 p-6">
+          <div className="relative overflow-hidden rounded-2xl bg-primary/5 border border-primary/20 shadow-sm p-6">
             <div className="relative z-10 space-y-3">
               <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-blue-400" />
-                <h3 className="text-lg font-semibold text-white">Class Announcements</h3>
+                <Bell className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold text-foreground">Class Announcements</h3>
               </div>
               <div className="space-y-2">
                 {announcements.map((announcement) => (
-                  <div key={announcement.id} className="flex items-start gap-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4">
+                  <div key={announcement.id} className="flex items-start gap-3 rounded-xl bg-card border border-border p-4">
                     {announcement.priority === 'urgent' && <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />}
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm leading-relaxed">{announcement.message}</p>
-                      <p className="text-xs text-slate-500 mt-2">- {announcement.teacher?.full_name || 'Teacher'}</p>
+                      <p className="text-foreground text-sm leading-relaxed">{announcement.message}</p>
+                      <p className="text-xs text-muted-foreground mt-2">- {announcement.teacher?.full_name || 'Teacher'}</p>
                     </div>
                   </div>
                 ))}
@@ -480,85 +518,85 @@ export default function StudentDashboard() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-blue-500/10 p-5">
+          <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-5">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-slate-300">Completed Lessons</p>
+                <p className="text-sm font-medium text-muted-foreground">Completed Lessons</p>
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{completedLessons}</p>
-              <p className="text-sm text-slate-400 mt-1">done</p>
+              <p className="text-4xl font-bold text-foreground">{completedLessons}</p>
+              <p className="text-sm text-muted-foreground mt-1">done</p>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-blue-500/10 p-5">
+          <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-5">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-slate-300">Courses</p>
-                <BookOpen className="w-5 h-5 text-blue-400" />
+                <p className="text-sm font-medium text-muted-foreground">Courses</p>
+                <BookOpen className="w-5 h-5 text-primary" />
               </div>
-              <p className="text-4xl font-bold text-white">{enrolledCourses.length}</p>
-              <p className="text-sm text-slate-400 mt-1">active</p>
+              <p className="text-4xl font-bold text-foreground">{enrolledCourses.length}</p>
+              <p className="text-sm text-muted-foreground mt-1">active</p>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-emerald-500/10 p-5">
+          <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-5">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-slate-300">Badges Earned</p>
+                <p className="text-sm font-medium text-muted-foreground">Badges Earned</p>
                 <Award className="w-5 h-5 text-emerald-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{earnedBadgeCount}</p>
-              <p className="text-sm text-slate-400 mt-1">unlocked</p>
+              <p className="text-4xl font-bold text-foreground">{earnedBadgeCount}</p>
+              <p className="text-sm text-muted-foreground mt-1">unlocked</p>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-yellow-500/10 p-5">
+          <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-5">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-slate-300">Average Grade</p>
+                <p className="text-sm font-medium text-muted-foreground">Average Grade</p>
                 <Trophy className="w-5 h-5 text-yellow-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{averageGrade}%</p>
-              <p className="text-sm text-slate-400 mt-1">graded work</p>
+              <p className="text-4xl font-bold text-foreground">{averageGrade}%</p>
+              <p className="text-sm text-muted-foreground mt-1">graded work</p>
             </div>
           </div>
         </div>
 
         {preferences.activity_timeline_widgets && (
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 backdrop-blur-xl border border-indigo-400/20 shadow-2xl p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">Activity Timeline</h3>
+          <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
+            <h3 className="text-xl font-semibold text-foreground mb-4">Activity Timeline</h3>
             <div className="space-y-3 text-sm">
-              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
-                Joined <span className="text-cyan-300 font-medium">{classEnrollments.length}</span> active classroom(s).
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-foreground">
+                Joined <span className="text-primary font-medium">{classEnrollments.length}</span> active classroom(s).
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
-                Completed <span className="text-cyan-300 font-medium">{completedLessons}</span> lesson(s).
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-foreground">
+                Completed <span className="text-primary font-medium">{completedLessons}</span> lesson(s).
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
-                Submitted <span className="text-cyan-300 font-medium">{submittedSubmissions}</span> assignment(s), with <span className="text-cyan-300 font-medium">{gradedSubmissions}</span> graded.
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-foreground">
+                Submitted <span className="text-primary font-medium">{submittedSubmissions}</span> assignment(s), with <span className="text-primary font-medium">{gradedSubmissions}</span> graded.
               </div>
             </div>
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+        <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
           <div className="relative z-10 space-y-4">
             <div>
-              <h3 className="text-xl font-semibold text-white">Achievement Badges</h3>
-              <p className="text-sm text-slate-400 mt-1">Badges unlock from real completed work and graded performance.</p>
+              <h3 className="text-xl font-semibold text-foreground">Achievement Badges</h3>
+              <p className="text-sm text-muted-foreground mt-1">Badges unlock from real completed work and graded performance.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {achievementBadges.map((badge) => {
                 const Icon = badge.icon === 'check' ? CheckCircle2 : badge.icon === 'target' ? Target : badge.icon === 'star' ? Star : badge.icon === 'trophy' ? Trophy : Award
                 return (
-                  <div key={badge.id} className={`rounded-xl border p-4 ${badge.earned ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-white/5 border-white/10'}`}>
+                  <div key={badge.id} className={`rounded-xl border p-4 ${badge.earned ? 'bg-emerald-500/15 border-emerald-500/40' : 'bg-muted/30 border-border'}`}>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-white">{badge.title}</p>
-                      <Icon className={`w-4 h-4 ${badge.earned ? 'text-emerald-300' : 'text-slate-500'}`} />
+                      <p className="text-sm font-semibold text-foreground">{badge.title}</p>
+                      <Icon className={`w-4 h-4 ${badge.earned ? 'text-emerald-300' : 'text-muted-foreground'}`} />
                     </div>
-                    <p className="text-xs text-slate-300 mt-1">{badge.description}</p>
-                    <p className={`text-xs mt-2 ${badge.earned ? 'text-emerald-300' : 'text-slate-500'}`}>{badge.earned ? 'Earned' : 'Locked'}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
+                    <p className={`text-xs mt-2 ${badge.earned ? 'text-emerald-300' : 'text-muted-foreground'}`}>{badge.earned ? 'Earned' : 'Locked'}</p>
                   </div>
                 )
               })}
@@ -567,18 +605,18 @@ export default function StudentDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="lg:col-span-1 relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
             <div className="relative z-10 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold text-white">Join Class by Code</h3>
-                <p className="text-sm text-slate-400 mt-1">Enter the classroom code provided by your teacher.</p>
+                <h3 className="text-xl font-semibold text-foreground">Join Class by Code</h3>
+                <p className="text-sm text-muted-foreground mt-1">Enter the classroom code provided by your teacher.</p>
               </div>
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="join-code" className="text-slate-300">Class Code</Label>
-                  <Input id="join-code" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={12} className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20" />
+                  <Label htmlFor="join-code">Class Code</Label>
+                  <Input id="join-code" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={12} />
                 </div>
-                <Button onClick={joinClassByCode} disabled={joining || !joinCode.trim()} className="w-full gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0">
+                <Button onClick={joinClassByCode} disabled={joining || !joinCode.trim()} className="w-full gap-2">
                   <Plus className="w-4 h-4" />
                   {joining ? 'Joining...' : 'Join Class'}
                 </Button>
@@ -588,19 +626,19 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
             <div className="relative z-10 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold text-white">My Classes</h3>
-                <p className="text-sm text-slate-400 mt-1">Classes you are currently enrolled in.</p>
+                <h3 className="text-xl font-semibold text-foreground">My Classes</h3>
+                <p className="text-sm text-muted-foreground mt-1">Classes you are currently enrolled in.</p>
               </div>
               <div className="space-y-3">
-                {classEnrollments.length === 0 && <p className="text-sm text-slate-400">You are not enrolled in any classes yet.</p>}
+                {classEnrollments.length === 0 && <p className="text-sm text-muted-foreground">You are not enrolled in any classes yet.</p>}
                 {classEnrollments.map((enrollment) => (
-                  <div key={enrollment.id} className="flex items-center justify-between rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
+                  <div key={enrollment.id} className="flex items-center justify-between rounded-xl bg-muted/20 border border-border p-4">
                     <div>
-                      <p className="font-medium text-white">{enrollment.classrooms?.name || 'Class'}</p>
-                      <p className="text-sm text-slate-400">Code: <span className="font-mono text-cyan-400">{enrollment.classrooms?.code}</span></p>
+                      <p className="font-medium text-foreground">{enrollment.classrooms?.name || 'Class'}</p>
+                      <p className="text-sm text-muted-foreground">Code: <span className="font-mono text-primary">{enrollment.classrooms?.code}</span></p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30"><Users className="w-3 h-3" /> Enrolled</Badge>
@@ -616,23 +654,23 @@ export default function StudentDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
             <div className="relative z-10 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold text-white">Your Courses</h3>
-                <p className="text-sm text-slate-400 mt-1">Continue or explore courses.</p>
+                <h3 className="text-xl font-semibold text-foreground">Your Courses</h3>
+                <p className="text-sm text-muted-foreground mt-1">Continue or explore courses.</p>
               </div>
               <div className="space-y-3">
                 {enrolledCourses.length === 0 ? (
-                  <p className="text-sm text-slate-400">No courses yet.</p>
+                  <p className="text-sm text-muted-foreground">No courses yet.</p>
                 ) : (
                   enrolledCourses.map((course) => (
-                    <div key={course.id} className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
-                      <p className="font-medium text-white">{course.name}</p>
-                      <p className="text-sm text-slate-400 line-clamp-2 mt-1">{course.description}</p>
+                    <div key={course.id} className="rounded-xl bg-muted/20 border border-border p-4">
+                      <p className="font-medium text-foreground">{course.name}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{course.description}</p>
                       <div className="mt-3 flex items-center justify-end gap-2">
                         <Link href={`/courses/${course.id}`}>
-                          <Button size="sm" variant="outline" className="gap-1 bg-white/5 border-white/10 text-slate-200 hover:bg-white/10 hover:text-white">
+                          <Button size="sm" variant="outline" className="gap-1">
                             Continue <ArrowRight className="w-3 h-3" />
                           </Button>
                         </Link>
@@ -642,7 +680,7 @@ export default function StudentDashboard() {
                 )}
                 <div className="pt-2">
                   <Link href="/courses">
-                    <Button className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg shadow-blue-500/25 border-0">
+                    <Button className="w-full">
                       Browse All Courses
                     </Button>
                   </Link>
@@ -651,28 +689,28 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+          <div className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
             <div className="relative z-10 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold text-white">Progress Snapshot</h3>
-                <p className="text-sm text-slate-400 mt-1">High-level progress across your active learning.</p>
+                <h3 className="text-xl font-semibold text-foreground">Progress Snapshot</h3>
+                <p className="text-sm text-muted-foreground mt-1">High-level progress across your active learning.</p>
               </div>
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-slate-400">Overall Learning Progress</span>
-                    <span className="font-medium text-white">{overallCourseProgress}%</span>
+                    <span className="text-muted-foreground">Overall Learning Progress</span>
+                    <span className="font-medium text-foreground">{overallCourseProgress}%</span>
                   </div>
-                  <Progress value={overallCourseProgress} className="h-2 bg-white/10" />
+                  <Progress value={overallCourseProgress} className="h-2 bg-muted" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
-                    <p className="text-xs text-slate-400">Lessons Completed</p>
-                    <p className="text-3xl font-semibold text-white mt-1">{completedLessons}</p>
+                  <div className="rounded-xl bg-muted/20 border border-border p-4">
+                    <p className="text-xs text-muted-foreground">Lessons Completed</p>
+                    <p className="text-3xl font-semibold text-foreground mt-1">{completedLessons}</p>
                   </div>
-                  <div className="rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 p-4 shadow-lg">
-                    <p className="text-xs text-slate-400">Assignments Graded</p>
-                    <p className="text-3xl font-semibold text-white mt-1">{gradedSubmissions}</p>
+                  <div className="rounded-xl bg-muted/20 border border-border p-4">
+                    <p className="text-xs text-muted-foreground">Assignments Graded</p>
+                    <p className="text-3xl font-semibold text-foreground mt-1">{gradedSubmissions}</p>
                   </div>
                 </div>
               </div>
@@ -683,7 +721,7 @@ export default function StudentDashboard() {
         <div className="space-y-4 pt-2">
           <LearnAveronCodeLab preferences={preferences} onPreferenceChange={setFeaturePreference} />
           <div className="flex justify-end">
-            <Button onClick={saveFeaturePreferences} disabled={savingPreferences} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600">
+            <Button onClick={saveFeaturePreferences} disabled={savingPreferences}>
               {savingPreferences ? 'Saving...' : 'Save Learn Averon Code Lab Preferences'}
             </Button>
           </div>

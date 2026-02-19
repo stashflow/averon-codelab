@@ -4,6 +4,7 @@ import { Moon, Sun, Palette } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { COLOR_THEMES, applyColorTheme, getStoredColorTheme, setStoredColorTheme, type ColorTheme } from '@/lib/color-theme'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,36 +14,28 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const colorThemes = [
-  { name: 'Ocean', value: 'ocean', color: 'bg-cyan-500' },
-  { name: 'Forest', value: 'forest', color: 'bg-emerald-500' },
+const colorThemes: Array<{ name: string; value: ColorTheme; color: string }> = [
   { name: 'Sunset', value: 'sunset', color: 'bg-orange-500' },
   { name: 'Rose', value: 'rose', color: 'bg-rose-500' },
+  { name: 'Forest', value: 'forest', color: 'bg-emerald-500' },
 ]
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  const [colorTheme, setColorTheme] = useState('ocean')
+  const [colorTheme, setColorTheme] = useState<ColorTheme>('sunset')
 
   // Avoid hydration mismatch
   useEffect(() => {
     setMounted(true)
-    const savedColorTheme = localStorage.getItem('color-theme') || 'ocean'
+    const savedColorTheme = getStoredColorTheme()
     setColorTheme(savedColorTheme)
-    if (savedColorTheme !== 'ocean') {
-      document.documentElement.setAttribute('data-color-theme', savedColorTheme)
-    }
+    applyColorTheme(savedColorTheme)
   }, [])
 
-  const handleColorThemeChange = (newColorTheme: string) => {
+  const handleColorThemeChange = (newColorTheme: ColorTheme) => {
     setColorTheme(newColorTheme)
-    localStorage.setItem('color-theme', newColorTheme)
-    if (newColorTheme === 'ocean') {
-      document.documentElement.removeAttribute('data-color-theme')
-    } else {
-      document.documentElement.setAttribute('data-color-theme', newColorTheme)
-    }
+    setStoredColorTheme(newColorTheme)
   }
 
   if (!mounted) {
@@ -86,7 +79,9 @@ export function ThemeToggle() {
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Color Themes</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {colorThemes.map((ct) => (
+          {colorThemes
+            .filter((ct) => COLOR_THEMES.includes(ct.value))
+            .map((ct) => (
             <DropdownMenuItem
               key={ct.value}
               onClick={() => handleColorThemeChange(ct.value)}

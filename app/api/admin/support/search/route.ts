@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       let query = admin
         .from('profiles')
         .select('id, email, full_name, role, created_at, deleted_at')
+        .is('deleted_at', null)
       if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`)
       const { data, error } = await query.limit(limit)
       if (error) throw error
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
     }
 
     if (type === 'districts') {
-      let query = admin.from('districts').select('id, name, created_at, deleted_at')
+      let query = admin.from('districts').select('id, name, created_at, deleted_at').is('deleted_at', null)
       if (q) query = query.ilike('name', `%${q}%`)
       const { data: districts, error } = await query.limit(limit)
       if (error) throw error
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
       const districtIds = (districts || []).map((d: any) => d.id)
       const [schoolsRes, adminsRes] = await Promise.all([
         districtIds.length
-          ? admin.from('schools').select('id, district_id').in('district_id', districtIds)
+          ? admin.from('schools').select('id, district_id').in('district_id', districtIds).is('deleted_at', null)
           : Promise.resolve({ data: [], error: null } as any),
         districtIds.length
           ? admin.from('district_admins').select('id, district_id').in('district_id', districtIds)
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
     }
 
     if (type === 'schools') {
-      let query = admin.from('schools').select('id, name, district_id, created_at, deleted_at')
+      let query = admin.from('schools').select('id, name, district_id, created_at, deleted_at').is('deleted_at', null)
       if (q) query = query.ilike('name', `%${q}%`)
       const { data: schools, error } = await query.limit(limit)
       if (error) throw error
@@ -98,7 +99,7 @@ export async function GET(request: Request) {
           ? admin.from('districts').select('id, name').in('id', districtIds)
           : Promise.resolve({ data: [], error: null } as any),
         schoolIds.length
-          ? admin.from('classrooms').select('id, school_id').in('school_id', schoolIds)
+          ? admin.from('classrooms').select('id, school_id').in('school_id', schoolIds).is('deleted_at', null)
           : Promise.resolve({ data: [], error: null } as any),
         schoolIds.length
           ? admin.from('school_admins').select('id, school_id').in('school_id', schoolIds)
@@ -132,7 +133,7 @@ export async function GET(request: Request) {
     }
 
     if (type === 'classrooms') {
-      let query = admin.from('classrooms').select('id, name, school_id, teacher_id, created_at, deleted_at')
+      let query = admin.from('classrooms').select('id, name, school_id, teacher_id, created_at, deleted_at').is('deleted_at', null)
       if (q) query = query.ilike('name', `%${q}%`)
       const { data: classrooms, error } = await query.limit(limit)
       if (error) throw error

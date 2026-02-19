@@ -6,49 +6,77 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  .warm-aurora {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(244, 114, 182, 0.22), transparent 40%),
+      radial-gradient(circle at 80% 30%, rgba(251, 146, 60, 0.2), transparent 45%),
+      radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.12), transparent 45%);
+    background-size: 160% 160%;
+    animation: warm-aurora-shift 14s ease-in-out infinite;
+  }
+
+  .dark .warm-aurora {
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(244, 114, 182, 0.12), transparent 40%),
+      radial-gradient(circle at 80% 30%, rgba(251, 146, 60, 0.1), transparent 45%),
+      radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.08), transparent 45%);
+  }
+}
+
+@keyframes warm-aurora-shift {
+  0% {
+    background-position: 0% 40%;
+  }
+  50% {
+    background-position: 100% 60%;
+  }
+  100% {
+    background-position: 0% 40%;
+  }
 }
 
 @layer base {
   /* LIGHT THEMES */
   
-  /* Default Light (Ocean) - Clean, professional blue-cyan theme */
+  /* Default Light - Bright neutral surface with warm pink/orange accents */
   :root {
     --font-inter: "Inter", "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif;
     --font-jetbrains-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    --background: 210 20% 98%;
-    --foreground: 215 25% 15%;
+    --background: 30 33% 99%;
+    --foreground: 345 22% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 345 22% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
-    --primary: 200 95% 45%;
+    --popover-foreground: 345 22% 14%;
+    --primary: 337 84% 56%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 20% 92%;
-    --secondary-foreground: 215 25% 20%;
-    --muted: 210 20% 95%;
-    --muted-foreground: 215 15% 45%;
-    --accent: 200 95% 45%;
+    --secondary: 24 100% 96%;
+    --secondary-foreground: 345 22% 20%;
+    --muted: 28 45% 95%;
+    --muted-foreground: 345 12% 42%;
+    --accent: 24 95% 58%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 210 20% 88%;
-    --input: 210 20% 90%;
-    --ring: 200 95% 45%;
-    --chart-1: 200 95% 45%;
-    --chart-2: 217 91% 55%;
-    --chart-3: 280 70% 55%;
-    --chart-4: 160 60% 45%;
-    --chart-5: 30 95% 55%;
+    --border: 24 40% 88%;
+    --input: 24 40% 91%;
+    --ring: 337 84% 56%;
+    --chart-1: 337 84% 56%;
+    --chart-2: 22 95% 58%;
+    --chart-3: 352 86% 62%;
+    --chart-4: 12 88% 61%;
+    --chart-5: 40 98% 62%;
     --radius: 0.75rem;
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 25% 15%;
-    --sidebar-primary: 200 95% 45%;
+    --sidebar-foreground: 345 22% 14%;
+    --sidebar-primary: 337 84% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 95%;
-    --sidebar-accent-foreground: 215 25% 20%;
-    --sidebar-border: 210 20% 88%;
-    --sidebar-ring: 200 95% 45%;
-    --logo-theme-filter: invert(61%) sepia(81%) saturate(1868%) hue-rotate(159deg) brightness(100%) contrast(101%);
+    --sidebar-accent: 24 45% 95%;
+    --sidebar-accent-foreground: 345 22% 20%;
+    --sidebar-border: 24 40% 88%;
+    --sidebar-ring: 337 84% 56%;
+    --logo-theme-filter: invert(57%) sepia(76%) saturate(1551%) hue-rotate(349deg) brightness(99%) contrast(103%);
   }
   
   /* Forest Light - Natural green theme */
@@ -85,7 +113,7 @@
     --sidebar-accent-foreground: 155 30% 20%;
     --sidebar-border: 150 15% 88%;
     --sidebar-ring: 158 70% 42%;
-    --logo-theme-filter: invert(62%) sepia(55%) saturate(630%) hue-rotate(106deg) brightness(93%) contrast(89%);
+    --logo-theme-filter: invert(48%) sepia(56%) saturate(1090%) hue-rotate(118deg) brightness(96%) contrast(94%);
   }
   
   /* Sunset Light - Warm orange-amber theme */
@@ -122,7 +150,7 @@
     --sidebar-accent-foreground: 20 30% 20%;
     --sidebar-border: 30 20% 88%;
     --sidebar-ring: 25 95% 53%;
-    --logo-theme-filter: invert(65%) sepia(58%) saturate(1557%) hue-rotate(346deg) brightness(100%) contrast(101%);
+    --logo-theme-filter: invert(57%) sepia(76%) saturate(1551%) hue-rotate(349deg) brightness(99%) contrast(103%);
   }
   
   /* Rose Light - Elegant pink-red theme */
@@ -159,46 +187,46 @@
     --sidebar-accent-foreground: 345 25% 20%;
     --sidebar-border: 340 15% 88%;
     --sidebar-ring: 346 77% 50%;
-    --logo-theme-filter: invert(44%) sepia(62%) saturate(1824%) hue-rotate(316deg) brightness(100%) contrast(91%);
+    --logo-theme-filter: invert(55%) sepia(86%) saturate(2007%) hue-rotate(314deg) brightness(101%) contrast(103%);
   }
   
   /* DARK THEMES */
   
-  /* Default Dark (Midnight) - Deep blue-black with cyan accents */
+  /* Default Dark - Deep neutral surface with warm pink/orange accents */
   .dark {
-    --background: 220 25% 8%;
+    --background: 20 18% 8%;
     --foreground: 0 0% 98%;
-    --card: 220 25% 10%;
+    --card: 20 18% 10%;
     --card-foreground: 0 0% 98%;
-    --popover: 220 25% 10%;
+    --popover: 20 18% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 200 100% 55%;
-    --primary-foreground: 220 25% 10%;
-    --secondary: 220 25% 15%;
+    --primary: 337 88% 62%;
+    --primary-foreground: 20 18% 10%;
+    --secondary: 20 18% 15%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 220 25% 18%;
+    --muted: 20 18% 18%;
     --muted-foreground: 0 0% 65%;
-    --accent: 200 100% 55%;
-    --accent-foreground: 220 25% 10%;
+    --accent: 24 100% 62%;
+    --accent-foreground: 20 18% 10%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 25% 20%;
-    --input: 220 25% 18%;
-    --ring: 200 100% 55%;
-    --chart-1: 200 100% 55%;
-    --chart-2: 217 91% 60%;
-    --chart-3: 263 70% 60%;
-    --chart-4: 160 60% 50%;
-    --chart-5: 30 90% 55%;
-    --sidebar-background: 220 25% 10%;
+    --border: 20 18% 21%;
+    --input: 20 18% 18%;
+    --ring: 337 88% 62%;
+    --chart-1: 337 88% 62%;
+    --chart-2: 24 100% 62%;
+    --chart-3: 352 88% 66%;
+    --chart-4: 12 85% 62%;
+    --chart-5: 40 98% 64%;
+    --sidebar-background: 20 18% 10%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 200 100% 55%;
-    --sidebar-primary-foreground: 220 25% 10%;
-    --sidebar-accent: 220 25% 18%;
+    --sidebar-primary: 337 88% 62%;
+    --sidebar-primary-foreground: 20 18% 10%;
+    --sidebar-accent: 20 18% 18%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 220 25% 20%;
-    --sidebar-ring: 200 100% 55%;
-    --logo-theme-filter: invert(61%) sepia(81%) saturate(1868%) hue-rotate(159deg) brightness(100%) contrast(101%);
+    --sidebar-border: 20 18% 21%;
+    --sidebar-ring: 337 88% 62%;
+    --logo-theme-filter: invert(63%) sepia(83%) saturate(1615%) hue-rotate(349deg) brightness(106%) contrast(102%);
   }
   
   /* Forest Dark - Rich green with nature tones */
@@ -235,7 +263,7 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 150 25% 20%;
     --sidebar-ring: 158 75% 48%;
-    --logo-theme-filter: invert(62%) sepia(55%) saturate(630%) hue-rotate(106deg) brightness(93%) contrast(89%);
+    --logo-theme-filter: invert(61%) sepia(49%) saturate(1055%) hue-rotate(115deg) brightness(106%) contrast(95%);
   }
   
   /* Sunset Dark - Warm oranges and reds */
@@ -272,7 +300,7 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 20 25% 20%;
     --sidebar-ring: 25 100% 60%;
-    --logo-theme-filter: invert(65%) sepia(58%) saturate(1557%) hue-rotate(346deg) brightness(100%) contrast(101%);
+    --logo-theme-filter: invert(63%) sepia(83%) saturate(1615%) hue-rotate(349deg) brightness(106%) contrast(102%);
   }
   
   /* Rose Dark - Deep pink and purple tones */
@@ -309,7 +337,7 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 340 25% 20%;
     --sidebar-ring: 346 80% 58%;
-    --logo-theme-filter: invert(44%) sepia(62%) saturate(1824%) hue-rotate(316deg) brightness(100%) contrast(91%);
+    --logo-theme-filter: invert(65%) sepia(88%) saturate(1760%) hue-rotate(307deg) brightness(106%) contrast(102%);
   }
 }
 

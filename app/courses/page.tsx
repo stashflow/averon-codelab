@@ -181,7 +181,7 @@ export default function CoursesPage() {
       description: 'Available courses',
       category_type: 'self_paced',
       icon_name: 'BookOpen',
-      color: 'cyan',
+      color: 'rose',
       order_index: 1000 + idx,
     }))
 
@@ -307,30 +307,30 @@ export default function CoursesPage() {
   const getCategoryAccentStyles = (color: string) => {
     const value = (color || '').toLowerCase()
     if (value.includes('green') || value.includes('emerald')) {
-      return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+      return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:border-emerald-400/30'
     }
     if (value.includes('orange') || value.includes('amber') || value.includes('yellow')) {
-      return 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+      return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-400/30'
     }
     if (value.includes('rose') || value.includes('red') || value.includes('pink')) {
-      return 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+      return 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-200 dark:border-rose-400/30'
     }
     if (value.includes('purple') || value.includes('violet')) {
-      return 'bg-violet-500/10 text-violet-300 border-violet-500/30'
+      return 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-200 dark:border-violet-400/30'
     }
-    return 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+    return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/15 dark:text-orange-200 dark:border-orange-400/30'
   }
 
   const getDifficultyColor = (level: string) => {
     switch (level) {
       case 'beginner':
-        return 'bg-green-500/10 text-green-400 border-green-500/20'
+        return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:border-emerald-400/30'
       case 'intermediate':
-        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+        return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-400/30'
       case 'advanced':
-        return 'bg-red-500/10 text-red-400 border-red-500/20'
+        return 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-200 dark:border-rose-400/30'
       default:
-        return 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+        return 'bg-muted text-muted-foreground border-border'
     }
   }
 
@@ -346,36 +346,36 @@ export default function CoursesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white/60">Loading courses...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Loading courses...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Background effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px]" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[128px]" />
+      <div className="fixed inset-0 overflow-hidden pointer-events-none warm-aurora">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-pink-500/15 dark:bg-pink-500/10 rounded-full blur-[128px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-400/20 dark:bg-orange-400/10 rounded-full blur-[128px] animate-pulse [animation-delay:1000ms]" />
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
               <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
-              <span className="font-bold text-2xl bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
+              <span className="font-bold text-2xl bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 bg-clip-text text-transparent">
                 Averon CodeLab
               </span>
             </Link>
             <div className="flex items-center gap-4">
-              <span className="text-white/60 text-sm">{user?.email}</span>
+              <span className="text-muted-foreground text-sm">{user?.email}</span>
               <Button 
                 onClick={handleSignOut}
                 variant="outline"
-                className="border-white/10 text-white/60 hover:text-white hover:bg-white/5 bg-transparent"
+                className="border-border text-muted-foreground hover:text-foreground hover:bg-accent/40 bg-transparent"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
@@ -388,18 +388,18 @@ export default function CoursesPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative">
         <div className="mb-12">
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-white via-cyan-200 to-blue-200 bg-clip-text text-transparent">
+          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 bg-clip-text text-transparent">
             Choose Your Course
           </h1>
-          <p className="text-xl text-white/60 font-light">
+          <p className="text-xl text-muted-foreground font-light">
             AP-style coding courses with lesson notes, checkpoints, and hands-on coding practice.
           </p>
         </div>
 
         {!hasClassroomEnrollment && (
-          <Alert className="mb-8 border-yellow-500/20 bg-yellow-500/10">
-            <AlertCircle className="h-4 w-4 text-yellow-400" />
-            <AlertDescription className="text-yellow-200">
+          <Alert className="mb-8 border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+            <AlertDescription className="text-amber-800 dark:text-amber-100">
               You need to join a classroom before enrolling in courses. Please contact your teacher for a class code.
             </AlertDescription>
           </Alert>
@@ -416,8 +416,8 @@ export default function CoursesPage() {
                   {getCategoryIcon(category.icon_name)}
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold text-white">{category.name}</h2>
-                  <p className="text-white/60 mt-1">{category.description}</p>
+                  <h2 className="text-3xl font-bold text-foreground">{category.name}</h2>
+                  <p className="text-muted-foreground mt-1">{category.description}</p>
                 </div>
               </div>
 
@@ -431,35 +431,35 @@ export default function CoursesPage() {
                   return (
                     <Card
                       key={course.id}
-                      className="relative overflow-hidden border-2 border-white/10 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-sm hover:border-cyan-500/50 transition-all duration-300 group"
+                      className="relative overflow-hidden border-2 border-border/80 bg-card/95 backdrop-blur-sm hover:border-primary/50 transition-all duration-300 group"
                     >
                       <CardHeader>
                         <div className="flex items-start justify-between mb-4">
-                          <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${course.color || 'from-cyan-500 to-blue-500'} flex items-center justify-center`}>
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-pink-500/30">
                             {getCourseIcon(course.icon_name)}
                           </div>
                           <Badge className={`${getDifficultyColor(course.difficulty_level)} border`}>
                             {course.difficulty_level}
                           </Badge>
                         </div>
-                        <CardTitle className="text-white text-3xl mb-2">{course.name}</CardTitle>
-                        <CardDescription className="text-white/60 text-base leading-relaxed">
+                        <CardTitle className="text-foreground text-3xl mb-2">{course.name}</CardTitle>
+                        <CardDescription className="text-muted-foreground text-base leading-relaxed">
                           {course.description}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          <div className="flex items-center gap-2 text-sm text-white/50">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <BookOpen className="w-4 h-4" />
                             <span>{course.language}</span>
                           </div>
 
                           {enrolled && enrollment && (
-                            <div className="text-sm text-white/60">
+                            <div className="text-sm text-muted-foreground">
                               Progress: {enrollment.progress_percentage.toFixed(0)}%
-                              <div className="w-full h-2 bg-white/10 rounded-full mt-2 overflow-hidden">
+                              <div className="w-full h-2 bg-muted rounded-full mt-2 overflow-hidden">
                                 <div 
-                                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                                  className="h-full bg-gradient-to-r from-fuchsia-500 to-orange-500"
                                   style={{ width: `${enrollment.progress_percentage}%` }}
                                 />
                               </div>
@@ -469,7 +469,7 @@ export default function CoursesPage() {
                           {enrolled ? (
                             hasAccess ? (
                               <Link href={`/courses/${course.id}`}>
-                                <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-cyan-500/25 transition-all">
+                                <Button className="w-full bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 hover:from-fuchsia-400 hover:via-pink-400 hover:to-orange-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-pink-500/30 transition-all">
                                   Continue Learning <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
                               </Link>
@@ -485,14 +485,14 @@ export default function CoursesPage() {
                             <Button
                               onClick={() => handleEnroll(course.id)}
                               disabled={enrolling === course.id || !hasClassroomEnrollment || !isAvailableToStudent}
-                              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="w-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-400 hover:to-rose-400 text-white font-semibold group-hover:shadow-xl group-hover:shadow-orange-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {enrolling === course.id ? 'Enrolling...' : 'Enroll Now'}
                               {enrolling !== course.id && <ArrowRight className="w-4 h-4 ml-2" />}
                             </Button>
                           )}
                           {!isAvailableToStudent && !hasAccess && (
-                            <p className="text-xs text-amber-300">
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
                               Your teacher has not offered this course to your classroom.
                             </p>
                           )}
@@ -508,11 +508,11 @@ export default function CoursesPage() {
 
         {displayCategories.length === 0 && (
           <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-8 h-8 text-white/60" />
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+              <BookOpen className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">No Courses Available</h3>
-            <p className="text-white/60">Courses will be added by your administrator soon.</p>
+            <h3 className="text-xl font-semibold text-foreground mb-2">No Courses Available</h3>
+            <p className="text-muted-foreground">Courses will be added by your administrator soon.</p>
           </div>
         )}
       </main>

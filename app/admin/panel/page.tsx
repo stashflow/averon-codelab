@@ -46,6 +46,10 @@ export default function AdminPanel() {
   const [studentsCountByClassId, setStudentsCountByClassId] = useState<Record<string, number>>({})
   const [studentClassCountById, setStudentClassCountById] = useState<Record<string, number>>({})
   const [studentLessonCompletedById, setStudentLessonCompletedById] = useState<Record<string, number>>({})
+  const [derivedStudentSchoolIdByStudent, setDerivedStudentSchoolIdByStudent] = useState<Record<string, string>>({})
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
+  const [loadingStudentDetailsId, setLoadingStudentDetailsId] = useState<string | null>(null)
+  const [studentDetailsById, setStudentDetailsById] = useState<Record<string, any>>({})
   const [newDistrict, setNewDistrict] = useState({ name: '', code: '' })
   const [newSchool, setNewSchool] = useState({ name: '', district_id: '', max_teachers: 25, max_students: 1500 })
   const [newClassroom, setNewClassroom] = useState({ name: '', description: '', school_id: '', teacher_id: '', max_students: 30, code: '' })
@@ -209,16 +213,30 @@ export default function AdminPanel() {
       const studentIds = (studentsData || []).map((s: any) => s.id)
 
       const [{ data: enrollmentData }, { data: linksData }, { data: progressData }] = await Promise.all([
-        classIds.length ? supabase.from('enrollments').select('classroom_id, student_id').in('classroom_id', classIds) : Promise.resolve({ data: [] as any[] }),
+        classIds.length
+          ? supabase
+              .from('enrollments')
+              .select('classroom_id, student_id, classrooms(school_id, teacher_id)')
+              .in('classroom_id', classIds)
+          : Promise.resolve({ data: [] as any[] }),
         canCreateInvites ? linksQuery : Promise.resolve({ data: [] as any[] }),
         studentIds.length ? supabase.from('student_lesson_progress').select('student_id, status').in('student_id', studentIds) : Promise.resolve({ data: [] as any[] }),
       ])
 
       const studentCounts: Record<string, number> = {}
       const studentClassCounts: Record<string, number> = {}
+      const derivedSchoolByStudent: Record<string, string> = {}
       ;(enrollmentData || []).forEach((row: any) => {
         studentCounts[row.classroom_id] = (studentCounts[row.classroom_id] || 0) + 1
         studentClassCounts[row.student_id] = (studentClassCounts[row.student_id] || 0) + 1
+
+        const classTeacherId = row.classrooms?.teacher_id
+        const classSchoolId = row.classrooms?.school_id
+        const teacherSchoolId = teachersData.find((t: any) => t.id === classTeacherId)?.school_id
+        const effectiveSchoolId = teacherSchoolId || classSchoolId || null
+        if (effectiveSchoolId && !derivedSchoolByStudent[row.student_id]) {
+          derivedSchoolByStudent[row.student_id] = effectiveSchoolId
+        }
       })
 
       const completedLessonsByStudent: Record<string, number> = {}
@@ -231,6 +249,7 @@ export default function AdminPanel() {
       setStudentsCountByClassId(studentCounts)
       setStudentClassCountById(studentClassCounts)
       setStudentLessonCompletedById(completedLessonsByStudent)
+      setDerivedStudentSchoolIdByStudent(derivedSchoolByStudent)
       setDistricts(districtsData)
       setSchools(schoolsData)
       setTeachers(teachersData)
@@ -485,6 +504,81 @@ export default function AdminPanel() {
 
   async function copyClassCode(code: string) {
     await navigator.clipboard.writeText(code)
+  }
+
+  async function loadStudentDetails(studentId: string) {
+    if (studentDetailsById[studentId]) return
+
+    const supabase = createClient()
+    setLoadingStudentDetailsId(studentId)
+
+    try {
+      const [{ data: enrollments }, { data: progressRows }, { data: badges }, { data: courseEnrollments }] = await Promise.all([
+        supabase
+          .from('enrollments')
+          .select('id, classroom_id, classrooms(name, code)')
+          .eq('student_id', studentId),
+        supabase
+          .from('student_lesson_progress')
+          .select('lesson_id, status, score, last_accessed, completed_at')
+          .eq('student_id', studentId)
+          .order('last_accessed', { ascending: false }),
+        supabase
+          .from('badges')
+          .select('badge_name, earned_at')
+          .eq('student_id', studentId)
+          .order('earned_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('course_enrollments')
+          .select('is_active, courses(name)')
+          .eq('student_id', studentId),
+      ])
+
+      const lessonIds = (progressRows || [])
+        .map((row: any) => row.lesson_id)
+        .filter(Boolean)
+      const { data: lessons } = lessonIds.length
+        ? await supabase.from('lessons').select('id, title').in('id', lessonIds)
+        : { data: [] as any[] }
+      const lessonById = Object.fromEntries((lessons || []).map((lesson: any) => [lesson.id, lesson.title]))
+
+      const completedCount = (progressRows || []).filter((row: any) => row.status === 'completed').length
+      const inProgressRows = (progressRows || []).filter((row: any) => row.status === 'in_progress')
+      const inProgressCount = inProgressRows.length
+      const scores = (progressRows || [])
+        .map((row: any) => row.score)
+        .filter((score: any) => typeof score === 'number')
+      const averageScore = scores.length ? Math.round(scores.reduce((sum: number, value: number) => sum + value, 0) / scores.length) : 0
+
+      const latestProgress = (progressRows || [])[0]
+      const currentLessonTitle = inProgressRows.length
+        ? lessonById[inProgressRows[0].lesson_id] || 'In-progress lesson'
+        : latestProgress?.lesson_id
+          ? lessonById[latestProgress.lesson_id] || 'Recent lesson'
+          : 'No recent lesson activity'
+
+      setStudentDetailsById((prev) => ({
+        ...prev,
+        [studentId]: {
+          classes: enrollments || [],
+          completedCount,
+          inProgressCount,
+          averageScore,
+          lastAccessed: latestProgress?.last_accessed || latestProgress?.completed_at || null,
+          currentLessonTitle,
+          badges: badges || [],
+          activeCourses: (courseEnrollments || [])
+            .filter((row: any) => row.is_active)
+            .map((row: any) => row.courses?.name)
+            .filter(Boolean),
+        },
+      }))
+    } catch (error) {
+      console.error('[v0] error loading student detail', error)
+    } finally {
+      setLoadingStudentDetailsId(null)
+    }
   }
 
   async function handleSignOut() {
@@ -1007,17 +1101,96 @@ export default function AdminPanel() {
                 {students.length === 0 && <p className="text-sm text-muted-foreground">No students found.</p>}
                 {students.map((student) => {
                   const enrolledClassCount = studentClassCountById[student.id] || 0
+                  const derivedSchoolId = derivedStudentSchoolIdByStudent[student.id]
+                  const effectiveSchoolId = student.school_id || derivedSchoolId || ''
+                  const details = studentDetailsById[student.id]
+                  const isOpen = selectedStudentId === student.id
 
                   return (
                     <div key={student.id} className="border rounded-md p-3 text-sm">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="font-medium">{student.full_name || 'Unnamed Student'}</p>
-                          <p className="text-muted-foreground">{student.email || 'No email'} • {schoolById[student.school_id]?.name || 'No School'}</p>
+                          <p className="text-muted-foreground">{student.email || 'No email'} • {schoolById[effectiveSchoolId]?.name || 'No School'}</p>
                         </div>
-                        <Badge variant="outline">Completed Lessons: {studentLessonCompletedById[student.id] || 0}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Completed Lessons: {studentLessonCompletedById[student.id] || 0}</Badge>
+                          {currentRole === 'full_admin' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                if (isOpen) {
+                                  setSelectedStudentId(null)
+                                  return
+                                }
+                                setSelectedStudentId(student.id)
+                                await loadStudentDetails(student.id)
+                              }}
+                            >
+                              {isOpen ? 'Hide Details' : 'View Activity'}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-muted-foreground mt-1">Classroom visibility: {enrolledClassCount} class records in scope</p>
+                      {!student.school_id && derivedSchoolId && (
+                        <p className="text-xs text-primary mt-1">Derived school from teacher/class: {schoolById[derivedSchoolId]?.name || 'Assigned school'}</p>
+                      )}
+
+                      {isOpen && currentRole === 'full_admin' && (
+                        <div className="mt-3 rounded-md border bg-muted/20 p-3 space-y-2">
+                          {loadingStudentDetailsId === student.id && !details && (
+                            <p className="text-xs text-muted-foreground">Loading student activity...</p>
+                          )}
+                          {details && (
+                            <>
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+                                <div className="rounded border p-2">
+                                  <p className="text-muted-foreground">Completed</p>
+                                  <p className="font-semibold text-sm">{details.completedCount}</p>
+                                </div>
+                                <div className="rounded border p-2">
+                                  <p className="text-muted-foreground">In Progress</p>
+                                  <p className="font-semibold text-sm">{details.inProgressCount}</p>
+                                </div>
+                                <div className="rounded border p-2">
+                                  <p className="text-muted-foreground">Avg Score</p>
+                                  <p className="font-semibold text-sm">{details.averageScore}%</p>
+                                </div>
+                                <div className="rounded border p-2">
+                                  <p className="text-muted-foreground">Last Active</p>
+                                  <p className="font-semibold text-sm">
+                                    {details.lastAccessed ? new Date(details.lastAccessed).toLocaleString() : 'No activity yet'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <p className="text-xs text-foreground">
+                                <span className="font-semibold">Current Focus:</span> {details.currentLessonTitle}
+                              </p>
+                              <p className="text-xs text-foreground">
+                                <span className="font-semibold">Active Courses:</span> {details.activeCourses.length ? details.activeCourses.join(', ') : 'None'}
+                              </p>
+                              <p className="text-xs text-foreground">
+                                <span className="font-semibold">Current Classes:</span>{' '}
+                                {details.classes.length
+                                  ? details.classes
+                                      .map((row: any) => row.classrooms?.name || row.classrooms?.code)
+                                      .filter(Boolean)
+                                      .join(', ')
+                                  : 'None'}
+                              </p>
+                              <p className="text-xs text-foreground">
+                                <span className="font-semibold">Recent Badges:</span>{' '}
+                                {details.badges.length
+                                  ? details.badges.map((badge: any) => badge.badge_name).join(', ')
+                                  : 'None'}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

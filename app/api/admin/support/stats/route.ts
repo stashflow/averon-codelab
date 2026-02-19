@@ -37,10 +37,10 @@ export async function GET() {
     }
 
     const [usersRes, districtsRes, schoolsRes, classroomsRes] = await Promise.all([
-      admin.from('profiles').select('id', { count: 'exact', head: true }),
-      admin.from('districts').select('id', { count: 'exact', head: true }),
-      admin.from('schools').select('id', { count: 'exact', head: true }),
-      admin.from('classrooms').select('id', { count: 'exact', head: true }),
+      admin.from('profiles').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+      admin.from('districts').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+      admin.from('schools').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+      admin.from('classrooms').select('id', { count: 'exact', head: true }).is('deleted_at', null),
     ])
 
     return NextResponse.json({

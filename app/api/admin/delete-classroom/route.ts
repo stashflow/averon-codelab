@@ -1,6 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureValidCsrf } from '@/lib/security/csrf'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) return null
+  return createAdminClient(url, serviceKey, { auth: { persistSession: false } })
+}
+
+function isMissingSchemaError(error: any) {
+  return error?.code === '42P01' || error?.code === '42703'
+}
+
+async function safeDelete(admin: any, table: string, column: string, value: string) {
+  const { error } = await admin.from(table).delete().eq(column, value)
+  if (error && !isMissingSchemaError(error)) throw error
+}
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +31,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is full admin
     const { data: userRole } = await supabase
       .from('profiles')
       .select('role')
@@ -25,27 +41,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden: Full admin access required' }, { status: 403 })
     }
 
-    const { classroom_id, reason } = await request.json()
+    const admin = getAdminClient()
+    if (!admin) {
+      return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not configured' }, { status: 500 })
+    }
+
+    const { classroom_id } = await request.json()
 
     if (!classroom_id) {
       return NextResponse.json({ error: 'Classroom ID is required' }, { status: 400 })
     }
 
-    // Call the delete function
-    const { data, error } = await supabase.rpc('admin_delete_classroom', {
-      p_classroom_id: classroom_id,
-      p_admin_id: user.id,
-      p_reason: reason || 'Admin deletion'
-    })
+    await safeDelete(admin, 'enrollments', 'classroom_id', classroom_id)
+    await safeDelete(admin, 'lesson_assignments', 'classroom_id', classroom_id)
+    await safeDelete(admin, 'messages', 'classroom_id', classroom_id)
+    await safeDelete(admin, 'classroom_course_offerings', 'classroom_id', classroom_id)
 
-    if (error) {
-      console.error('Error deleting classroom:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const { error: classroomError } = await admin
+      .from('classrooms')
+      .delete()
+      .eq('id', classroom_id)
 
-    return NextResponse.json({ success: true, message: 'Classroom deleted successfully' })
-  } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    if (classroomError) throw classroomError
+
+    return NextResponse.json({ success: true, message: 'Classroom permanently deleted' })
+  } catch (error: any) {
+    console.error('Error deleting classroom:', error)
+    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 })
   }
 }

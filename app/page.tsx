@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { releasePlan } from '@/lib/version-changelog'
 import {
   ArrowRight,
   Code,
@@ -111,7 +112,7 @@ export default function Home() {
                 </Button>
               </Link>
               <Link href="/auth/sign-up">
-                <Button className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-lg shadow-primary/25 font-semibold">
+                <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg shadow-primary/25 font-semibold">
                   Get Started
                 </Button>
               </Link>
@@ -124,16 +125,16 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 sm:py-40 lg:py-48 relative">
           <div className="text-center space-y-10">
-            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 backdrop-blur-sm">
-              <Sparkles className="w-5 h-5 text-cyan-400" />
-              <span className="text-sm font-semibold text-cyan-300">Next-Gen Coding Education</span>
+            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/15 to-accent/15 border border-primary/30 backdrop-blur-sm">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <span className="text-sm font-semibold text-primary">Next-Gen Coding Education</span>
             </div>
 
             <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-balance leading-[1.1]">
               <span className="block bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
                 The complete platform
               </span>
-              <span className="block bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
                 to teach code.
               </span>
             </h1>
@@ -147,7 +148,7 @@ export default function Home() {
               <Link href="/auth/sign-up">
                 <Button
                   size="lg"
-                  className="text-base px-10 py-6 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-2xl shadow-cyan-500/25 gap-3 font-semibold rounded-xl"
+                  className="text-base px-10 py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-2xl shadow-primary/25 gap-3 font-semibold rounded-xl"
                 >
                   Get Started <ArrowRight className="w-5 h-5" />
                 </Button>
@@ -208,55 +209,55 @@ export default function Home() {
               icon: Globe,
               title: 'District Management',
               description: 'Organize schools and districts with hierarchical access control and centralized oversight.',
-              gradient: 'from-cyan-500 to-blue-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: Users,
               title: 'Smart Classrooms',
               description: 'Virtual classrooms with real-time progress tracking, analytics, and student engagement metrics.',
-              gradient: 'from-blue-500 to-indigo-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: Code,
               title: 'Live Code Editor',
               description: 'Professional IDE experience with syntax highlighting, auto-complete, and multi-language support.',
-              gradient: 'from-indigo-500 to-purple-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: Zap,
               title: 'Instant Feedback',
               description: 'Automated test execution with detailed results and suggestions for improvement.',
-              gradient: 'from-purple-500 to-pink-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: TrendingUp,
               title: 'Advanced Analytics',
               description: 'Comprehensive insights into learning patterns, performance trends, and skill development.',
-              gradient: 'from-pink-500 to-rose-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: Shield,
               title: 'Secure & Reliable',
               description: 'Enterprise-grade security with role-based permissions and data protection.',
-              gradient: 'from-rose-500 to-orange-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: BookOpen,
               title: 'Assignment Hub',
               description: 'Rich assignment creation with test cases, starter code, and visibility controls.',
-              gradient: 'from-orange-500 to-amber-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: Trophy,
               title: 'Smart Grading',
               description: 'Streamlined grading workflows with rubrics, feedback templates, and batch operations.',
-              gradient: 'from-amber-500 to-yellow-500',
+              gradient: 'from-primary to-accent',
             },
             {
               icon: Sparkles,
               title: 'Course Library',
               description: 'Pre-built courses for Python, JavaScript, Java, and C++ with progressive difficulty levels.',
-              gradient: 'from-yellow-500 to-lime-500',
+              gradient: 'from-primary to-accent',
             },
           ].map((feature, idx) => (
             <div
@@ -290,7 +291,7 @@ export default function Home() {
               { value: '98%', label: 'Satisfaction' },
             ].map((stat, idx) => (
               <div key={idx} className="text-center space-y-3 group">
-                <div className="text-5xl sm:text-6xl font-bold bg-gradient-to-br from-cyan-300 via-blue-300 to-indigo-300 bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300">
+                <div className="text-5xl sm:text-6xl font-bold bg-gradient-to-br from-primary via-accent to-primary bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300">
                   {stat.value}
                 </div>
                 <div className="text-sm text-muted-foreground font-semibold uppercase tracking-wider">{stat.label}</div>
@@ -312,7 +313,7 @@ export default function Home() {
               <span className="block bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent mb-2">
                 Ready to transform
               </span>
-              <span className="block bg-gradient-to-r from-cyan-300 via-blue-300 to-indigo-300 bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
                 your classroom?
               </span>
             </h2>
@@ -323,7 +324,7 @@ export default function Home() {
               <Link href="/auth/sign-up">
                 <Button
                   size="lg"
-                  className="text-base px-10 py-6 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-2xl shadow-primary/25 gap-3 font-semibold rounded-xl"
+                  className="text-base px-10 py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-2xl shadow-primary/25 gap-3 font-semibold rounded-xl"
                 >
                   Start for Free <ArrowRight className="w-5 h-5" />
                 </Button>
@@ -341,9 +342,16 @@ export default function Home() {
               <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
               <span className="font-bold text-lg text-foreground">Averon CodeLab</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} Averon CodeLab. All rights reserved.
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                &copy; {new Date().getFullYear()} Averon CodeLab. All rights reserved.
+              </p>
+              <Link href="/version">
+                <Button variant="outline" size="sm" className="font-semibold">
+                  {releasePlan.currentVersion}
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </footer>
