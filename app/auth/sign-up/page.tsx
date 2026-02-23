@@ -104,9 +104,9 @@ export default function SignUp() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-rose-50/40 to-orange-50/60 flex warm-aurora">
+    <div className="min-h-screen bg-gradient-to-br from-white via-rose-50/40 to-orange-50/60 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 flex warm-aurora">
       {/* Left Side - Visual */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-white via-rose-50/40 to-orange-50/70 items-center justify-center p-12 border-r border-slate-200/70">
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-white via-rose-50/40 to-orange-50/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 items-center justify-center p-12 border-r border-slate-200/70 dark:border-slate-800/80">
         <div className="max-w-md space-y-6">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold tracking-tight">
@@ -114,7 +114,7 @@ export default function SignUp() {
                 Start Your Journey
               </span>
             </h2>
-            <p className="text-lg text-slate-700 leading-relaxed">
+            <p className="text-lg text-slate-700 dark:text-slate-300 leading-relaxed">
               Join Averon CodeLab and unlock your potential with hands-on coding exercises, instant feedback, and
               expert-designed curriculum.
             </p>
@@ -122,10 +122,10 @@ export default function SignUp() {
           <div className="space-y-3 pt-4">
             {['School-ready platform', 'Role-based access', 'Instant access'].map((item, idx) => (
               <div key={idx} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-pink-600" />
+                <div className="w-6 h-6 rounded-full bg-rose-100 border border-rose-200 dark:bg-rose-500/15 dark:border-rose-400/30 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-pink-600 dark:bg-pink-400" />
                 </div>
-                <span className="text-sm text-slate-600">{item}</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">{item}</span>
               </div>
             ))}
           </div>
@@ -141,16 +141,16 @@ export default function SignUp() {
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Create Account</h1>
-              <p className="text-slate-600 mt-2">Sign up to start learning today</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Create Account</h1>
+              <p className="text-slate-600 dark:text-slate-300 mt-2">Sign up to start learning today</p>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-xl p-6 backdrop-blur-sm">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/90 shadow-xl dark:shadow-black/30 p-6 backdrop-blur-sm">
             <div className="space-y-5">
               <form onSubmit={handleSignUp} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="fullName" className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Full Name
                   </Label>
                   <Input
@@ -161,12 +161,12 @@ export default function SignUp() {
                     onChange={(e) => setFullName(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-pink-500 focus:ring-pink-500/20"
+                    className="h-11 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-pink-500 dark:focus:border-pink-400 focus:ring-pink-500/20 dark:focus:ring-pink-400/30"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Email Address
                   </Label>
                   <Input
@@ -177,12 +177,12 @@ export default function SignUp() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-pink-500 focus:ring-pink-500/20"
+                    className="h-11 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-pink-500 dark:focus:border-pink-400 focus:ring-pink-500/20 dark:focus:ring-pink-400/30"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Password
                   </Label>
                   <Input
@@ -193,12 +193,12 @@ export default function SignUp() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-pink-500 focus:ring-pink-500/20"
+                    className="h-11 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-pink-500 dark:focus:border-pink-400 focus:ring-pink-500/20 dark:focus:ring-pink-400/30"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="role" className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     I am a...
                   </Label>
                   <select
@@ -206,7 +206,7 @@ export default function SignUp() {
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     disabled={loading}
-                    className="w-full h-11 px-3 border border-slate-300 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:border-pink-500 focus:ring-pink-500/20"
+                    className="w-full h-11 px-3 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:border-pink-500 dark:focus:border-pink-400 focus:ring-pink-500/20 dark:focus:ring-pink-400/30"
                   >
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
@@ -220,11 +220,11 @@ export default function SignUp() {
                       checked={acceptedTerms}
                       onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
                       disabled={loading}
-                      className="mt-1"
+                      className="mt-1 border-slate-400 dark:border-slate-600 data-[state=checked]:bg-pink-600 dark:data-[state=checked]:bg-pink-500 data-[state=checked]:border-pink-600 dark:data-[state=checked]:border-pink-500"
                     />
-                    <label htmlFor="terms" className="text-sm text-slate-700 leading-relaxed cursor-pointer">
+                    <label htmlFor="terms" className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed cursor-pointer">
                       I agree to the{' '}
-                      <Link href="/terms" target="_blank" className="text-pink-700 hover:text-orange-700 hover:underline font-medium">
+                      <Link href="/terms" target="_blank" className="text-pink-700 dark:text-pink-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline font-medium">
                         Terms of Service
                       </Link>
                     </label>
@@ -236,11 +236,11 @@ export default function SignUp() {
                       checked={acceptedPrivacy}
                       onCheckedChange={(checked) => setAcceptedPrivacy(checked === true)}
                       disabled={loading}
-                      className="mt-1"
+                      className="mt-1 border-slate-400 dark:border-slate-600 data-[state=checked]:bg-pink-600 dark:data-[state=checked]:bg-pink-500 data-[state=checked]:border-pink-600 dark:data-[state=checked]:border-pink-500"
                     />
-                    <label htmlFor="privacy" className="text-sm text-slate-700 leading-relaxed cursor-pointer">
+                    <label htmlFor="privacy" className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed cursor-pointer">
                       I agree to the{' '}
-                      <Link href="/privacy" target="_blank" className="text-pink-700 hover:text-orange-700 hover:underline font-medium">
+                      <Link href="/privacy" target="_blank" className="text-pink-700 dark:text-pink-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline font-medium">
                         Privacy Policy
                       </Link>
                     </label>
@@ -248,7 +248,7 @@ export default function SignUp() {
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
+                  <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm">
                     {error}
                   </div>
                 )}
@@ -263,10 +263,10 @@ export default function SignUp() {
 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200" />
+                    <div className="w-full border-t border-slate-200 dark:border-slate-700" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-slate-500">Or continue with</span>
+                    <span className="bg-white dark:bg-slate-900 px-2 text-slate-500 dark:text-slate-400">Or continue with</span>
                   </div>
                 </div>
 
@@ -275,7 +275,7 @@ export default function SignUp() {
                   variant="outline"
                   onClick={() => handleOAuthSignUp('google')}
                   disabled={loading}
-                  className="w-full h-11 border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  className="w-full h-11 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                 >
                   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path
@@ -301,9 +301,9 @@ export default function SignUp() {
             </div>
           </div>
 
-          <p className="text-sm text-center text-slate-600">
+          <p className="text-sm text-center text-slate-600 dark:text-slate-300">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-pink-700 hover:text-orange-700 hover:underline font-semibold">
+            <Link href="/auth/login" className="text-pink-700 dark:text-pink-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline font-semibold">
               Sign in
             </Link>
           </p>

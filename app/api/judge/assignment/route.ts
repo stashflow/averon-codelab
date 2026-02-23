@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ensureValidCsrf } from '@/lib/security/csrf'
 import { normalizeTestCases, runSandboxJudge } from '@/lib/judge/service'
+import { canUserAccessClassroom } from '@/lib/security/role-scope'
 
 export async function POST(request: Request) {
   try {
@@ -36,24 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
     }
 
-    const [{ data: profile }, { data: enrollment }, { data: classroom }] = await Promise.all([
-      supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-      supabase
-        .from('enrollments')
-        .select('id')
-        .eq('classroom_id', assignment.classroom_id)
-        .eq('student_id', user.id)
-        .maybeSingle(),
-      supabase
-        .from('classrooms')
-        .select('teacher_id')
-        .eq('id', assignment.classroom_id)
-        .maybeSingle(),
-    ])
-
-    const role = profile?.role || ''
-    const isPrivileged = ['teacher', 'full_admin', 'district_admin', 'school_admin'].includes(role)
-    const isAuthorized = Boolean(enrollment) || (isPrivileged && classroom?.teacher_id === user.id) || ['full_admin', 'district_admin', 'school_admin'].includes(role)
+    const isAuthorized = await canUserAccessClassroom(supabase, user.id, String(assignment.classroom_id))
 
     if (!isAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

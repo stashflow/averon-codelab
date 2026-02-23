@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { ensureValidCsrf } from '@/lib/security/csrf'
+import { canUserManageClassroom } from '@/lib/security/role-scope'
 
 export async function POST(request: Request) {
   try {
@@ -19,8 +20,9 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const { classroom_id, message, priority, expires_at } = body
+    const classroomId = String(classroom_id || '').trim()
 
-    if (!classroom_id || !message) {
+    if (!classroomId || !message) {
       return NextResponse.json(
         { error: 'Classroom ID and message are required' },
         { status: 400 }
@@ -36,22 +38,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
     }
 
-    // Verify user is teacher/admin of the classroom
-    const { data: classroom } = await supabase
-      .from('classrooms')
-      .select('teacher_id')
-      .eq('id', classroom_id)
-      .single()
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const isAuthorized =
-      classroom?.teacher_id === user.id ||
-      ['district_admin', 'school_admin', 'full_admin'].includes(profile?.role || '')
+    // Verify teacher ownership or admin scope (full/district/school).
+    const isAuthorized = await canUserManageClassroom(supabase, user.id, classroomId)
 
     if (!isAuthorized) {
       return NextResponse.json(
@@ -64,7 +52,7 @@ export async function POST(request: Request) {
     const { data: announcement, error } = await supabase
       .from('class_announcements')
       .insert({
-        classroom_id,
+        classroom_id: classroomId,
         teacher_id: user.id,
         message: safeMessage,
         priority: safePriority,

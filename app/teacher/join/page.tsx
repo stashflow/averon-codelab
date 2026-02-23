@@ -122,16 +122,21 @@ export default function TeacherJoinPage() {
         return
       }
 
-      // Check if already requested
-      const { data: existingRequest } = await supabase
+      // Check latest request for this class; allow retry after rejected/denied/cancelled.
+      const { data: existingRequests } = await supabase
         .from('teacher_requests')
-        .select('id, status')
+        .select('id, status, requested_at')
         .eq('classroom_id', classroomData.id)
         .eq('teacher_id', user.id)
-        .single()
+        .order('requested_at', { ascending: false })
+        .limit(1)
 
-      if (existingRequest) {
-        setError(`You already have a ${existingRequest.status} request for this class`)
+      const latestRequest = existingRequests?.[0]
+      const retryableStatuses = new Set(['rejected', 'denied', 'cancelled', 'canceled'])
+      const latestStatus = String(latestRequest?.status || '').toLowerCase()
+
+      if (latestRequest && !retryableStatuses.has(latestStatus)) {
+        setError(`You already have a ${latestRequest.status} request for this class`)
         return
       }
 

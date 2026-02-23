@@ -33,6 +33,62 @@ export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const features = [
+    {
+      icon: Globe,
+      title: 'District Management',
+      description: 'Organize schools and districts with hierarchical access control and centralized oversight.',
+    },
+    {
+      icon: Users,
+      title: 'Smart Classrooms',
+      description: 'Live classroom command center with roster intelligence, assignment queueing, progress heatmaps, intervention flags, and real-time student momentum signals.',
+      highlights: ['Activity Timeline', 'Progress Heatmap', 'Intervention Alerts', 'Roster Intelligence'],
+    },
+    {
+      icon: Code,
+      title: 'Live Code Editor',
+      description: 'Professional IDE experience with syntax highlighting, auto-complete, and multi-language support.',
+    },
+    {
+      icon: Zap,
+      title: 'Instant Feedback',
+      description: 'Automated test execution with detailed results and suggestions for improvement.',
+    },
+    {
+      icon: TrendingUp,
+      title: 'Advanced Analytics',
+      description: 'Comprehensive insights into learning patterns, performance trends, and skill development.',
+    },
+    {
+      icon: Shield,
+      title: 'Secure & Reliable',
+      description: 'Enterprise-grade security with role-based permissions and data protection.',
+    },
+    {
+      icon: BookOpen,
+      title: 'Assignment Hub',
+      description: 'Rich assignment creation with test cases, starter code, and visibility controls.',
+    },
+    {
+      icon: Trophy,
+      title: 'Smart Grading',
+      description: 'Streamlined grading workflows with rubrics, feedback templates, and batch operations.',
+    },
+    {
+      icon: Sparkles,
+      title: 'Course Library',
+      description: 'Pre-built courses for Python, JavaScript, Java, and C++ with progressive difficulty levels.',
+    },
+  ]
+  const classroomToolkit = [
+    { label: 'Live Student Presence', detail: 'See who is active, idle, or stuck right now.' },
+    { label: 'Assignment Queue', detail: 'Prioritize upcoming, late, and graded work in one stream.' },
+    { label: 'Intervention Flags', detail: 'Auto-identify students with low score or low activity patterns.' },
+    { label: 'Progress Heatmap', detail: 'Visualize mastery by lesson, unit, and classroom cohorts.' },
+    { label: 'Quick Actions', detail: 'Message class, extend due dates, and re-open work instantly.' },
+    { label: 'Teacher Notes', detail: 'Track context per student to personalize next steps.' },
+  ]
 
   useEffect(() => {
     async function checkAuth() {
@@ -82,9 +138,9 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[128px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[128px] animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-primary/5 via-transparent to-primary/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[128px] animate-float-slow" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-[128px] animate-float-reverse" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-full blur-3xl animate-pulse" />
       </div>
 
       {/* Header */}
@@ -100,7 +156,7 @@ export default function Home() {
                 priority
                 className="w-12 h-12 logo-theme-filter"
               />
-              <span className="hidden sm:block font-bold text-xl bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent group-hover:opacity-90 transition-all">
+              <span className="hidden sm:block font-bold text-xl bg-gradient-to-r from-orange-400 via-orange-500 to-rose-500 bg-clip-text text-transparent group-hover:opacity-90 transition-all">
                 Averon CodeLab
               </span>
             </Link>
@@ -125,12 +181,12 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 sm:py-40 lg:py-48 relative">
           <div className="text-center space-y-10">
-            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/15 to-accent/15 border border-primary/30 backdrop-blur-sm">
+            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/15 to-accent/15 border border-primary/30 backdrop-blur-sm animate-fade-up">
               <Sparkles className="w-5 h-5 text-primary" />
               <span className="text-sm font-semibold text-primary">Next-Gen Coding Education</span>
             </div>
 
-            <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-balance leading-[1.1]">
+            <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-balance leading-[1.1] animate-fade-up" style={{ animationDelay: '80ms' }}>
               <span className="block bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
                 The complete platform
               </span>
@@ -139,12 +195,12 @@ export default function Home() {
               </span>
             </h1>
 
-            <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed text-balance">
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed text-balance animate-fade-up" style={{ animationDelay: '140ms' }}>
               Empowering educators and students with professional tools for teaching and learning programming.
               Streamline assignments, grading, and progress tracking in one unified platform.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 animate-fade-up" style={{ animationDelay: '220ms' }}>
               <Link href="/auth/sign-up">
                 <Button
                   size="lg"
@@ -164,7 +220,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-8 pt-12 text-base text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-center gap-8 pt-12 text-base text-muted-foreground animate-fade-up" style={{ animationDelay: '280ms' }}>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary" />
                 <span>Built for student success</span>
@@ -182,12 +238,14 @@ export default function Home() {
         </div>
 
         {/* Floating gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/20 rounded-full blur-[100px] animate-pulse delay-700" />
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-[100px] animate-float-slow" />
+        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-accent/20 rounded-full blur-[100px] animate-float-reverse" />
       </section>
 
-      {/* Features Grid */}
+      {/* Features Experience */}
       <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 relative">
+        <div className="absolute -top-10 left-1/3 w-72 h-72 bg-primary/10 blur-[120px] rounded-full animate-float-slow pointer-events-none" />
+        <div className="absolute -bottom-16 right-1/4 w-72 h-72 bg-accent/10 blur-[120px] rounded-full animate-float-reverse pointer-events-none" />
         <div className="text-center mb-20">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted border border-border mb-6">
             <Layers className="w-4 h-4 text-primary" />
@@ -203,79 +261,95 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[
-            {
-              icon: Globe,
-              title: 'District Management',
-              description: 'Organize schools and districts with hierarchical access control and centralized oversight.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: Users,
-              title: 'Smart Classrooms',
-              description: 'Virtual classrooms with real-time progress tracking, analytics, and student engagement metrics.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: Code,
-              title: 'Live Code Editor',
-              description: 'Professional IDE experience with syntax highlighting, auto-complete, and multi-language support.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: Zap,
-              title: 'Instant Feedback',
-              description: 'Automated test execution with detailed results and suggestions for improvement.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: TrendingUp,
-              title: 'Advanced Analytics',
-              description: 'Comprehensive insights into learning patterns, performance trends, and skill development.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: Shield,
-              title: 'Secure & Reliable',
-              description: 'Enterprise-grade security with role-based permissions and data protection.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: BookOpen,
-              title: 'Assignment Hub',
-              description: 'Rich assignment creation with test cases, starter code, and visibility controls.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: Trophy,
-              title: 'Smart Grading',
-              description: 'Streamlined grading workflows with rubrics, feedback templates, and batch operations.',
-              gradient: 'from-primary to-accent',
-            },
-            {
-              icon: Sparkles,
-              title: 'Course Library',
-              description: 'Pre-built courses for Python, JavaScript, Java, and C++ with progressive difficulty levels.',
-              gradient: 'from-primary to-accent',
-            },
-          ].map((feature, idx) => (
-            <div
-              key={idx}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-card backdrop-blur-sm hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative p-8 space-y-4">
-                <div className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${feature.gradient} shadow-lg shadow-primary/20`}>
-                  <feature.icon className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground leading-relaxed text-[15px]">{feature.description}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 relative overflow-hidden rounded-3xl border border-border bg-card/90 backdrop-blur-sm p-8 sm:p-10">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
+            <div className="relative space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="text-2xl sm:text-3xl font-bold text-foreground">Explore Features</h3>
+                <span className="inline-flex items-center px-3 py-1 rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold text-primary">
+                  Platform Map
+                </span>
+              </div>
+              <p className="text-muted-foreground max-w-2xl">
+                Every part of the platform works together, from classroom setup to analytics and grading workflows.
+              </p>
+              <div className="space-y-3">
+                {features.slice(0, 6).map((feature, idx) => (
+                  <div
+                    key={feature.title}
+                    className="group flex items-center gap-4 rounded-2xl border border-border/80 bg-background/80 p-4 hover:border-primary/50 transition-all duration-300 animate-fade-up"
+                    style={{ animationDelay: `${idx * 70}ms` }}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-md shadow-primary/25">
+                      <feature.icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-foreground">{feature.title}</p>
+                      <p className="text-sm text-muted-foreground">{feature.description}</p>
+                      {feature.highlights?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {feature.highlights.map((highlight) => (
+                            <span
+                              key={`${feature.title}-${highlight}`}
+                              className="px-2 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-[11px] font-medium text-primary"
+                            >
+                              {highlight}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+          </div>
+
+          <div className="lg:col-span-5 grid gap-6">
+            <div className="relative overflow-hidden rounded-3xl border border-border bg-card/90 backdrop-blur-sm p-8">
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10" />
+              <div className="relative space-y-5">
+                <h4 className="text-xl font-bold text-foreground">Capability Coverage</h4>
+                {features.slice(6).map((feature, idx) => (
+                  <div key={feature.title} className="space-y-2 animate-fade-up" style={{ animationDelay: `${(idx + 2) * 90}ms` }}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-foreground font-medium">{feature.title}</span>
+                      <span className="text-muted-foreground">{92 - idx * 4}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted/70 overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-primary to-accent animate-pulse" style={{ width: `${92 - idx * 4}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-3xl border border-border bg-card/90 backdrop-blur-sm p-8">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
+              <div className="relative">
+                <h4 className="text-xl font-bold text-foreground mb-2">Smart Classroom Toolkit</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Built to help teachers manage the room, spot gaps early, and keep every student moving.
+                </p>
+                <div className="space-y-3">
+                  {classroomToolkit.map((item, idx) => (
+                    <div
+                      key={item.label}
+                      className="rounded-xl border border-border/70 bg-background/80 p-3 animate-fade-up"
+                      style={{ animationDelay: `${(idx + 1) * 70}ms` }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

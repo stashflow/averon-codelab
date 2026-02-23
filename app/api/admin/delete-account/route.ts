@@ -19,13 +19,8 @@ async function safeDelete(admin: any, table: string, column: string, value: stri
   if (error && !isMissingSchemaError(error)) throw error
 }
 
-async function deleteClassroom(admin: any, classroomId: string) {
-  await safeDelete(admin, 'enrollments', 'classroom_id', classroomId)
-  await safeDelete(admin, 'lesson_assignments', 'classroom_id', classroomId)
-  await safeDelete(admin, 'messages', 'classroom_id', classroomId)
-  await safeDelete(admin, 'classroom_course_offerings', 'classroom_id', classroomId)
-
-  const { error } = await admin.from('classrooms').delete().eq('id', classroomId)
+async function safeUpdate(admin: any, table: string, values: Record<string, any>, column: string, value: string) {
+  const { error } = await admin.from(table).update(values).eq(column, value)
   if (error && !isMissingSchemaError(error)) throw error
 }
 
@@ -35,17 +30,15 @@ export async function POST(request: Request) {
     if (csrfError) return csrfError
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userRole } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const { data: userRole } = await supabase.from('profiles').select('role').eq('id', user.id).single()
 
     if (userRole?.role !== 'full_admin') {
       return NextResponse.json({ error: 'Forbidden: Full admin access required' }, { status: 403 })
@@ -66,44 +59,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
-    const { data: teachingClasses, error: teachingClassLookupError } = await admin
-      .from('classrooms')
-      .select('id')
-      .eq('teacher_id', target_user_id)
+    // Clear known references that can block auth.users deletion in stricter schemas.
+    await Promise.all([
+      safeDelete(admin, 'audit_logs', 'user_id', target_user_id),
+      safeDelete(admin, 'class_requests', 'requested_by', target_user_id),
+      safeUpdate(admin, 'class_requests', { reviewed_by: null }, 'reviewed_by', target_user_id),
+      safeUpdate(admin, 'districts', { created_by: user.id }, 'created_by', target_user_id),
+      safeUpdate(admin, 'district_admins', { assigned_by: null }, 'assigned_by', target_user_id),
+      safeUpdate(admin, 'school_admins', { assigned_by: null }, 'assigned_by', target_user_id),
+      safeUpdate(admin, 'classrooms', { activated_by: null }, 'activated_by', target_user_id),
+      safeUpdate(admin, 'schools', { admin_id: null }, 'admin_id', target_user_id),
+      safeUpdate(admin, 'schools', { created_by: null }, 'created_by', target_user_id),
+      safeUpdate(admin, 'data_exports', { requested_by: null }, 'requested_by', target_user_id),
+    ])
 
-    if (teachingClassLookupError && !isMissingSchemaError(teachingClassLookupError)) {
-      throw teachingClassLookupError
-    }
-
-    for (const classroom of teachingClasses || []) {
-      await deleteClassroom(admin, classroom.id)
-    }
-
-    await safeDelete(admin, 'district_admins', 'admin_id', target_user_id)
-    await safeDelete(admin, 'school_admins', 'admin_id', target_user_id)
-    await safeDelete(admin, 'enrollments', 'student_id', target_user_id)
-    await safeDelete(admin, 'course_enrollments', 'student_id', target_user_id)
-    await safeDelete(admin, 'audit_logs', 'user_id', target_user_id)
-
-    const { error: exportUpdateError } = await admin
-      .from('data_exports')
-      .update({ requested_by: null })
-      .eq('requested_by', target_user_id)
-    if (exportUpdateError && !isMissingSchemaError(exportUpdateError)) {
-      throw exportUpdateError
-    }
-
-    const { error: profileError } = await admin
-      .from('profiles')
-      .delete()
-      .eq('id', target_user_id)
-
-    if (profileError) throw profileError
-
+    // Delete in auth first so we avoid "profile deleted but auth user still exists" mismatches.
     const { error: authError } = await admin.auth.admin.deleteUser(target_user_id)
     if (authError) {
-      console.error('Auth user deletion failed after profile removal:', authError)
-      return NextResponse.json({ error: authError.message || 'User profile deleted, but auth account removal failed' }, { status: 500 })
+      console.error('Auth user deletion failed:', authError)
+      return NextResponse.json({ error: authError.message || 'Failed to delete auth account' }, { status: 500 })
+    }
+
+    // Safety cleanup for environments where profile does not cascade from auth.users.
+    const { error: profileCleanupError } = await admin.from('profiles').delete().eq('id', target_user_id)
+    if (profileCleanupError && !isMissingSchemaError(profileCleanupError)) {
+      throw profileCleanupError
     }
 
     return NextResponse.json({ success: true, message: 'Account permanently deleted' })

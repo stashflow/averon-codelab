@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 const colorThemes: Array<{ name: string; value: ColorTheme; color: string }> = [
-  { name: 'Sunset', value: 'sunset', color: 'bg-orange-500' },
+  { name: 'Regular', value: 'sunset', color: 'bg-gradient-to-r from-pink-500 to-orange-500' },
   { name: 'Rose', value: 'rose', color: 'bg-rose-500' },
   { name: 'Forest', value: 'forest', color: 'bg-emerald-500' },
 ]

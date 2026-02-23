@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { canUserAccessClassroom } from '@/lib/security/role-scope'
 
 export async function GET(
   request: Request,
@@ -21,17 +22,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const [{ data: classroom }, { data: enrollment }, { data: profile }] = await Promise.all([
-      supabase.from('classrooms').select('id, teacher_id').eq('id', classroom_id).single(),
-      supabase.from('enrollments').select('id').eq('classroom_id', classroom_id).eq('student_id', user.id).maybeSingle(),
-      supabase.from('profiles').select('role').eq('id', user.id).single(),
-    ])
-
-    const isElevatedRole = ['full_admin', 'district_admin', 'school_admin'].includes(profile?.role || '')
-    const isTeacherForClass = classroom?.teacher_id === user.id
-    const isEnrolledStudent = Boolean(enrollment)
-
-    if (!classroom || (!isElevatedRole && !isTeacherForClass && !isEnrolledStudent)) {
+    const isAuthorized = await canUserAccessClassroom(supabase, user.id, classroom_id)
+    if (!isAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

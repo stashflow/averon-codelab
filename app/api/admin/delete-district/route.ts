@@ -24,55 +24,21 @@ async function safeUpdate(admin: any, table: string, values: Record<string, any>
   if (error && !isMissingSchemaError(error)) throw error
 }
 
-async function deleteClassroom(admin: any, classroomId: string) {
-  await safeDelete(admin, 'enrollments', 'classroom_id', classroomId)
-  await safeDelete(admin, 'lesson_assignments', 'classroom_id', classroomId)
-  await safeDelete(admin, 'messages', 'classroom_id', classroomId)
-  await safeDelete(admin, 'classroom_course_offerings', 'classroom_id', classroomId)
-
-  const { error } = await admin.from('classrooms').delete().eq('id', classroomId)
-  if (error && !isMissingSchemaError(error)) throw error
-}
-
-async function deleteSchool(admin: any, schoolId: string) {
-  const { data: classrooms, error: classroomLookupError } = await admin
-    .from('classrooms')
-    .select('id')
-    .eq('school_id', schoolId)
-
-  if (classroomLookupError && !isMissingSchemaError(classroomLookupError)) {
-    throw classroomLookupError
-  }
-
-  for (const classroom of classrooms || []) {
-    await deleteClassroom(admin, classroom.id)
-  }
-
-  await safeDelete(admin, 'school_admins', 'school_id', schoolId)
-  await safeUpdate(admin, 'profiles', { school_id: null }, 'school_id', schoolId)
-  await safeDelete(admin, 'magic_links', 'school_id', schoolId)
-
-  const { error: schoolError } = await admin.from('schools').delete().eq('id', schoolId)
-  if (schoolError && !isMissingSchemaError(schoolError)) throw schoolError
-}
-
 export async function POST(request: Request) {
   try {
     const csrfError = ensureValidCsrf(request)
     if (csrfError) return csrfError
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: userRole } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const { data: userRole } = await supabase.from('profiles').select('role').eq('id', user.id).single()
 
     if (userRole?.role !== 'full_admin') {
       return NextResponse.json({ error: 'Forbidden: Full admin access required' }, { status: 403 })
@@ -98,33 +64,34 @@ export async function POST(request: Request) {
       throw schoolLookupError
     }
 
-    for (const school of schools || []) {
-      await deleteSchool(admin, school.id)
+    const schoolIds = (schools || []).map((s: any) => s.id)
+
+    await Promise.all([
+      safeDelete(admin, 'district_admins', 'district_id', district_id),
+      safeDelete(admin, 'magic_links', 'district_id', district_id),
+      safeDelete(admin, 'data_exports', 'district_id', district_id),
+      safeUpdate(admin, 'profiles', { district_id: null, school_id: null }, 'district_id', district_id),
+    ])
+
+    if (schoolIds.length) {
+      const { error: schoolClassroomDeleteError } = await admin.from('classrooms').delete().in('school_id', schoolIds)
+      if (schoolClassroomDeleteError && !isMissingSchemaError(schoolClassroomDeleteError)) {
+        throw schoolClassroomDeleteError
+      }
+
+      const { error: schoolDeleteError } = await admin.from('schools').delete().in('id', schoolIds)
+      if (schoolDeleteError && !isMissingSchemaError(schoolDeleteError)) {
+        throw schoolDeleteError
+      }
     }
 
-    const { data: districtClassrooms, error: classroomLookupError } = await admin
-      .from('classrooms')
-      .select('id')
-      .eq('district_id', district_id)
-
-    if (classroomLookupError && !isMissingSchemaError(classroomLookupError)) {
-      throw classroomLookupError
+    // Clean up legacy classrooms that may only point to district_id.
+    const { error: districtClassroomDeleteError } = await admin.from('classrooms').delete().eq('district_id', district_id)
+    if (districtClassroomDeleteError && !isMissingSchemaError(districtClassroomDeleteError)) {
+      throw districtClassroomDeleteError
     }
 
-    for (const classroom of districtClassrooms || []) {
-      await deleteClassroom(admin, classroom.id)
-    }
-
-    await safeDelete(admin, 'district_admins', 'district_id', district_id)
-    await safeDelete(admin, 'magic_links', 'district_id', district_id)
-    await safeDelete(admin, 'data_exports', 'district_id', district_id)
-    await safeUpdate(admin, 'profiles', { district_id: null, school_id: null }, 'district_id', district_id)
-
-    const { error: districtError } = await admin
-      .from('districts')
-      .delete()
-      .eq('id', district_id)
-
+    const { error: districtError } = await admin.from('districts').delete().eq('id', district_id)
     if (districtError) throw districtError
 
     return NextResponse.json({ success: true, message: 'District permanently deleted' })

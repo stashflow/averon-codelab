@@ -22,6 +22,18 @@
       radial-gradient(circle at 80% 30%, rgba(251, 146, 60, 0.1), transparent 45%),
       radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.08), transparent 45%);
   }
+
+  .animate-fade-up {
+    animation: fade-up 700ms ease-out both;
+  }
+
+  .animate-float-slow {
+    animation: float-slow 9s ease-in-out infinite;
+  }
+
+  .animate-float-reverse {
+    animation: float-reverse 11s ease-in-out infinite;
+  }
 }
 
 @keyframes warm-aurora-shift {
@@ -33,6 +45,37 @@
   }
   100% {
     background-position: 0% 40%;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  50% {
+    transform: translateY(-18px) translateX(10px);
+  }
+}
+
+@keyframes float-reverse {
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  50% {
+    transform: translateY(16px) translateX(-10px);
   }
 }
 
@@ -116,7 +159,7 @@
     --logo-theme-filter: invert(48%) sepia(56%) saturate(1090%) hue-rotate(118deg) brightness(96%) contrast(94%);
   }
   
-  /* Sunset Light - Warm orange-amber theme */
+  /* Regular Light - Pink/orange default blend */
   :root[data-color-theme="sunset"] {
     --background: 30 20% 97%;
     --foreground: 20 30% 15%;
@@ -124,7 +167,7 @@
     --card-foreground: 20 30% 15%;
     --popover: 0 0% 100%;
     --popover-foreground: 20 30% 15%;
-    --primary: 25 95% 53%;
+    --primary: 337 84% 56%;
     --primary-foreground: 0 0% 100%;
     --secondary: 30 20% 92%;
     --secondary-foreground: 20 30% 20%;
@@ -136,20 +179,20 @@
     --destructive-foreground: 0 0% 100%;
     --border: 30 20% 88%;
     --input: 30 20% 90%;
-    --ring: 25 95% 53%;
-    --chart-1: 25 95% 53%;
+    --ring: 337 84% 56%;
+    --chart-1: 337 84% 56%;
     --chart-2: 45 93% 47%;
     --chart-3: 355 85% 63%;
     --chart-4: 15 86% 60%;
     --chart-5: 50 98% 64%;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 20 30% 15%;
-    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary: 337 84% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 30 20% 95%;
     --sidebar-accent-foreground: 20 30% 20%;
     --sidebar-border: 30 20% 88%;
-    --sidebar-ring: 25 95% 53%;
+    --sidebar-ring: 337 84% 56%;
     --logo-theme-filter: invert(57%) sepia(76%) saturate(1551%) hue-rotate(349deg) brightness(99%) contrast(103%);
   }
   
@@ -266,7 +309,7 @@
     --logo-theme-filter: invert(61%) sepia(49%) saturate(1055%) hue-rotate(115deg) brightness(106%) contrast(95%);
   }
   
-  /* Sunset Dark - Warm oranges and reds */
+  /* Regular Dark - Pink/orange default blend */
   .dark[data-color-theme="sunset"] {
     --background: 20 25% 8%;
     --foreground: 0 0% 98%;
@@ -274,7 +317,7 @@
     --card-foreground: 0 0% 98%;
     --popover: 20 25% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 25 100% 60%;
+    --primary: 337 88% 62%;
     --primary-foreground: 20 25% 10%;
     --secondary: 20 25% 15%;
     --secondary-foreground: 0 0% 98%;
@@ -286,20 +329,20 @@
     --destructive-foreground: 0 0% 100%;
     --border: 20 25% 20%;
     --input: 20 25% 18%;
-    --ring: 25 100% 60%;
-    --chart-1: 25 100% 60%;
+    --ring: 337 88% 62%;
+    --chart-1: 337 88% 62%;
     --chart-2: 45 93% 47%;
     --chart-3: 355 85% 63%;
     --chart-4: 15 86% 60%;
     --chart-5: 50 98% 64%;
     --sidebar-background: 20 25% 10%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 25 100% 60%;
+    --sidebar-primary: 337 88% 62%;
     --sidebar-primary-foreground: 20 25% 10%;
     --sidebar-accent: 20 25% 18%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 20 25% 20%;
-    --sidebar-ring: 25 100% 60%;
+    --sidebar-ring: 337 88% 62%;
     --logo-theme-filter: invert(63%) sepia(83%) saturate(1615%) hue-rotate(349deg) brightness(106%) contrast(102%);
   }
   

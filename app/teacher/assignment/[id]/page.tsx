@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -56,6 +56,7 @@ export default function TeacherAssignmentPage() {
   const [gradeFeedback, setGradeFeedback] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const selectedSubmissionIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     async function loadData() {
@@ -103,12 +104,27 @@ export default function TeacherAssignmentPage() {
           .eq('assignment_id', assignmentId)
           .order('created_at', { ascending: false })
 
-        setSubmissions(submissionData || [])
+        const nextSubmissions = submissionData || []
+        setSubmissions(nextSubmissions)
 
-        if (submissionData && submissionData.length > 0) {
-          setSelectedSubmission(submissionData[0])
-          setGradeScore(submissionData[0].score?.toString() || '')
-          setGradeFeedback(submissionData[0].feedback || '')
+        const nextSelected =
+          (selectedSubmissionIdRef.current
+            ? nextSubmissions.find((submission) => submission.id === selectedSubmissionIdRef.current)
+            : null) || nextSubmissions[0] || null
+
+        if (!nextSelected) {
+          selectedSubmissionIdRef.current = null
+          setSelectedSubmission(null)
+          setGradeScore('')
+          setGradeFeedback('')
+        } else {
+          const selectionChanged = selectedSubmissionIdRef.current !== nextSelected.id
+          selectedSubmissionIdRef.current = nextSelected.id
+          setSelectedSubmission(nextSelected)
+          if (selectionChanged) {
+            setGradeScore(nextSelected.score?.toString() || '')
+            setGradeFeedback(nextSelected.feedback || '')
+          }
         }
       } catch (err: any) {
         console.error('Error loading data:', err)
@@ -205,6 +221,7 @@ export default function TeacherAssignmentPage() {
         feedback: normalizedFeedback,
         status: 'graded',
       })
+      selectedSubmissionIdRef.current = selectedSubmission.id
 
       // Update submissions list
       setSubmissions(
@@ -294,6 +311,7 @@ export default function TeacherAssignmentPage() {
                       key={submission.id}
                       className={`cursor-pointer transition-colors rounded-2xl backdrop-blur-xl border p-4 ${selectedSubmission?.id === submission.id ? 'border-blue-400/50 bg-gradient-to-br from-blue-500/20 to-blue-500/10' : 'border-white/10 bg-gradient-to-br from-white/10 to-white/5 hover:border-blue-400/30'}`}
                       onClick={() => {
+                        selectedSubmissionIdRef.current = submission.id
                         setSelectedSubmission(submission)
                         setGradeScore(submission.score?.toString() || '')
                         setGradeFeedback(submission.feedback || '')

@@ -9,6 +9,10 @@ function getAdminClient() {
   return createAdminClient(url, serviceKey, { auth: { persistSession: false } })
 }
 
+function isMissingSchemaError(error: any) {
+  return error?.code === '42P01' || error?.code === '42703'
+}
+
 async function assertFullAdmin() {
   const supabase = await createServerClient()
   const {
@@ -19,6 +23,106 @@ async function assertFullAdmin() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'full_admin') return { ok: false, status: 403, error: 'Forbidden' }
   return { ok: true }
+}
+
+async function runWithDeletedAtFallback(runFiltered: () => any, runUnfiltered: () => any) {
+  const filtered = await runFiltered()
+  if (!filtered.error) return filtered
+  if (isMissingSchemaError(filtered.error)) {
+    return runUnfiltered()
+  }
+  return filtered
+}
+
+async function fetchLastSignInMap(admin: any, userIds: string[]) {
+  const pending = new Set(userIds.filter(Boolean))
+  const byId: Record<string, string | null> = {}
+  if (!pending.size) return byId
+
+  let page = 1
+  const perPage = 200
+
+  while (pending.size > 0) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) break
+
+    const users = data?.users || []
+    for (const authUser of users) {
+      if (pending.has(authUser.id)) {
+        byId[authUser.id] = authUser.last_sign_in_at || null
+        pending.delete(authUser.id)
+      }
+    }
+
+    if (users.length < perPage) break
+    page += 1
+    if (page > 50) break
+  }
+
+  return byId
+}
+
+async function fetchUsersWithContext(admin: any, q: string, limit: number) {
+  const queryUsers = (fields: string, filterDeleted: boolean) => {
+    let query = admin.from('profiles').select(fields)
+    if (filterDeleted) query = query.is('deleted_at', null)
+    if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`)
+    return query.limit(limit)
+  }
+
+  const fieldCandidates = [
+    { fields: 'id, email, full_name, role, created_at, deleted_at, district_id, school_id', filterDeleted: true },
+    { fields: 'id, email, full_name, role, created_at, deleted_at', filterDeleted: true },
+    { fields: 'id, email, full_name, role, created_at, district_id, school_id', filterDeleted: false },
+    { fields: 'id, email, full_name, role, created_at', filterDeleted: false },
+  ]
+
+  let users: any[] = []
+  let lastError: any = null
+
+  for (const candidate of fieldCandidates) {
+    const { data, error } = await queryUsers(candidate.fields, candidate.filterDeleted)
+    if (!error) {
+      users = data || []
+      lastError = null
+      break
+    }
+    lastError = error
+    if (!isMissingSchemaError(error)) break
+  }
+
+  if (lastError) throw lastError
+
+  const districtIds = Array.from(new Set(users.map((u: any) => u.district_id).filter(Boolean)))
+  const schoolIds = Array.from(new Set(users.map((u: any) => u.school_id).filter(Boolean)))
+
+  const [districtsRes, schoolsRes, lastSignInById] = await Promise.all([
+    districtIds.length
+      ? admin.from('districts').select('id, name').in('id', districtIds)
+      : Promise.resolve({ data: [], error: null } as any),
+    schoolIds.length
+      ? admin.from('schools').select('id, name').in('id', schoolIds)
+      : Promise.resolve({ data: [], error: null } as any),
+    fetchLastSignInMap(admin, users.map((u: any) => u.id)),
+  ])
+
+  if (districtsRes.error && !isMissingSchemaError(districtsRes.error)) throw districtsRes.error
+  if (schoolsRes.error && !isMissingSchemaError(schoolsRes.error)) throw schoolsRes.error
+
+  const districtById = Object.fromEntries((districtsRes.data || []).map((d: any) => [d.id, d.name]))
+  const schoolById = Object.fromEntries((schoolsRes.data || []).map((s: any) => [s.id, s.name]))
+
+  return users.map((user: any) => ({
+    id: user.id,
+    email: user.email,
+    full_name: user.full_name,
+    role: user.role,
+    created_at: user.created_at,
+    deleted_at: user.deleted_at,
+    district_name: user.district_id ? districtById[user.district_id] || undefined : undefined,
+    school_name: user.school_id ? schoolById[user.school_id] || undefined : undefined,
+    last_sign_in_at: lastSignInById[user.id] || null,
+  }))
 }
 
 export async function GET(request: Request) {
@@ -40,26 +144,32 @@ export async function GET(request: Request) {
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.floor(limitRaw))) : 50
 
     if (type === 'users') {
-      let query = admin
-        .from('profiles')
-        .select('id, email, full_name, role, created_at, deleted_at')
-        .is('deleted_at', null)
-      if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`)
-      const { data, error } = await query.limit(limit)
-      if (error) throw error
-      return NextResponse.json({ items: data || [] })
+      const items = await fetchUsersWithContext(admin, q, limit)
+      return NextResponse.json({ items })
     }
 
     if (type === 'districts') {
-      let query = admin.from('districts').select('id, name, created_at, deleted_at').is('deleted_at', null)
-      if (q) query = query.ilike('name', `%${q}%`)
-      const { data: districts, error } = await query.limit(limit)
+      const { data: districts, error } = await runWithDeletedAtFallback(
+        () => {
+          let query = admin.from('districts').select('id, name, created_at, deleted_at').is('deleted_at', null)
+          if (q) query = query.ilike('name', `%${q}%`)
+          return query.limit(limit)
+        },
+        () => {
+          let query = admin.from('districts').select('id, name, created_at')
+          if (q) query = query.ilike('name', `%${q}%`)
+          return query.limit(limit)
+        },
+      )
       if (error) throw error
 
       const districtIds = (districts || []).map((d: any) => d.id)
       const [schoolsRes, adminsRes] = await Promise.all([
         districtIds.length
-          ? admin.from('schools').select('id, district_id').in('district_id', districtIds).is('deleted_at', null)
+          ? runWithDeletedAtFallback(
+              () => admin.from('schools').select('id, district_id').in('district_id', districtIds).is('deleted_at', null),
+              () => admin.from('schools').select('id, district_id').in('district_id', districtIds),
+            )
           : Promise.resolve({ data: [], error: null } as any),
         districtIds.length
           ? admin.from('district_admins').select('id, district_id').in('district_id', districtIds)
@@ -86,9 +196,18 @@ export async function GET(request: Request) {
     }
 
     if (type === 'schools') {
-      let query = admin.from('schools').select('id, name, district_id, created_at, deleted_at').is('deleted_at', null)
-      if (q) query = query.ilike('name', `%${q}%`)
-      const { data: schools, error } = await query.limit(limit)
+      const { data: schools, error } = await runWithDeletedAtFallback(
+        () => {
+          let query = admin.from('schools').select('id, name, district_id, created_at, deleted_at').is('deleted_at', null)
+          if (q) query = query.ilike('name', `%${q}%`)
+          return query.limit(limit)
+        },
+        () => {
+          let query = admin.from('schools').select('id, name, district_id, created_at')
+          if (q) query = query.ilike('name', `%${q}%`)
+          return query.limit(limit)
+        },
+      )
       if (error) throw error
 
       const schoolIds = (schools || []).map((s: any) => s.id)
@@ -99,7 +218,10 @@ export async function GET(request: Request) {
           ? admin.from('districts').select('id, name').in('id', districtIds)
           : Promise.resolve({ data: [], error: null } as any),
         schoolIds.length
-          ? admin.from('classrooms').select('id, school_id').in('school_id', schoolIds).is('deleted_at', null)
+          ? runWithDeletedAtFallback(
+              () => admin.from('classrooms').select('id, school_id').in('school_id', schoolIds).is('deleted_at', null),
+              () => admin.from('classrooms').select('id, school_id').in('school_id', schoolIds),
+            )
           : Promise.resolve({ data: [], error: null } as any),
         schoolIds.length
           ? admin.from('school_admins').select('id, school_id').in('school_id', schoolIds)
@@ -133,9 +255,18 @@ export async function GET(request: Request) {
     }
 
     if (type === 'classrooms') {
-      let query = admin.from('classrooms').select('id, name, school_id, teacher_id, created_at, deleted_at').is('deleted_at', null)
-      if (q) query = query.ilike('name', `%${q}%`)
-      const { data: classrooms, error } = await query.limit(limit)
+      const { data: classrooms, error } = await runWithDeletedAtFallback(
+        () => {
+          let query = admin.from('classrooms').select('id, name, school_id, teacher_id, created_at, deleted_at').is('deleted_at', null)
+          if (q) query = query.ilike('name', `%${q}%`)
+          return query.limit(limit)
+        },
+        () => {
+          let query = admin.from('classrooms').select('id, name, school_id, teacher_id, created_at')
+          if (q) query = query.ilike('name', `%${q}%`)
+          return query.limit(limit)
+        },
+      )
       if (error) throw error
 
       const schoolIds = Array.from(new Set((classrooms || []).map((c: any) => c.school_id).filter(Boolean)))

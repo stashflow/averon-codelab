@@ -49,7 +49,7 @@ type User = {
   full_name: string
   role: string
   created_at: string
-  last_sign_in_at: string
+  last_sign_in_at: string | null
   district_name?: string
   school_name?: string
   deleted_at?: string
@@ -88,7 +88,7 @@ type Classroom = {
 type SupportTab = 'users' | 'districts' | 'schools' | 'classrooms'
 
 export default function AdminSupportCenter() {
-  const [loading, setLoading] = useState(false)
+  const [pendingRequests, setPendingRequests] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [districts, setDistricts] = useState<District[]>([])
@@ -111,6 +111,11 @@ export default function AdminSupportCenter() {
   useEffect(() => {
     verifyAccessAndLoad()
   }, [])
+
+  const loading = pendingRequests > 0
+
+  const beginRequest = () => setPendingRequests((prev) => prev + 1)
+  const endRequest = () => setPendingRequests((prev) => Math.max(0, prev - 1))
 
   const verifyAccessAndLoad = async () => {
     try {
@@ -164,7 +169,7 @@ export default function AdminSupportCenter() {
 
   const searchUsers = async (queryOverride?: string) => {
     const query = (queryOverride ?? searchQuery).trim()
-    setLoading(true)
+    beginRequest()
     try {
       const response = await fetch(`/api/admin/support/search?type=users&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
       const payload = await response.json()
@@ -187,13 +192,13 @@ export default function AdminSupportCenter() {
       console.error('Error searching users:', error)
       showAlert('error', 'Failed to search users')
     } finally {
-      setLoading(false)
+      endRequest()
     }
   }
 
   const searchDistricts = async (queryOverride?: string) => {
     const query = (queryOverride ?? searchQuery).trim()
-    setLoading(true)
+    beginRequest()
     try {
       const response = await fetch(`/api/admin/support/search?type=districts&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
       const payload = await response.json()
@@ -203,13 +208,13 @@ export default function AdminSupportCenter() {
       console.error('Error searching districts:', error)
       showAlert('error', 'Failed to search districts')
     } finally {
-      setLoading(false)
+      endRequest()
     }
   }
 
   const searchSchools = async (queryOverride?: string) => {
     const query = (queryOverride ?? searchQuery).trim()
-    setLoading(true)
+    beginRequest()
     try {
       const response = await fetch(`/api/admin/support/search?type=schools&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
       const payload = await response.json()
@@ -219,13 +224,13 @@ export default function AdminSupportCenter() {
       console.error('Error searching schools:', error)
       showAlert('error', 'Failed to search schools')
     } finally {
-      setLoading(false)
+      endRequest()
     }
   }
 
   const searchClassrooms = async (queryOverride?: string) => {
     const query = (queryOverride ?? searchQuery).trim()
-    setLoading(true)
+    beginRequest()
     try {
       const response = await fetch(`/api/admin/support/search?type=classrooms&q=${encodeURIComponent(query)}&limit=${query ? 20 : 50}`)
       const payload = await response.json()
@@ -235,7 +240,7 @@ export default function AdminSupportCenter() {
       console.error('Error searching classrooms:', error)
       showAlert('error', 'Failed to search classrooms')
     } finally {
-      setLoading(false)
+      endRequest()
     }
   }
 
@@ -258,7 +263,7 @@ export default function AdminSupportCenter() {
   const handleDelete = async () => {
     if (!deleteTarget || !deleteType) return
 
-    setLoading(true)
+    beginRequest()
     try {
       const endpoints = {
         user: '/api/admin/delete-account',
@@ -303,7 +308,7 @@ export default function AdminSupportCenter() {
       console.error('Error deleting:', error)
       showAlert('error', error.message || 'Failed to delete')
     } finally {
-      setLoading(false)
+      endRequest()
     }
   }
 
@@ -318,11 +323,11 @@ export default function AdminSupportCenter() {
     setTimeout(() => setAlert(null), 5000)
   }
 
-  const resetPassword = async (userId: string, email: string) => {
+  const resetPassword = async (email: string) => {
     try {
       const supabase = createClient()
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/auth/reset-password`
       })
 
       if (error) throw error
@@ -501,7 +506,7 @@ export default function AdminSupportCenter() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => resetPassword(user.id, user.email)}
+                                onClick={() => resetPassword(user.email)}
                               >
                                 <Lock className="w-4 h-4 mr-2" />
                                 Reset Password

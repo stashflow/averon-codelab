@@ -10,15 +10,6 @@ function getAdminClient() {
   return createAdminClient(url, serviceKey, { auth: { persistSession: false } })
 }
 
-function isMissingSchemaError(error: any) {
-  return error?.code === '42P01' || error?.code === '42703'
-}
-
-async function safeDelete(admin: any, table: string, column: string, value: string) {
-  const { error } = await admin.from(table).delete().eq(column, value)
-  if (error && !isMissingSchemaError(error)) throw error
-}
-
 export async function POST(request: Request) {
   try {
     const csrfError = ensureValidCsrf(request)
@@ -51,11 +42,6 @@ export async function POST(request: Request) {
     if (!classroom_id) {
       return NextResponse.json({ error: 'Classroom ID is required' }, { status: 400 })
     }
-
-    await safeDelete(admin, 'enrollments', 'classroom_id', classroom_id)
-    await safeDelete(admin, 'lesson_assignments', 'classroom_id', classroom_id)
-    await safeDelete(admin, 'messages', 'classroom_id', classroom_id)
-    await safeDelete(admin, 'classroom_course_offerings', 'classroom_id', classroom_id)
 
     const { error: classroomError } = await admin
       .from('classrooms')

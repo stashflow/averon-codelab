@@ -10,6 +10,10 @@ function getAdminClient() {
   return createAdminClient(url, serviceKey, { auth: { persistSession: false } })
 }
 
+function isMissingSchemaError(error: any) {
+  return error?.code === '42P01' || error?.code === '42703'
+}
+
 async function assertFullAdmin() {
   const supabase = await createServerClient()
   const {
@@ -24,6 +28,46 @@ async function assertFullAdmin() {
   return { ok: true }
 }
 
+async function countWithDeletedAtFallback(admin: any, table: string) {
+  const filtered = await admin.from(table).select('id', { count: 'exact', head: true }).is('deleted_at', null)
+  if (!filtered.error) return filtered.count || 0
+  if (isMissingSchemaError(filtered.error)) {
+    const unfiltered = await admin.from(table).select('id', { count: 'exact', head: true })
+    if (unfiltered.error) throw unfiltered.error
+    return unfiltered.count || 0
+  }
+  throw filtered.error
+}
+
+async function countActiveUsers24h(admin: any) {
+  const cutoffMs = Date.now() - 24 * 60 * 60 * 1000
+  let count = 0
+  let page = 1
+  const perPage = 200
+
+  while (true) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) break
+
+    const users = data?.users || []
+    if (!users.length) break
+
+    for (const user of users) {
+      if (!user.last_sign_in_at) continue
+      const ts = Date.parse(user.last_sign_in_at)
+      if (!Number.isNaN(ts) && ts >= cutoffMs) {
+        count += 1
+      }
+    }
+
+    if (users.length < perPage) break
+    page += 1
+    if (page > 100) break
+  }
+
+  return count
+}
+
 export async function GET() {
   try {
     const auth = await assertFullAdmin()
@@ -36,19 +80,20 @@ export async function GET() {
       return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not configured' }, { status: 500 })
     }
 
-    const [usersRes, districtsRes, schoolsRes, classroomsRes] = await Promise.all([
-      admin.from('profiles').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-      admin.from('districts').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-      admin.from('schools').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-      admin.from('classrooms').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+    const [totalUsers, totalDistricts, totalSchools, totalClassrooms, activeUsers24h] = await Promise.all([
+      countWithDeletedAtFallback(admin, 'profiles'),
+      countWithDeletedAtFallback(admin, 'districts'),
+      countWithDeletedAtFallback(admin, 'schools'),
+      countWithDeletedAtFallback(admin, 'classrooms'),
+      countActiveUsers24h(admin),
     ])
 
     return NextResponse.json({
-      totalUsers: usersRes.count || 0,
-      totalDistricts: districtsRes.count || 0,
-      totalSchools: schoolsRes.count || 0,
-      totalClassrooms: classroomsRes.count || 0,
-      activeUsers24h: 0,
+      totalUsers,
+      totalDistricts,
+      totalSchools,
+      totalClassrooms,
+      activeUsers24h,
     })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Failed to load support stats' }, { status: 500 })
