@@ -476,7 +476,7 @@ export default function CoursesPage() {
                             ) : (
                               <Button
                                 disabled
-                                className="w-full bg-slate-700/60 text-slate-200 font-semibold disabled:opacity-80"
+                                className="w-full border border-border bg-muted text-muted-foreground font-semibold disabled:opacity-80"
                               >
                                 Enrollment Inactive
                               </Button>

@@ -174,25 +174,25 @@ export default function CourseDetailPage() {
       case 'in_progress':
         return <Play className="w-5 h-5 text-cyan-400" />
       default:
-        return <Lock className="w-5 h-5 text-white/50" />
+        return <Lock className="w-5 h-5 text-muted-foreground" />
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white/60">Loading course...</div>
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-muted-foreground">Loading course...</div>
       </div>
     )
   }
 
   if (!course) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="text-center">
-          <div className="text-white/60 mb-4">Course not found</div>
+          <div className="text-muted-foreground mb-4">Course not found</div>
           <Link href="/courses">
-            <Button variant="outline" className="border-white/10 text-white/60 hover:text-white hover:bg-white/5 bg-transparent">
+            <Button variant="outline" className="border-border text-muted-foreground hover:text-foreground hover:bg-accent/40 bg-transparent">
               Back to Courses
             </Button>
           </Link>
@@ -209,25 +209,25 @@ export default function CourseDetailPage() {
       .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))[0]?.id || null
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Background effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px]" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[128px]" />
+      <div className="fixed inset-0 overflow-hidden pointer-events-none warm-aurora">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/12 dark:bg-cyan-500/10 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/15 dark:bg-blue-500/10 rounded-full blur-[128px]" />
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
               <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
-              <span className="font-bold text-2xl bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
+              <span className="font-bold text-2xl bg-gradient-to-r from-cyan-600 via-sky-500 to-blue-500 dark:from-white dark:via-cyan-200 dark:to-cyan-400 bg-clip-text text-transparent">
                 Averon CodeLab
               </span>
             </Link>
             <Link href="/courses">
-              <Button variant="outline" className="border-white/10 text-white/60 hover:text-white hover:bg-white/5 bg-transparent">
+              <Button variant="outline" className="border-border text-muted-foreground hover:text-foreground hover:bg-accent/40 bg-transparent">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 All Courses
               </Button>
@@ -237,25 +237,25 @@ export default function CourseDetailPage() {
       </header>
 
       {/* Course Header */}
-      <section className="relative border-b border-white/10 bg-gradient-to-b from-white/5 to-transparent">
+      <section className="relative border-b border-border/70 bg-gradient-to-b from-accent/20 to-transparent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative">
           <div className="flex items-start gap-8">
             <div className={`w-24 h-24 rounded-3xl bg-gradient-to-r ${course.color || 'from-cyan-500 to-blue-500'} flex items-center justify-center flex-shrink-0`}>
               <BookOpen className="w-12 h-12 text-white" />
             </div>
             <div className="flex-1">
-              <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 border mb-4">
+              <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20 border mb-4">
                 {course.difficulty_level}
               </Badge>
-              <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-white via-cyan-200 to-blue-200 bg-clip-text text-transparent">
+              <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-700 via-sky-600 to-blue-600 dark:from-white dark:via-cyan-200 dark:to-blue-200 bg-clip-text text-transparent">
                 {course.name}
               </h1>
-              <div className="text-xl text-white/70 font-light mb-6 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/50 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-900 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-8 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-900 [&_th]:p-2">
+              <div className="text-xl text-muted-foreground font-light mb-6 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/50 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-8 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                   {normalizeMarkdown(course.description)}
                 </ReactMarkdown>
               </div>
-              <div className="flex items-center gap-2 text-sm text-white/50">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <BookOpen className="w-4 h-4" />
                 <span>{units.length} units</span>
               </div>
@@ -265,8 +265,8 @@ export default function CourseDetailPage() {
           {progressPercent > 0 && (
             <div className="mt-8">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-white/60 text-sm">Your Progress</span>
-                <span className="text-white font-semibold">{progressPercent}%</span>
+                <span className="text-muted-foreground text-sm">Your Progress</span>
+                <span className="text-foreground font-semibold">{progressPercent}%</span>
               </div>
               <Progress value={progressPercent} className="h-2" />
             </div>
@@ -274,10 +274,10 @@ export default function CourseDetailPage() {
 
           {isApcspCourse && firstLessonId && (
             <div className="mt-6 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
-              <p className="text-sm font-semibold text-cyan-200">Start Here</p>
-              <p className="text-sm text-cyan-100 mt-1">Open Lesson 1.0 course intro notes before Lesson 1.1.</p>
+              <p className="text-sm font-semibold text-cyan-700 dark:text-cyan-200">Start Here</p>
+              <p className="text-sm text-cyan-800 dark:text-cyan-100 mt-1">Open Lesson 1.0 course intro notes before Lesson 1.1.</p>
               <Link href={`/lesson/${firstLessonId}?view=course-intro`}>
-                <Button className="mt-3 bg-cyan-500 text-slate-950 hover:bg-cyan-400">Open 1.0 Course Intro</Button>
+                <Button className="mt-3 bg-cyan-500 text-white hover:bg-cyan-400">Open 1.0 Course Intro</Button>
               </Link>
             </div>
           )}
@@ -290,14 +290,14 @@ export default function CourseDetailPage() {
           {units.map((unit, unitIndex) => (
             <Card
               key={unit.id}
-              className="border-2 border-white/10 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-sm"
+              className="border-2 border-border/70 bg-card/95 backdrop-blur-sm"
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-cyan-400 text-sm font-semibold mb-2">Unit {unitIndex + 1}</div>
-                    <CardTitle className="text-white text-2xl mb-2">{unit.title}</CardTitle>
-                    <CardDescription className="text-white/70 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/40 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-900 [&_code]:px-1 [&_code]:py-0.5 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-3">
+                    <CardTitle className="text-foreground text-2xl mb-2">{unit.title}</CardTitle>
+                    <CardDescription className="text-muted-foreground [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/40 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-3">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                         {normalizeMarkdown(unit.description)}
                       </ReactMarkdown>
@@ -315,13 +315,13 @@ export default function CourseDetailPage() {
                         : `/lesson/${lesson.id}`
                     return (
                       <Link key={lesson.id} href={lessonHref}>
-                        <div className="flex items-center gap-4 p-4 rounded-xl border border-white/10 hover:border-cyan-500/50 hover:bg-white/5 transition-all cursor-pointer group">
+                        <div className="flex items-center gap-4 p-4 rounded-xl border border-border hover:border-cyan-500/50 hover:bg-accent/30 transition-all cursor-pointer group">
                           <div className="flex-shrink-0">{getStatusIcon(status)}</div>
                           <div className="flex-1">
-                            <div className="text-white font-semibold group-hover:text-cyan-300 transition-colors">
+                            <div className="text-foreground font-semibold group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors">
                               {lessonIndex + 1}. {lesson.title}
                             </div>
-                            <div className="mt-1 text-xs text-slate-400">
+                            <div className="mt-1 text-xs text-muted-foreground">
                               {lesson.duration_minutes ? `${lesson.duration_minutes} min` : '45 min'} · Notes + Checkpoint
                             </div>
                           </div>
@@ -336,7 +336,7 @@ export default function CourseDetailPage() {
                   })}
 
                   {(!unit.lessons || unit.lessons.length === 0) && (
-                    <div className="text-center py-8 text-white/70 text-base">No lessons available yet</div>
+                    <div className="text-center py-8 text-muted-foreground text-base">No lessons available yet</div>
                   )}
                 </div>
               </CardContent>
@@ -345,11 +345,11 @@ export default function CourseDetailPage() {
 
           {units.length === 0 && (
             <div className="text-center py-16">
-              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="w-8 h-8 text-white/60" />
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Course Content Coming Soon</h3>
-              <p className="text-white/60">Units and lessons will be added soon.</p>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Course Content Coming Soon</h3>
+              <p className="text-muted-foreground">Units and lessons will be added soon.</p>
             </div>
           )}
         </div>
