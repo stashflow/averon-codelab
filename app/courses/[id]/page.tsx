@@ -309,8 +309,12 @@ export default function CourseDetailPage() {
                 <div className="space-y-3">
                   {unit.lessons?.map((lesson: any, lessonIndex: number) => {
                     const status = getLessonStatus(lesson.id)
+                    const lessonHref =
+                      isApcspCourse && lesson.id === firstLessonId
+                        ? `/lesson/${lesson.id}?view=course-intro`
+                        : `/lesson/${lesson.id}`
                     return (
-                      <Link key={lesson.id} href={`/lesson/${lesson.id}`}>
+                      <Link key={lesson.id} href={lessonHref}>
                         <div className="flex items-center gap-4 p-4 rounded-xl border border-white/10 hover:border-cyan-500/50 hover:bg-white/5 transition-all cursor-pointer group">
                           <div className="flex-shrink-0">{getStatusIcon(status)}</div>
                           <div className="flex-1">

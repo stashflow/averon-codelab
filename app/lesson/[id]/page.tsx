@@ -12,6 +12,7 @@ import rehypeRaw from 'rehype-raw'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ArrowLeft,
   CheckCircle,
@@ -101,6 +102,13 @@ type ApcspFrameworkTag = {
   unitLabel: string
   bigIdeas: string[]
   practices: string[]
+}
+
+type NotionProgress = {
+  answered: number
+  correct: number
+  total: number
+  statusById: Record<string, { answered: boolean; correct: boolean }>
 }
 
 const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
@@ -292,6 +300,18 @@ type ConcreteLessonPlan = {
 function inferConcretePlan(lessonTitle: string): ConcreteLessonPlan {
   const title = lessonTitle.toLowerCase()
 
+  if (title.includes('pseudocode') || title.includes('sequencing')) {
+    return {
+      heading: 'Pseudocode Sequencing with a Real Checkout Example',
+      idea: 'Sequencing means each step runs in order and each step has one clear job.',
+      problem: 'Calculate a checkout total from subtotal, tax rate, and tip.',
+      constraint: 'Return the total rounded to 2 decimals.',
+      pseudocode: ['READ subtotal, tax_rate, tip', 'total <- subtotal + (subtotal * tax_rate) + tip', 'OUTPUT round(total, 2)'],
+      python: ['subtotal = 100', 'tax_rate = 0.07', 'tip = 5', 'total = subtotal + (subtotal * tax_rate) + tip', 'print(round(total, 2))  # 112.0'],
+      tryIt: 'Write pseudocode for computing the final cost after a 15% discount.',
+    }
+  }
+
   if (title.includes('problem') || title.includes('constraint')) {
     return {
       heading: 'Problem Statements and Constraints',
@@ -364,6 +384,30 @@ function inferConcretePlan(lessonTitle: string): ConcreteLessonPlan {
     }
   }
 
+  if (title.includes('variable') || title.includes('price') || title.includes('coupon') || title.includes('discount')) {
+    return {
+      heading: 'Variables in a Shopping App',
+      idea: 'Variables store values so your logic stays readable and reusable.',
+      problem: 'Compute discounted price from original price and coupon percent.',
+      constraint: 'Return exactly two decimal places.',
+      pseudocode: ['READ price and coupon_percent', 'discounted <- price * (1 - coupon_percent / 100)', 'OUTPUT round(discounted, 2)'],
+      python: ['price = 59.99', 'coupon_percent = 10', 'discounted = price * (1 - coupon_percent / 100)', 'print(round(discounted, 2))  # 53.99'],
+      tryIt: 'Write pseudocode for final price with both discount and tax.',
+    }
+  }
+
+  if (title.includes('string') || title.includes('name') || title.includes('username')) {
+    return {
+      heading: 'String Cleanup for Real User Input',
+      idea: 'Real apps clean user text so output is consistent and predictable.',
+      problem: 'Normalize a profile name into lowercase words joined by underscores.',
+      constraint: 'Trim spaces first, then lowercase, then join words with `_`.',
+      pseudocode: ['READ raw_name', 'parts <- split(trim(lower(raw_name)))', 'OUTPUT join(parts, "_")'],
+      python: ['raw_name = "  Ava Johnson  "', 'parts = raw_name.strip().lower().split()', 'print("_".join(parts))  # ava_johnson'],
+      tryIt: 'Write pseudocode to normalize "MIA   K" into "mia_k".',
+    }
+  }
+
   if (title.includes('list') || title.includes('array')) {
     return {
       heading: 'Lists (Many Values Together)',
@@ -373,6 +417,54 @@ function inferConcretePlan(lessonTitle: string): ConcreteLessonPlan {
       pseudocode: ['SET max <- first item', 'FOR each item: if item > max then max <- item', 'RETURN max'],
       python: ['nums = [4, 9, 2, 7]', 'max_num = nums[0]', 'for n in nums:', '    if n > max_num:', '        max_num = n', 'print(max_num)'],
       tryIt: 'Write pseudocode to count how many numbers are greater than 10.',
+    }
+  }
+
+  if (title.includes('bit') || title.includes('compression') || title.includes('data')) {
+    return {
+      heading: 'Data Examples You Can Actually Use',
+      idea: 'Data problems become easy when you model one precise calculation.',
+      problem: 'Compute compression ratio from original and compressed file sizes.',
+      constraint: 'If original size is 0, output 0.',
+      pseudocode: ['READ original_size and compressed_size', 'IF original_size = 0 OUTPUT 0', 'ELSE OUTPUT round(compressed_size / original_size, 2)'],
+      python: ['original_size = 100', 'compressed_size = 40', 'ratio = 0 if original_size == 0 else round(compressed_size / original_size, 2)', 'print(ratio)  # 0.4'],
+      tryIt: 'Write pseudocode for total space saved: original - compressed.',
+    }
+  }
+
+  if (title.includes('internet') || title.includes('network') || title.includes('cyber') || title.includes('mask')) {
+    return {
+      heading: 'Network and Security with Concrete Rules',
+      idea: 'Security and networking are easier when rules are explicit and testable.',
+      problem: 'Mask an email before showing it in logs.',
+      constraint: 'Keep first local-character only; hide the rest with `***`.',
+      pseudocode: ['READ email', 'IF "@" missing OUTPUT "***"', 'ELSE OUTPUT first_char + "***@" + domain'],
+      python: ['email = "alex@example.com"', 'local, domain = email.split("@", 1)', 'masked = local[0] + "***@" + domain', 'print(masked)  # a***@example.com'],
+      tryIt: 'Write pseudocode for detecting if an IP is local/private.',
+    }
+  }
+
+  if (title.includes('fair') || title.includes('bias') || title.includes('impact') || title.includes('moderation')) {
+    return {
+      heading: 'Responsible Computing with Measurable Logic',
+      idea: 'Ethics tasks in AP CSP still use clear input-output decision rules.',
+      problem: 'Classify moderation outcome from flags and trust score.',
+      constraint: 'Return only one of: allow, review, block.',
+      pseudocode: ['READ flags, trust_score', 'IF flags >= 3 AND trust_score < 0.4 OUTPUT "block"', 'ELSE IF flags >= 1 OUTPUT "review" ELSE OUTPUT "allow"'],
+      python: ['flags = 3', 'trust_score = 0.2', 'if flags >= 3 and trust_score < 0.4:', '    print("block")', 'elif flags >= 1:', '    print("review")', 'else:', '    print("allow")'],
+      tryIt: 'Write pseudocode for a fairness alert based on disparity and sample size.',
+    }
+  }
+
+  if (title.includes('create') || title.includes('artifact') || title.includes('response') || title.includes('reflection')) {
+    return {
+      heading: 'AP Create Task Readiness with Real Checks',
+      idea: 'Create-task prep is easiest when readiness is a strict pass/fail rule.',
+      problem: 'Decide if a project is ready from pass rate, bugs open, and reflection words.',
+      constraint: 'Return exactly "ready" or "revise".',
+      pseudocode: ['READ pass_rate, bugs_open, reflection_words', 'IF pass_rate >= 0.9 AND bugs_open = 0 AND reflection_words >= 60 OUTPUT "ready"', 'ELSE OUTPUT "revise"'],
+      python: ['pass_rate = 0.95', 'bugs_open = 0', 'reflection_words = 80', 'if pass_rate >= 0.9 and bugs_open == 0 and reflection_words >= 60:', '    print("ready")', 'else:', '    print("revise")'],
+      tryIt: 'Write pseudocode for counting completed Create components.',
     }
   }
 
@@ -401,13 +493,13 @@ function inferConcretePlan(lessonTitle: string): ConcreteLessonPlan {
   }
 
   return {
-    heading: 'Core Programming Steps',
-    idea: 'Solve one clear problem using one clear algorithm.',
-    problem: 'Read input and produce a correctly formatted output.',
-    constraint: 'Follow the exact output format every time.',
-    pseudocode: ['READ input', 'APPLY the algorithm step-by-step', 'OUTPUT final answer'],
-    python: ['value = "example"', 'result = value', 'print(result)'],
-    tryIt: 'Write a 3-step algorithm for a small task you choose.',
+    heading: 'Core Programming with a Real Student Dashboard Example',
+    idea: 'Use one concrete scenario, one algorithm, and one exact output format.',
+    problem: 'Convert completed lessons and total lessons into a progress percent.',
+    constraint: 'If total is 0, return "0%"; otherwise return rounded percent with `%`.',
+    pseudocode: ['READ completed, total', 'IF total = 0 OUTPUT "0%"', 'ELSE percent <- round((completed / total) * 100) and OUTPUT percent + "%"'],
+    python: ['completed = 3', 'total = 4', 'if total == 0:', '    print("0%")', 'else:', '    percent = round((completed / total) * 100)', '    print(f"{percent}%")  # 75%'],
+    tryIt: 'Write pseudocode for attendance percent using present_days and total_days.',
   }
 }
 
@@ -461,6 +553,46 @@ Python reference:
 ${plan.python.join('\n')}
 \`\`\`
 `
+}
+
+function buildConcretePlanQuiz(lessonTitle: string): QuickQuizItem[] {
+  const plan = inferConcretePlan(lessonTitle)
+  const firstStep = plan.pseudocode[0] || 'READ input'
+  const secondStep = plan.pseudocode[1] || 'APPLY the algorithm'
+
+  return [
+    {
+      id: 'plan-q1',
+      question: `In this lesson, what is the core problem?`,
+      options: [
+        plan.problem,
+        'Build a full social media platform UI',
+        'Configure cloud infrastructure and DNS records',
+        'Rewrite the autograder architecture',
+      ],
+      correctIndex: 0,
+      rationale: `The notes center on this exact problem: ${plan.problem}`,
+    },
+    {
+      id: 'plan-q2',
+      question: 'Which statement matches the key constraint from the notes?',
+      options: [
+        plan.constraint,
+        'Any output format is acceptable as long as it compiles',
+        'Use random values to pass hidden tests',
+        'Ignore edge cases to keep code short',
+      ],
+      correctIndex: 0,
+      rationale: `The constraint in the notes is: ${plan.constraint}`,
+    },
+    {
+      id: 'plan-q3',
+      question: 'Which pseudocode step appears in the lesson flow?',
+      options: [secondStep, 'Deploy the app to production', 'Create a database migration first', firstStep],
+      correctIndex: 3,
+      rationale: `The first pseudocode step is: ${firstStep}`,
+    },
+  ]
 }
 
 function splitMarkdownIntoSections(markdown: string): MarkdownSection[] {
@@ -826,6 +958,14 @@ function formatLearnerName(fullName: string | null): string {
   return first || 'there'
 }
 
+function notesResponseStorageKey(lessonId: string, userId: string | null): string {
+  return `lesson-notes:${lessonId}:${userId || 'anonymous'}`
+}
+
+function courseIntroCompletionStorageKey(courseId: string, userId: string): string {
+  return `apcsp-course-intro-complete:${courseId}:${userId}`
+}
+
 function buildCourseIntroSections(learnerName: string): MarkdownSection[] {
   return [
     {
@@ -970,6 +1110,8 @@ export default function LessonViewer() {
   const [quizSaving, setQuizSaving] = useState(false)
   const [persistedNotions, setPersistedNotions] = useState<PersistedNotionQuestion[]>([])
   const [visibleNarrativeSteps, setVisibleNarrativeSteps] = useState<Record<number, boolean>>({})
+  const [hasCompletedCourseIntro, setHasCompletedCourseIntro] = useState(false)
+  const [introGateReady, setIntroGateReady] = useState(false)
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const lessonFlowRef = useRef<HTMLDivElement | null>(null)
@@ -979,6 +1121,45 @@ export default function LessonViewer() {
     void loadLessonData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!lessonId) return
+    const key = notesResponseStorageKey(lessonId, user?.id || null)
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (!raw) {
+        setQuestionResponses({})
+        return
+      }
+      const parsed = JSON.parse(raw) as Record<string, string>
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        setQuestionResponses({})
+        return
+      }
+      const sanitized: Record<string, string> = {}
+      Object.entries(parsed).forEach(([entryKey, value]) => {
+        if (typeof value === 'string') sanitized[entryKey] = value
+      })
+      setQuestionResponses(sanitized)
+    } catch {
+      setQuestionResponses({})
+    }
+  }, [lessonId, user?.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!lessonId) return
+    const key = notesResponseStorageKey(lessonId, user?.id || null)
+    const timeout = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(questionResponses))
+      } catch {
+        // Best effort save for client-only note responses.
+      }
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [lessonId, questionResponses, user?.id])
 
   const markdownSource = useMemo(() => {
     const normalized = normalizeLessonMarkdown(lesson?.content_body || '')
@@ -992,7 +1173,11 @@ export default function LessonViewer() {
   const isUnitIntroMode = viewMode === 'unit-intro'
   const isIntroMode = isCourseIntroMode || isUnitIntroMode
   const isApcspCourse = useMemo(() => /ap computer science principles|ap csp/i.test(courseTitle), [courseTitle])
-  const useConcreteApcspLesson = isApcspCourse && !isIntroMode
+  const hasAuthoredLessonContent = useMemo(
+    () => normalizeLessonMarkdown(lesson?.content_body || '').trim().length > 0,
+    [lesson?.content_body],
+  )
+  const useConcreteApcspLesson = isApcspCourse && !isIntroMode && !hasAuthoredLessonContent
 
   const lessonSourceForDisplay = useMemo(() => {
     if (!useConcreteApcspLesson) return markdownSource
@@ -1043,18 +1228,20 @@ export default function LessonViewer() {
     () => (isApcspCourse && !isIntroMode ? buildApcspQuiz(lesson?.title || '') : []),
     [isApcspCourse, isIntroMode, lesson?.title],
   )
+  const concreteLessonNotions = useMemo(
+    () => (isApcspCourse && !isIntroMode ? buildConcretePlanQuiz(lesson?.title || '') : []),
+    [isApcspCourse, isIntroMode, lesson?.title],
+  )
   const introNotions = useMemo(
     () =>
-      isCourseIntroMode
-        ? buildApcspQuiz('course intro')
-        : isUnitIntroMode
-          ? buildApcspQuiz(`${introUnit?.title || currentUnitTitle} intro`)
-          : [],
-    [currentUnitTitle, introUnit?.title, isCourseIntroMode, isUnitIntroMode],
+      isUnitIntroMode
+        ? buildApcspQuiz(`${introUnit?.title || currentUnitTitle} intro`)
+        : [],
+    [currentUnitTitle, introUnit?.title, isUnitIntroMode],
   )
   const notions = useMemo(() => {
-    if (useConcreteApcspLesson) return []
-    if (isCourseIntroMode || isUnitIntroMode) return introNotions
+    if (isCourseIntroMode) return []
+    if (isUnitIntroMode) return introNotions
     if (persistedNotions.length > 0) {
       return persistedNotions.map((item) => ({
         id: item.id,
@@ -1064,14 +1251,37 @@ export default function LessonViewer() {
         rationale: item.rationale,
       }))
     }
+    if (useConcreteApcspLesson) return concreteLessonNotions
     return fallbackLessonNotions
-  }, [fallbackLessonNotions, introNotions, isCourseIntroMode, isUnitIntroMode, persistedNotions, useConcreteApcspLesson])
+  }, [concreteLessonNotions, fallbackLessonNotions, introNotions, isCourseIntroMode, isUnitIntroMode, persistedNotions, useConcreteApcspLesson])
+  const persistedNotionIdSet = useMemo(() => new Set(persistedNotions.map((item) => item.id)), [persistedNotions])
   const quizScore = useMemo(() => {
     if (notions.length === 0) return 100
     const answered = notions.filter((item) => Number.isFinite(quizAnswers[item.id]))
     if (answered.length === 0) return 0
     const correct = notions.filter((item) => quizAnswers[item.id] === item.correctIndex).length
     return Math.round((correct / notions.length) * 100)
+  }, [notions, quizAnswers])
+  const notionProgress = useMemo<NotionProgress>(() => {
+    const statusById: Record<string, { answered: boolean; correct: boolean }> = {}
+    let answered = 0
+    let correct = 0
+
+    notions.forEach((item) => {
+      const selected = Number(quizAnswers[item.id])
+      const hasAnswer = Number.isFinite(selected)
+      const isCorrect = hasAnswer && selected === item.correctIndex
+      if (hasAnswer) answered += 1
+      if (isCorrect) correct += 1
+      statusById[item.id] = { answered: hasAnswer, correct: Boolean(isCorrect) }
+    })
+
+    return {
+      answered,
+      correct,
+      total: notions.length,
+      statusById,
+    }
   }, [notions, quizAnswers])
   const hasMinimumNotesResponse = useMemo(() => {
     const responses = Object.values(questionResponses).map((value) => value.trim()).filter(Boolean)
@@ -1082,8 +1292,8 @@ export default function LessonViewer() {
     if (!isApcspCourse) return true
     if (notions.length === 0) return true
     if (!quizSubmitted) return false
-    return quizScore >= 80 && hasMinimumNotesResponse
-  }, [hasMinimumNotesResponse, isApcspCourse, notions.length, quizScore, quizSubmitted])
+    return notionProgress.correct === notionProgress.total && hasMinimumNotesResponse
+  }, [hasMinimumNotesResponse, isApcspCourse, notionProgress.correct, notionProgress.total, notions.length, quizSubmitted])
 
   const filteredUnits = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase()
@@ -1404,6 +1614,7 @@ export default function LessonViewer() {
 
       const payload = notions
         .map((item) => {
+          if (!persistedNotionIdSet.has(item.id)) return null
           const selected = Number.isFinite(quizAnswers[item.id]) ? Number(quizAnswers[item.id]) : -1
           if (selected < 0) return null
           const correct = selected === item.correctIndex
@@ -1429,6 +1640,17 @@ export default function LessonViewer() {
     } finally {
       setQuizSaving(false)
     }
+  }
+
+  function markCourseIntroCompleted() {
+    if (typeof window === 'undefined') return
+    if (!courseId || !user?.id) return
+    try {
+      window.localStorage.setItem(courseIntroCompletionStorageKey(courseId, user.id), '1')
+    } catch {
+      // Best effort local completion marker.
+    }
+    setHasCompletedCourseIntro(true)
   }
 
   function switchCheckpoint(checkpoint: Checkpoint) {
@@ -1459,8 +1681,42 @@ export default function LessonViewer() {
     return `${slug}.${languageExtension(editorLanguage)}`
   }
 
-  const firstCourseLessonId =
-    courseUnits.flatMap((unit) => unit.lessons)[0]?.id || lesson?.id || ''
+  const canonicalFirstCourseLessonId = courseUnits.flatMap((unit) => unit.lessons)[0]?.id || ''
+  const firstCourseLessonId = canonicalFirstCourseLessonId || lesson?.id || ''
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setIntroGateReady(false)
+    if (!isApcspCourse || !courseId || !user?.id) {
+      setHasCompletedCourseIntro(false)
+      setIntroGateReady(true)
+      return
+    }
+    try {
+      const completed = window.localStorage.getItem(courseIntroCompletionStorageKey(courseId, user.id)) === '1'
+      setHasCompletedCourseIntro(completed)
+    } catch {
+      setHasCompletedCourseIntro(false)
+    } finally {
+      setIntroGateReady(true)
+    }
+  }, [courseId, isApcspCourse, user?.id])
+
+  useEffect(() => {
+    if (!introGateReady) return
+    if (!isApcspCourse || isIntroMode) return
+    if (!lesson?.id || !canonicalFirstCourseLessonId) return
+    if (hasCompletedCourseIntro) return
+    if (lesson.id !== canonicalFirstCourseLessonId) return
+    router.replace(`/lesson/${canonicalFirstCourseLessonId}?view=course-intro`)
+  }, [canonicalFirstCourseLessonId, hasCompletedCourseIntro, introGateReady, isApcspCourse, isIntroMode, lesson?.id, router])
+
+  function resolveLessonHref(targetLessonId: string): string {
+    if (isApcspCourse && canonicalFirstCourseLessonId && targetLessonId === canonicalFirstCourseLessonId && !hasCompletedCourseIntro) {
+      return `/lesson/${targetLessonId}?view=course-intro`
+    }
+    return `/lesson/${targetLessonId}`
+  }
 
   if (loading) {
     return (
@@ -1551,87 +1807,182 @@ export default function LessonViewer() {
               )}
 
               <div className="overflow-y-auto p-3">
-                <div className="space-y-4">
-                  {isApcspCourse && (
-                    <Link href={`/lesson/${firstCourseLessonId}?view=course-intro`}>
-                      <div
-                        className={`rounded-lg border px-3 py-2 text-sm transition ${
-                          isCourseIntroMode
-                            ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
-                            : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
-                        }`}
-                      >
-                        {!sidebarCollapsed ? '1.0 Course Intro Notes' : '1.0'}
-                      </div>
-                    </Link>
-                  )}
-
-                  {filteredUnits.map((unit) => (
-                    <div key={unit.id} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
-                      {!sidebarCollapsed && (
-                        <>
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-300">
-                            Unit {unit.unit_number || unit.order_index || '-'}
-                          </p>
-                          <p className="mb-3 text-sm font-semibold text-white">{unit.title}</p>
-                        </>
-                      )}
-
-                      <div className="space-y-2">
-                        {isApcspCourse && (
-                          <Link href={`/lesson/${unit.lessons[0]?.id || lesson.id}?view=unit-intro&unit=${unit.id}`}>
-                            <div
-                              className={`rounded-md px-3 py-2 text-sm transition ${
-                                isUnitIntroMode && introUnit?.id === unit.id
-                                  ? 'border border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
-                                  : 'border border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
-                              }`}
-                            >
-                              {!sidebarCollapsed ? `Unit ${unit.unit_number || unit.order_index || '-'} Intro` : 'U'}
-                            </div>
-                          </Link>
-                        )}
-
-                        {unit.lessons.map((entry) => {
-                          const active = !isIntroMode && entry.id === lesson.id
-                          const status = getLessonStatus(entry.id)
-                          return (
-                            <Link key={entry.id} href={`/lesson/${entry.id}`}>
+                {sidebarCollapsed ? (
+                  <TooltipProvider delayDuration={100}>
+                    <div className="space-y-3">
+                      {isApcspCourse && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={`/lesson/${firstCourseLessonId}?view=course-intro`}>
                               <div
-                                className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition ${
-                                  active
-                                    ? 'border border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
-                                    : 'border border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+                                className={`flex h-11 w-full items-center justify-center rounded-xl border text-xs font-semibold transition ${
+                                  isCourseIntroMode
+                                    ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100'
+                                    : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500/40 hover:text-cyan-100'
                                 }`}
                               >
-                                {!sidebarCollapsed && (
+                                1.0
+                              </div>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="border-slate-700 bg-slate-900 text-slate-100">
+                            Course Intro Notes
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {filteredUnits.map((unit) => (
+                        <div key={unit.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-2">
+                          <div className="mb-2 flex items-center justify-center">
+                            <span className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold text-cyan-200">
+                              U{unit.unit_number || unit.order_index || '-'}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {isApcspCourse && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link href={`/lesson/${unit.lessons[0]?.id || lesson.id}?view=unit-intro&unit=${unit.id}`}>
+                                    <div
+                                      className={`flex h-9 items-center justify-center rounded-lg border text-[11px] font-semibold transition ${
+                                        isUnitIntroMode && introUnit?.id === unit.id
+                                          ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                                          : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500/40 hover:text-cyan-100'
+                                      }`}
+                                    >
+                                      Intro
+                                    </div>
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="border-slate-700 bg-slate-900 text-slate-100">
+                                  Unit {unit.unit_number || unit.order_index || '-'} Intro
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {unit.lessons.map((entry) => {
+                              const active = !isIntroMode && entry.id === lesson.id
+                              const status = getLessonStatus(entry.id)
+                              const lessonNumber = entry.lesson_number || entry.order_index || '-'
+                              return (
+                                <Tooltip key={entry.id}>
+                                  <TooltipTrigger asChild>
+                                    <Link href={resolveLessonHref(entry.id)} className="block">
+                                      <div
+                                        className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-semibold transition ${
+                                          active
+                                            ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100'
+                                            : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500/40 hover:text-cyan-100'
+                                        }`}
+                                      >
+                                        {lessonNumber}
+                                        <span
+                                          className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border border-slate-950 ${
+                                            status === 'completed'
+                                              ? 'bg-emerald-400'
+                                              : status === 'in_progress'
+                                                ? 'bg-cyan-400'
+                                                : 'bg-slate-600'
+                                          }`}
+                                        />
+                                      </div>
+                                    </Link>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" className="border-slate-700 bg-slate-900 text-slate-100">
+                                    <p className="text-xs font-semibold">Lesson {lessonNumber}</p>
+                                    <p className="max-w-xs text-[11px] text-slate-300">{entry.title}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+
+                      {filteredUnits.length === 0 && (
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-center text-xs text-slate-400">
+                          No matches
+                        </div>
+                      )}
+                    </div>
+                  </TooltipProvider>
+                ) : (
+                  <div className="space-y-4">
+                    {isApcspCourse && (
+                      <Link href={`/lesson/${firstCourseLessonId}?view=course-intro`}>
+                        <div
+                          className={`rounded-lg border px-3 py-2 text-sm transition ${
+                            isCourseIntroMode
+                              ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                              : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+                          }`}
+                        >
+                          1.0 Course Intro Notes
+                        </div>
+                      </Link>
+                    )}
+
+                    {filteredUnits.map((unit) => (
+                      <div key={unit.id} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-300">
+                          Unit {unit.unit_number || unit.order_index || '-'}
+                        </p>
+                        <p className="mb-3 text-sm font-semibold text-white">{unit.title}</p>
+
+                        <div className="space-y-2">
+                          {isApcspCourse && (
+                            <Link href={`/lesson/${unit.lessons[0]?.id || lesson.id}?view=unit-intro&unit=${unit.id}`}>
+                              <div
+                                className={`rounded-md border px-3 py-2 text-sm transition ${
+                                  isUnitIntroMode && introUnit?.id === unit.id
+                                    ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                                    : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+                                }`}
+                              >
+                                Unit {unit.unit_number || unit.order_index || '-'} Intro
+                              </div>
+                            </Link>
+                          )}
+
+                          {unit.lessons.map((entry) => {
+                            const active = !isIntroMode && entry.id === lesson.id
+                            const status = getLessonStatus(entry.id)
+                            return (
+                              <Link key={entry.id} href={resolveLessonHref(entry.id)}>
+                                <div
+                                  className={`flex items-center justify-between rounded-md px-3 py-2 text-sm transition ${
+                                    active
+                                      ? 'border border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                                      : 'border border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+                                  }`}
+                                >
                                   <div className="min-w-0">
                                     <p className="truncate">{entry.lesson_number || entry.order_index || '-'} . {entry.title}</p>
                                   </div>
-                                )}
-                                <div className={sidebarCollapsed ? 'mx-auto shrink-0' : 'ml-3 shrink-0'}>
-                                  {status === 'completed' ? (
-                                    <CheckCircle className="h-4 w-4 text-emerald-300" />
-                                  ) : status === 'in_progress' ? (
-                                    <Circle className="h-4 w-4 text-cyan-300" />
-                                  ) : (
-                                    <Circle className="h-4 w-4 text-slate-600" />
-                                  )}
+                                  <div className="ml-3 shrink-0">
+                                    {status === 'completed' ? (
+                                      <CheckCircle className="h-4 w-4 text-emerald-300" />
+                                    ) : status === 'in_progress' ? (
+                                      <Circle className="h-4 w-4 text-cyan-300" />
+                                    ) : (
+                                      <Circle className="h-4 w-4 text-slate-600" />
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </Link>
-                          )
-                        })}
+                              </Link>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  {filteredUnits.length === 0 && (
-                    <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                      No lessons match your search.
-                    </div>
-                  )}
-                </div>
+                    {filteredUnits.length === 0 && (
+                      <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
+                        No lessons match your search.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </aside>
@@ -1678,52 +2029,78 @@ export default function LessonViewer() {
                       ))}
                     </div>
 
-                    <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4">
-                      <p className="text-sm font-semibold text-indigo-100">Notions</p>
-                      <p className="text-xs text-indigo-200 mt-1">Answer each multiple-choice notion and grade your understanding.</p>
-                      <div className="mt-3 space-y-3">
-                        {notions.map((item, index) => {
-                          return (
-                            <div key={item.id}>
-                              <p className="text-sm text-white">N{index + 1}. {item.question}</p>
-                              <div className="mt-2 grid gap-1">
-                                {item.options.map((option, optionIndex) => (
-                                  <label key={`${item.id}-${optionIndex}`} className="flex items-center gap-2 text-sm text-slate-100">
-                                    <input
-                                      type="radio"
-                                      name={`intro-notion-${item.id}`}
-                                      checked={quizAnswers[item.id] === optionIndex}
-                                      onChange={() => setQuizAnswers((prev) => ({ ...prev, [item.id]: optionIndex }))}
-                                    />
-                                    <span>{option}</span>
-                                  </label>
-                                ))}
+                    {!isCourseIntroMode && notions.length > 0 && (
+                      <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4">
+                        <p className="text-sm font-semibold text-indigo-100">Notions</p>
+                        <p className="mt-1 text-xs text-indigo-200">Answer each multiple-choice notion, then submit to see your score.</p>
+                        <div className="mt-3 space-y-3">
+                          {notions.map((item, index) => {
+                            const itemProgress = notionProgress.statusById[item.id]
+                            return (
+                              <div
+                                key={item.id}
+                                className={`rounded-lg border p-3 ${
+                                  quizSubmitted && itemProgress?.correct
+                                    ? 'border-emerald-400/40 bg-emerald-500/10'
+                                    : 'border-indigo-500/20 bg-slate-950/30'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-sm text-white">N{index + 1}. {item.question}</p>
+                                  {quizSubmitted && itemProgress?.correct && (
+                                    <span className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                                      Finished
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-2 grid gap-1">
+                                  {item.options.map((option, optionIndex) => (
+                                    <label key={`${item.id}-${optionIndex}`} className="flex items-center gap-2 text-sm text-slate-100">
+                                      <input
+                                        type="radio"
+                                        name={`intro-notion-${item.id}`}
+                                        checked={quizAnswers[item.id] === optionIndex}
+                                        onChange={() => setQuizAnswers((prev) => ({ ...prev, [item.id]: optionIndex }))}
+                                      />
+                                      <span>{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                                {quizSubmitted && (
+                                  <p className={`mt-1 text-xs ${itemProgress?.correct ? 'text-emerald-300' : 'text-orange-300'}`}>
+                                    {!itemProgress?.answered ? 'Choose an answer, then submit again.' : itemProgress?.correct ? 'Correct' : `Review: ${item.rationale}`}
+                                  </p>
+                                )}
                               </div>
-                              {quizSubmitted && (
-                                <p className={`mt-1 text-xs ${quizAnswers[item.id] === item.correctIndex ? 'text-emerald-300' : 'text-orange-300'}`}>
-                                  {quizAnswers[item.id] === item.correctIndex ? 'Correct' : `Review: ${item.rationale}`}
-                                </p>
-                              )}
-                            </div>
-                          )
-                        })}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="border-indigo-400/40 bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
-                            onClick={() => void handleSubmitNotions()}
-                          >
-                            {quizSaving ? 'Saving...' : 'Grade Notions'}
-                          </Button>
-                          <p className="text-xs text-indigo-100">Notions Score: {quizScore}%</p>
+                            )
+                          })}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="border-indigo-400/40 bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30"
+                              onClick={() => void handleSubmitNotions()}
+                            >
+                              {quizSaving ? 'Saving...' : quizSubmitted ? 'Re-submit Notions' : 'Grade Notions'}
+                            </Button>
+                            {quizSubmitted && (
+                              <p className="text-xs text-indigo-100">
+                                Notions Score: {quizScore}% ({notionProgress.correct}/{notionProgress.total} correct)
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="flex flex-wrap gap-2">
-                      <Link href={isCourseIntroMode ? `/lesson/${firstCourseLessonId}` : `/lesson/${introUnit?.lessons?.[0]?.id || lesson.id}`}>
+                      <Link
+                        href={isCourseIntroMode ? `/lesson/${firstCourseLessonId}` : `/lesson/${introUnit?.lessons?.[0]?.id || lesson.id}`}
+                        onClick={() => {
+                          if (isCourseIntroMode) markCourseIntroCompleted()
+                        }}
+                      >
                         <Button className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
                           {isCourseIntroMode ? 'Start Lesson 1.1' : 'Start This Unit'}
                         </Button>
@@ -1780,9 +2157,25 @@ export default function LessonViewer() {
                             )}
                             {hasViewedAllNarrativeSteps && (
                               <>
-                                {notions.map((item, index) => (
-                                  <div key={item.id} className="text-sm text-slate-100">
-                                    <p className="mb-2 font-medium">Q{index + 1}. {item.question}</p>
+                                {notions.map((item, index) => {
+                                  const itemProgress = notionProgress.statusById[item.id]
+                                  return (
+                                  <div
+                                    key={item.id}
+                                    className={`rounded-lg border p-3 text-sm text-slate-100 ${
+                                      quizSubmitted && itemProgress?.correct
+                                        ? 'border-emerald-400/40 bg-emerald-500/10'
+                                        : 'border-slate-700 bg-slate-900/50'
+                                    }`}
+                                  >
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                      <p className="font-medium">Q{index + 1}. {item.question}</p>
+                                      {quizSubmitted && itemProgress?.correct && (
+                                        <span className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                                          Finished
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="grid gap-1">
                                       {item.options.map((option, optionIndex) => (
                                         <label key={`${item.id}-${optionIndex}`} className="flex items-center gap-2 text-slate-200">
@@ -1797,12 +2190,12 @@ export default function LessonViewer() {
                                       ))}
                                     </div>
                                     {quizSubmitted && (
-                                      <p className={`mt-1 text-xs ${quizAnswers[item.id] === item.correctIndex ? 'text-emerald-300' : 'text-orange-300'}`}>
-                                        {quizAnswers[item.id] === item.correctIndex ? 'Correct' : `Review: ${item.rationale}`}
+                                      <p className={`mt-1 text-xs ${itemProgress?.correct ? 'text-emerald-300' : 'text-orange-300'}`}>
+                                        {!itemProgress?.answered ? 'Choose an answer, then submit again.' : itemProgress?.correct ? 'Correct' : `Review: ${item.rationale}`}
                                       </p>
                                     )}
                                   </div>
-                                ))}
+                                )})}
                                 <div className="flex flex-wrap items-center gap-2">
                                   <Button
                                     type="button"
@@ -1811,9 +2204,13 @@ export default function LessonViewer() {
                                     className="border-cyan-500/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
                                     onClick={() => void handleSubmitNotions()}
                                   >
-                                    {quizSaving ? 'Saving...' : 'Grade Notions'}
+                                    {quizSaving ? 'Saving...' : quizSubmitted ? 'Re-submit Notions' : 'Grade Notions'}
                                   </Button>
-                                  <p className="text-xs text-slate-300">Notions Score: {quizScore}%</p>
+                                  {quizSubmitted && (
+                                    <p className="text-xs text-slate-300">
+                                      Notions Score: {quizScore}% ({notionProgress.correct}/{notionProgress.total} correct)
+                                    </p>
+                                  )}
                                 </div>
                               </>
                             )}
@@ -2050,14 +2447,16 @@ export default function LessonViewer() {
                         ))}
                       </div>
                     )}
-                    <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">Notions (Quick Reflection)</p>
-                      <ul className="mt-2 space-y-2 text-sm text-indigo-100">
-                        {notions.map((item, index) => (
-                          <li key={`side-notion-${item.id}`}>N{index + 1}. {item.question}</li>
-                        ))}
-                      </ul>
-                    </div>
+                    {notions.length > 0 && (
+                      <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">Notions (Quick Reflection)</p>
+                        <ul className="mt-2 space-y-2 text-sm text-indigo-100">
+                          {notions.map((item, index) => (
+                            <li key={`side-notion-${item.id}`}>N{index + 1}. {item.question}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 ) : currentCheckpoint ? (
                   <div className="space-y-4">
@@ -2174,6 +2573,7 @@ export default function LessonViewer() {
                   <BookOpen className="h-4 w-4 text-cyan-300" />
                   <p className="text-sm font-semibold text-white">Notions</p>
                 </div>
+                <p className="mb-3 text-xs text-slate-400">Typed responses auto-save on this device for this lesson.</p>
 
                 {sectionQuestions.length > 0 ? (
                   <div className="space-y-3">
