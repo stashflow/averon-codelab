@@ -28,6 +28,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   NotebookText,
+  Maximize2,
+  Minimize2,
   X,
 } from 'lucide-react'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
@@ -36,6 +38,8 @@ import type { editor } from 'monaco-editor'
 const MonacoEditor = nextDynamic(() => import('@monaco-editor/react'), { ssr: false })
 
 type MonacoLanguage = 'python' | 'javascript' | 'typescript' | 'java' | 'cpp' | 'c' | 'json'
+type CheckpointKind = 'hello_world' | 'function' | 'loops' | 'conditionals' | 'data' | 'unknown'
+type StarterTemplateKey = 'easy' | 'standard' | 'challenge'
 
 type Checkpoint = {
   id: string
@@ -44,6 +48,10 @@ type Checkpoint = {
   starter_code: string
   points: number
   order_index: number
+  checkpoint_type?: string | null
+  starter_templates?: Record<string, unknown> | null
+  required_function_name?: string | null
+  required_signature?: string | null
 }
 
 type Lesson = {
@@ -51,6 +59,7 @@ type Lesson = {
   title: string
   description: string
   content_body: string
+  lesson_type?: string | null
   lesson_number: number | null
   order_index: number | null
   unit_id: string
@@ -109,6 +118,15 @@ type NotionProgress = {
   correct: number
   total: number
   statusById: Record<string, { answered: boolean; correct: boolean }>
+}
+
+type JudgeResultRow = {
+  id?: string
+  name?: string
+  passed: boolean
+  expected?: string
+  actual?: string
+  error?: string | null
 }
 
 const LANGUAGE_OPTIONS: Array<{ value: MonacoLanguage; label: string }> = [
@@ -717,6 +735,46 @@ function defaultStarterForLanguage(language: MonacoLanguage): string {
   return '{}\n'
 }
 
+function helloWorldStarterForLanguage(language: MonacoLanguage): string {
+  if (language === 'python') return 'print("Hello, World!")\n'
+  if (language === 'javascript') return 'console.log("Hello, World!");\n'
+  if (language === 'typescript') return 'console.log("Hello, World!");\n'
+  if (language === 'java') {
+    return [
+      'class Main {',
+      '  public static void main(String[] args) {',
+      '    System.out.println("Hello, World!");',
+      '  }',
+      '}',
+      '',
+    ].join('\n')
+  }
+  if (language === 'cpp') {
+    return [
+      '#include <iostream>',
+      '',
+      'int main() {',
+      '  std::cout << "Hello, World!" << std::endl;',
+      '  return 0;',
+      '}',
+      '',
+    ].join('\n')
+  }
+  if (language === 'c') {
+    return [
+      '#include <stdio.h>',
+      '',
+      'int main(void) {',
+      '  printf("Hello, World!\\n");',
+      '  return 0;',
+      '}',
+      '',
+    ].join('\n')
+  }
+  if (language === 'json') return '{\n  "message": "Hello, World!"\n}\n'
+  return defaultStarterForLanguage(language)
+}
+
 function normalizeStarterCode(rawStarter: string, preferred: MonacoLanguage): string {
   const direct = String(rawStarter || '').trim()
   const extracted = extractCodeFromMarkdown(direct, preferred)
@@ -732,6 +790,99 @@ function normalizeStarterCode(rawStarter: string, preferred: MonacoLanguage): st
   }
 
   return `${candidate}\n`
+}
+
+function normalizeCheckpointKind(raw: string | null | undefined): CheckpointKind {
+  const text = String(raw || '').trim().toLowerCase()
+  if (text === 'hello_world') return 'hello_world'
+  if (text === 'function') return 'function'
+  if (text === 'loops') return 'loops'
+  if (text === 'conditionals') return 'conditionals'
+  if (text === 'data') return 'data'
+  return 'unknown'
+}
+
+function inferCheckpointKind(checkpoint: Checkpoint | null): CheckpointKind {
+  if (!checkpoint) return 'unknown'
+  const explicit = normalizeCheckpointKind(checkpoint.checkpoint_type)
+  if (explicit !== 'unknown') return explicit
+  const text = `${checkpoint.title || ''} ${checkpoint.problem_description || ''}`.toLowerCase()
+  if (text.includes('hello world') || text.includes('hello, world') || text.includes('first program')) return 'hello_world'
+  if (text.includes('for ') || text.includes('while ') || text.includes('loop')) return 'loops'
+  if (text.includes('if ') || text.includes('else') || text.includes('condition')) return 'conditionals'
+  if (text.includes('list') || text.includes('array') || text.includes('data')) return 'data'
+  return 'function'
+}
+
+function isHelloWorldCheckpoint(checkpoint: Checkpoint | null): boolean {
+  return inferCheckpointKind(checkpoint) === 'hello_world'
+}
+
+function parseStarterTemplates(raw: unknown): Partial<Record<StarterTemplateKey, string>> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const source = raw as Record<string, unknown>
+  const output: Partial<Record<StarterTemplateKey, string>> = {}
+  const easy = typeof source.easy === 'string' ? source.easy.trim() : ''
+  const standard = typeof source.standard === 'string' ? source.standard.trim() : ''
+  const challenge = typeof source.challenge === 'string' ? source.challenge.trim() : ''
+  if (easy) output.easy = easy
+  if (standard) output.standard = standard
+  if (challenge) output.challenge = challenge
+  return output
+}
+
+function resolveCheckpointStarter(
+  checkpoint: Checkpoint | null,
+  preferred: MonacoLanguage,
+  template: StarterTemplateKey = 'standard',
+): string {
+  if (!checkpoint) return defaultStarterForLanguage(preferred)
+  const templates = parseStarterTemplates(checkpoint.starter_templates)
+  const candidate = templates[template]
+  if (candidate) return normalizeStarterCode(candidate, preferred)
+  if (isHelloWorldCheckpoint(checkpoint)) {
+    return helloWorldStarterForLanguage(preferred)
+  }
+  return normalizeStarterCode(checkpoint.starter_code || '', preferred)
+}
+
+function inferRequiredFunctionSignature(checkpoint: Checkpoint | null, language: MonacoLanguage): string | null {
+  if (!checkpoint) return null
+  if (checkpoint.required_signature?.trim()) return checkpoint.required_signature.trim()
+  if (checkpoint.required_function_name?.trim()) return `${checkpoint.required_function_name.trim()}(...)`
+
+  const starter = String(checkpoint.starter_code || '')
+  if (language === 'python') {
+    const match = starter.match(/(?:^|\n)\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*:/)
+    if (match?.[1]) return `${match[1]}(${match[2] || ''})`
+  }
+  if (language === 'javascript' || language === 'typescript') {
+    const fnMatch = starter.match(/function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)/)
+    if (fnMatch?.[1]) return `${fnMatch[1]}(${fnMatch[2] || ''})`
+  }
+  return null
+}
+
+function getBeginnerHint(checkpoint: Checkpoint | null): string {
+  const kind = inferCheckpointKind(checkpoint)
+  if (kind === 'hello_world') return 'Type one print statement, run tests, then change the text and run again.'
+  if (kind === 'conditionals') return 'Write one if branch first, test it, then add the next branch.'
+  if (kind === 'loops') return 'Start with a small loop and print intermediate values to verify each step.'
+  return 'Start with the function name and return value, then fill in the logic in tiny steps.'
+}
+
+function validateCheckpointForLearner(checkpoint: Checkpoint | null, language: MonacoLanguage): string[] {
+  if (!checkpoint) return []
+  const issues: string[] = []
+  const kind = inferCheckpointKind(checkpoint)
+  const starter = String(checkpoint.starter_code || '').toLowerCase()
+  if (kind === 'hello_world' && /(add_tax|def\s+\w+\(|return\s+0)/.test(starter)) {
+    issues.push('Checkpoint metadata says Hello World but starter code looks like a different function task.')
+  }
+  if (kind === 'function' && !inferRequiredFunctionSignature(checkpoint, language) && language === 'python') {
+    issues.push('No required function signature was detected. Autograder expectations may be unclear.')
+  }
+  return issues
 }
 
 function resolvePreferredLanguage(courseTitle: string, courseLanguageHint: string, starterCode: string): MonacoLanguage {
@@ -1094,16 +1245,20 @@ export default function LessonViewer() {
   const [preferredLanguage, setPreferredLanguage] = useState<MonacoLanguage>('python')
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 })
 
-  const [testResults, setTestResults] = useState<{ passed: boolean; score: number; results: Array<{ passed: boolean }> } | null>(null)
+  const [testResults, setTestResults] = useState<{ passed: boolean; score: number; results: JudgeResultRow[] } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [learnerName, setLearnerName] = useState<string | null>(null)
+  const [beginnerMode, setBeginnerMode] = useState(true)
+  const [selectedTemplate, setSelectedTemplate] = useState<StarterTemplateKey>('standard')
+  const [helloWorldPreview, setHelloWorldPreview] = useState<{ expected: string; actual: string; matches: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [activeSectionIndex, setActiveSectionIndex] = useState(0)
   const [questionResponses, setQuestionResponses] = useState<Record<string, string>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+  const [editorFocusMode, setEditorFocusMode] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({})
   const [quizSubmitted, setQuizSubmitted] = useState(false)
@@ -1318,10 +1473,75 @@ export default function LessonViewer() {
   }, [sections, visibleNarrativeSteps])
 
   const staticIssues = useMemo(() => runStaticChecks(code, editorLanguage), [code, editorLanguage])
+  const requiredSignature = useMemo(
+    () => inferRequiredFunctionSignature(currentCheckpoint, editorLanguage),
+    [currentCheckpoint, editorLanguage],
+  )
+  const checkpointWarnings = useMemo(
+    () => validateCheckpointForLearner(currentCheckpoint, editorLanguage),
+    [currentCheckpoint, editorLanguage],
+  )
+  const beginnerHint = useMemo(() => getBeginnerHint(currentCheckpoint), [currentCheckpoint])
+  const isEarlyLesson = (lesson?.lesson_number || 1) <= 2
+  const availableTemplates = useMemo(() => parseStarterTemplates(currentCheckpoint?.starter_templates), [currentCheckpoint?.starter_templates])
 
   useEffect(() => {
     setVisibleNarrativeSteps({})
   }, [lessonId, sections.length])
+
+  useEffect(() => {
+    setHelloWorldPreview(null)
+  }, [currentCheckpoint?.id, code])
+
+  useEffect(() => {
+    if (notesOpen) trackLessonEvent('notes_opened', { section: activeSectionIndex })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notesOpen])
+
+  useEffect(() => {
+    if (!lessonId || !user?.id) return
+    const supabase = createClient()
+    let active = true
+    void supabase
+      .from('lesson_note_responses')
+      .select('response_key,response_text')
+      .eq('lesson_id', lessonId)
+      .eq('student_id', user.id)
+      .then(({ data, error }) => {
+        if (!active || error || !Array.isArray(data) || data.length === 0) return
+        const fromDb: Record<string, string> = {}
+        data.forEach((row: any) => {
+          if (typeof row?.response_key === 'string' && typeof row?.response_text === 'string') {
+            fromDb[row.response_key] = row.response_text
+          }
+        })
+        if (Object.keys(fromDb).length > 0) {
+          setQuestionResponses((previous) => ({ ...fromDb, ...previous }))
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [lessonId, user?.id])
+
+  useEffect(() => {
+    if (!lessonId || !user?.id) return
+    const entries = Object.entries(questionResponses).filter(([, value]) => value.trim().length > 0)
+    if (entries.length === 0) return
+    const timeout = window.setTimeout(() => {
+      const supabase = createClient()
+      void supabase.from('lesson_note_responses').upsert(
+        entries.map(([response_key, response_text]) => ({
+          lesson_id: lessonId,
+          student_id: user.id,
+          response_key,
+          response_text,
+        })),
+        { onConflict: 'lesson_id,student_id,response_key' },
+      )
+    }, 900)
+    return () => window.clearTimeout(timeout)
+  }, [lessonId, questionResponses, user?.id])
 
   useEffect(() => {
     const root = lessonFlowRef.current
@@ -1349,6 +1569,13 @@ export default function LessonViewer() {
     return () => observer.disconnect()
   }, [sections])
 
+  useEffect(() => {
+    if (isIntroMode) return
+    if (sections.length === 0) return
+    const boundedIndex = Math.min(activeSectionIndex, sections.length - 1)
+    setVisibleNarrativeSteps((previous) => ({ ...previous, [boundedIndex]: true }))
+  }, [activeSectionIndex, isIntroMode, sections.length])
+
   async function loadLessonData() {
     const supabase = createClient()
     let resolvedCourseLanguage = 'python'
@@ -1368,14 +1595,19 @@ export default function LessonViewer() {
       setUser({ id: authUser.id })
       const { data: viewerProfile } = await supabase
         .from('profiles')
-        .select('full_name')
+        .select('full_name, beginner_mode')
         .eq('id', authUser.id)
         .maybeSingle()
-      setLearnerName((viewerProfile as { full_name?: string | null } | null)?.full_name || null)
+      const typedProfile = (viewerProfile as { full_name?: string | null; beginner_mode?: boolean | null } | null) || null
+      setLearnerName(typedProfile?.full_name || null)
+      const resolvedBeginnerMode = typeof typedProfile?.beginner_mode === 'boolean' ? typedProfile.beginner_mode : beginnerMode
+      if (typeof typedProfile?.beginner_mode === 'boolean') {
+        setBeginnerMode(typedProfile.beginner_mode)
+      }
 
       const { data: lessonData, error: lessonError } = await supabase
         .from('lessons')
-        .select('id, title, description, content_body, unit_id, lesson_number, order_index')
+        .select('id, title, description, content_body, lesson_type, unit_id, lesson_number, order_index')
         .eq('id', lessonId)
         .single()
       if (lessonError || !lessonData) throw lessonError
@@ -1426,7 +1658,7 @@ export default function LessonViewer() {
 
       const { data: checkpointsData, error: checkpointsError } = await supabase
         .from('checkpoints')
-        .select('id, title, problem_description, starter_code, points, order_index')
+        .select('id, title, problem_description, starter_code, points, order_index, checkpoint_type, starter_templates, required_function_name, required_signature')
         .eq('lesson_id', lessonId)
         .order('order_index', { ascending: true })
 
@@ -1438,7 +1670,9 @@ export default function LessonViewer() {
         const first = list[0]
         setCurrentCheckpoint(first)
         const resolved = resolvePreferredLanguage(resolvedCourseName || courseTitle, resolvedCourseLanguage, first.starter_code || '')
-        const starter = normalizeStarterCode(first.starter_code || '', resolved)
+        const initialTemplate: StarterTemplateKey = resolvedBeginnerMode ? 'easy' : 'standard'
+        setSelectedTemplate(initialTemplate)
+        const starter = resolveCheckpointStarter(first, resolved, initialTemplate)
         setCode(starter)
         setPreferredLanguage(resolved)
         setEditorLanguage(resolved)
@@ -1499,6 +1733,65 @@ export default function LessonViewer() {
     })
   }
 
+  function trackLessonEvent(eventType: string, payload: Record<string, unknown> = {}) {
+    if (!user?.id) return
+    const supabase = createClient()
+    void supabase.from('lesson_engagement_events').insert({
+      lesson_id: lessonId,
+      student_id: user.id,
+      event_type: eventType,
+      payload,
+    })
+  }
+
+  function handleApplyStarterTemplate(template: StarterTemplateKey) {
+    if (!currentCheckpoint) return
+    setSelectedTemplate(template)
+    setCode(resolveCheckpointStarter(currentCheckpoint, editorLanguage, template))
+    trackLessonEvent('starter_template_applied', { template, checkpointId: currentCheckpoint.id })
+  }
+
+  async function handleToggleBeginnerMode() {
+    const next = !beginnerMode
+    setBeginnerMode(next)
+    setSelectedTemplate(next ? 'easy' : 'standard')
+    if (currentCheckpoint) {
+      setCode(resolveCheckpointStarter(currentCheckpoint, editorLanguage, next ? 'easy' : 'standard'))
+    }
+    if (!user?.id) return
+    const supabase = createClient()
+    try {
+      await supabase.from('profiles').update({ beginner_mode: next }).eq('id', user.id)
+    } catch {
+      // If schema is not migrated yet, keep local toggle and continue.
+    }
+    trackLessonEvent('beginner_mode_toggled', { enabled: next })
+  }
+
+  function previewHelloWorldOutput() {
+    const expected = 'Hello, World!'
+    let actual = ''
+    if (editorLanguage === 'python') {
+      const match = code.match(/print\((['"])(.*?)\1\)/)
+      actual = match?.[2] || ''
+    } else if (editorLanguage === 'javascript' || editorLanguage === 'typescript') {
+      const match = code.match(/console\.log\((['"])(.*?)\1\)/)
+      actual = match?.[2] || ''
+    } else if (editorLanguage === 'java') {
+      const match = code.match(/System\.out\.println\((['"])(.*?)\1\)/)
+      actual = match?.[2] || ''
+    } else if (editorLanguage === 'cpp') {
+      const match = code.match(/<<\s*(['"])(.*?)\1/)
+      actual = match?.[2] || ''
+    } else if (editorLanguage === 'c') {
+      const match = code.match(/printf\((['"])(.*?)\\n?\1\)/)
+      actual = match?.[2] || ''
+    }
+    const matches = actual === expected
+    setHelloWorldPreview({ expected, actual: actual || '(no output detected)', matches })
+    trackLessonEvent('hello_world_preview', { matches, checkpointId: currentCheckpoint?.id || null })
+  }
+
   async function handleRunTests() {
     if (!currentCheckpoint) return
 
@@ -1512,7 +1805,7 @@ export default function LessonViewer() {
         body: JSON.stringify({
           checkpointId: currentCheckpoint.id,
           code,
-          starterCode: normalizeStarterCode(currentCheckpoint.starter_code || '', editorLanguage),
+          starterCode: resolveCheckpointStarter(currentCheckpoint, editorLanguage, selectedTemplate),
           language: editorLanguage,
         }),
       })
@@ -1525,6 +1818,12 @@ export default function LessonViewer() {
       const results = Array.isArray(judged.results) ? judged.results : []
 
       setTestResults({ passed: allPassed, score, results })
+      trackLessonEvent('run_tests', {
+        checkpointId: currentCheckpoint.id,
+        passed: allPassed,
+        score,
+        failures: results.filter((result: any) => !result?.passed).length,
+      })
 
       const supabase = createClient()
       await supabase.from('checkpoint_submissions').insert({
@@ -1547,6 +1846,7 @@ export default function LessonViewer() {
       }
     } catch (err: unknown) {
       console.error('[v0] Error running tests:', err)
+      trackLessonEvent('run_tests_error', { checkpointId: currentCheckpoint.id, message: err instanceof Error ? err.message : 'unknown' })
     } finally {
       setSubmitting(false)
     }
@@ -1656,12 +1956,15 @@ export default function LessonViewer() {
   function switchCheckpoint(checkpoint: Checkpoint) {
     setCurrentCheckpoint(checkpoint)
     const resolved = resolvePreferredLanguage(courseTitle, courseLanguage, checkpoint.starter_code || '')
-    setCode(normalizeStarterCode(checkpoint.starter_code || '', resolved))
+    const template: StarterTemplateKey = beginnerMode ? 'easy' : 'standard'
+    setSelectedTemplate(template)
+    setCode(resolveCheckpointStarter(checkpoint, resolved, template))
     setPreferredLanguage(resolved)
     setEditorLanguage(resolved)
     setQuizAnswers({})
     setQuizSubmitted(false)
     setTestResults(null)
+    trackLessonEvent('checkpoint_switched', { checkpointId: checkpoint.id, template })
   }
 
   function getLessonStatus(lessonEntryId: string): 'completed' | 'in_progress' | 'not_started' {
@@ -1739,6 +2042,17 @@ export default function LessonViewer() {
     : isUnitIntroMode
       ? `Unit Intro: ${introUnit?.title || currentUnitTitle}`
       : lesson.title
+  const editorLayoutClass = isIntroMode
+    ? sidebarCollapsed
+      ? 'xl:col-span-9'
+      : 'xl:col-span-7'
+    : editorFocusMode
+      ? sidebarCollapsed
+        ? 'xl:col-span-11'
+        : 'xl:col-span-9'
+      : sidebarCollapsed
+        ? 'xl:col-span-9'
+        : 'xl:col-span-7'
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -1777,12 +2091,36 @@ export default function LessonViewer() {
               <NotebookText className="h-4 w-4" />
               <span className="hidden md:inline">Notes</span>
             </Button>
+            {!isIntroMode && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleToggleBeginnerMode()}
+                className={beginnerMode ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30' : 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'}
+              >
+                <span className="hidden md:inline">{beginnerMode ? 'Beginner On' : 'Beginner Off'}</span>
+                <span className="md:hidden">{beginnerMode ? 'On' : 'Off'}</span>
+              </Button>
+            )}
+            {!isIntroMode && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditorFocusMode((prev) => !prev)}
+                className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+              >
+                {editorFocusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                <span className="hidden md:inline">{editorFocusMode ? 'Exit Focus' : 'Focus Mode'}</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1800px] px-4 py-4 lg:px-6 lg:py-6">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <main className="mx-auto w-full max-w-[2200px] px-4 py-4 lg:px-6 lg:py-6">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
           <aside className={sidebarCollapsed ? 'xl:col-span-1' : 'xl:col-span-3'}>
             <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
@@ -1987,12 +2325,12 @@ export default function LessonViewer() {
             </div>
           </aside>
 
-          <section className={sidebarCollapsed ? 'xl:col-span-8' : 'xl:col-span-6'}>
-            <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
+          <section className={editorLayoutClass}>
+            <div className="flex h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
                 <p className="text-sm font-medium text-slate-200">{isIntroMode ? 'Guided Notes' : 'Code Editor'}</p>
                 <p className="text-xs text-slate-400">
-                  {isIntroMode ? 'Read, reflect, and prepare before coding.' : 'Write and run your solution here'}
+                  {isIntroMode ? 'Read, reflect, and prepare before coding.' : 'IDE workflow: read task, code, run tests, iterate.'}
                 </p>
               </div>
 
@@ -2123,37 +2461,81 @@ export default function LessonViewer() {
                             : 'Learn first, then quick check, then code.'}
                         </p>
 
-                        <div ref={lessonFlowRef} className="max-h-72 space-y-3 overflow-y-auto rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
-                          <div
-                            data-note-step={0}
-                            className="rounded-lg border border-slate-700 bg-slate-900/85 p-3 transition-all duration-300"
-                          >
+                        <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
+                          <div className="rounded-lg border border-slate-700 bg-slate-900/85 p-3">
                             <p className="text-xs uppercase tracking-wide text-cyan-300">Intro Notes</p>
                             <p className="mt-1 text-sm text-slate-100">
                               In this lesson, we will connect AP CSP concepts to one small, testable Python function before moving to larger problems.
                             </p>
                           </div>
-                          {sections.map((section, index) => (
-                            <div
-                              key={`narrative-${section.title}-${index}`}
-                              data-note-step={index}
-                              className="rounded-lg border border-slate-700 bg-slate-900/85 p-3 transition-all duration-300"
-                            >
-                              <p className="text-xs uppercase tracking-wide text-cyan-300">Notes {index + 1}</p>
-                              <p className="mt-1 text-sm font-semibold text-white">{section.title}</p>
-                              <div className="mt-2 text-sm text-slate-200 max-h-24 overflow-hidden">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                                  {section.body}
-                                </ReactMarkdown>
-                              </div>
+
+                          <div
+                            ref={lessonFlowRef}
+                            data-note-step={activeSectionIndex}
+                            className="rounded-lg border border-slate-700 bg-slate-900/85 p-3"
+                          >
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <p className="text-xs uppercase tracking-wide text-cyan-300">
+                                Notes {Math.min(activeSectionIndex + 1, sections.length)} / {sections.length}
+                              </p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setNotesOpen(true)}
+                                className="border-cyan-500/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
+                              >
+                                Open Full Notes
+                              </Button>
                             </div>
-                          ))}
+                            <p className="text-sm font-semibold text-white">{activeSection?.title || 'Overview'}</p>
+                            <div className="mt-2 text-sm text-slate-200 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                {activeSection?.body || 'Lesson notes are loading.'}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setActiveSectionIndex((prev) => {
+                                  const next = Math.max(0, prev - 1)
+                                  if (next !== prev) trackLessonEvent('notes_step_changed', { from: prev, to: next })
+                                  return next
+                                })
+                              }}
+                              disabled={activeSectionIndex <= 0}
+                              className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                            >
+                              Previous Notes
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setActiveSectionIndex((prev) => {
+                                  const next = Math.min(sections.length - 1, prev + 1)
+                                  if (next !== prev) trackLessonEvent('notes_step_changed', { from: prev, to: next })
+                                  return next
+                                })
+                              }}
+                              disabled={sections.length === 0 || activeSectionIndex >= sections.length - 1}
+                              className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                            >
+                              Next Notes
+                            </Button>
+                          </div>
                         </div>
 
                         {notions.length > 0 && (
                           <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-slate-950/40 p-3">
                             {!hasViewedAllNarrativeSteps && (
-                              <p className="text-xs text-amber-300">Scroll through all notes cards first to unlock Notions.</p>
+                              <p className="text-xs text-amber-300">Review each notes page first to unlock Notions.</p>
                             )}
                             {hasViewedAllNarrativeSteps && (
                               <>
@@ -2220,6 +2602,21 @@ export default function LessonViewer() {
                     )}
 
                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+                      {requiredSignature && (
+                        <div className="mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+                          Autograder target: <span className="font-mono">{requiredSignature}</span>
+                        </div>
+                      )}
+                      {checkpointWarnings.length > 0 && (
+                        <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                          {checkpointWarnings[0]}
+                        </div>
+                      )}
+                      {beginnerMode && isEarlyLesson && (
+                        <div className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+                          Beginner hint: {beginnerHint}
+                        </div>
+                      )}
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <h4 className="flex items-center gap-2 text-base font-semibold text-white">
                           <Code2 className="h-5 w-5 text-cyan-300" />
@@ -2230,8 +2627,61 @@ export default function LessonViewer() {
                             type="button"
                             size="sm"
                             variant="outline"
+                            className={selectedTemplate === 'easy' ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30' : 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'}
+                            onClick={() => handleApplyStarterTemplate('easy')}
+                          >
+                            Easy
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className={selectedTemplate === 'standard' ? 'border-cyan-500/40 bg-cyan-500/20 text-cyan-100 hover:bg-cyan-500/30' : 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'}
+                            onClick={() => handleApplyStarterTemplate('standard')}
+                          >
+                            Standard
+                          </Button>
+                          {(availableTemplates.challenge || currentCheckpoint?.starter_code) && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className={selectedTemplate === 'challenge' ? 'border-violet-500/40 bg-violet-500/20 text-violet-100 hover:bg-violet-500/30' : 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'}
+                              onClick={() => handleApplyStarterTemplate('challenge')}
+                            >
+                              Challenge
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-cyan-500/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
+                            onClick={() => {
+                              setCode(helloWorldStarterForLanguage(editorLanguage))
+                              trackLessonEvent('starter_template_applied', { template: 'hello_world', checkpointId: currentCheckpoint.id })
+                            }}
+                          >
+                            Hello World
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
                             className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                            onClick={() => setCode(normalizeStarterCode(currentCheckpoint.starter_code || '', editorLanguage))}
+                            onClick={() => {
+                              setCode(defaultStarterForLanguage(editorLanguage))
+                              trackLessonEvent('starter_template_applied', { template: 'function_template', checkpointId: currentCheckpoint.id })
+                            }}
+                          >
+                            Function Template
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                            onClick={() => setCode(resolveCheckpointStarter(currentCheckpoint, editorLanguage, selectedTemplate))}
                           >
                             Reset
                           </Button>
@@ -2277,15 +2727,16 @@ export default function LessonViewer() {
                         </div>
 
                         <MonacoEditor
-                          height="560px"
+                          height={editorFocusMode ? 'calc(100vh - 13rem)' : 'calc(100vh - 18rem)'}
                           language={editorLanguage}
                           value={code}
                           onMount={onEditorMount}
                           onChange={(value) => setCode(value ?? '')}
                           theme="vs-dark"
                           options={{
-                            minimap: { enabled: true },
-                            fontSize: 15,
+                            minimap: { enabled: !beginnerMode },
+                            fontSize: beginnerMode ? 18 : 16,
+                            lineHeight: beginnerMode ? 28 : 25,
                             lineNumbers: 'on',
                             roundedSelection: false,
                             scrollBeyondLastLine: false,
@@ -2304,7 +2755,7 @@ export default function LessonViewer() {
                         <div className="flex items-center justify-between border-t border-slate-700 bg-[#111a33] px-3 py-2 text-xs text-slate-300">
                           <div className="flex items-center gap-4">
                             <span>{getLanguageLabel(editorLanguage)}</span>
-                            <span>Target: {getLanguageLabel(preferredLanguage)}</span>
+                            {!beginnerMode && <span>Target: {getLanguageLabel(preferredLanguage)}</span>}
                             <span>UTF-8</span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -2314,7 +2765,7 @@ export default function LessonViewer() {
                         </div>
                       </div>
 
-                      {staticIssues.length > 0 && (
+                      {!beginnerMode && staticIssues.length > 0 && (
                         <div className="mt-3 space-y-2">
                           {staticIssues.map((issue, index) => (
                             <div
@@ -2331,7 +2782,17 @@ export default function LessonViewer() {
                         </div>
                       )}
 
-                      <div className="mt-4 flex gap-2">
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {isHelloWorldCheckpoint(currentCheckpoint) && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={previewHelloWorldOutput}
+                            className="border-emerald-500/40 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25"
+                          >
+                            Run Hello World
+                          </Button>
+                        )}
                         <Button
                           onClick={() => void handleRunTests()}
                           disabled={submitting}
@@ -2347,6 +2808,12 @@ export default function LessonViewer() {
                           </Button>
                         )}
                       </div>
+                      {helloWorldPreview && (
+                        <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${helloWorldPreview.matches ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100' : 'border-amber-500/30 bg-amber-500/10 text-amber-100'}`}>
+                          Expected: <span className="font-mono">{helloWorldPreview.expected}</span> | Detected output:{' '}
+                          <span className="font-mono">{helloWorldPreview.actual}</span>
+                        </div>
+                      )}
                     </div>
 
                     {testResults && (
@@ -2381,7 +2848,13 @@ export default function LessonViewer() {
                                   : 'border-red-500/30 bg-red-500/10 text-red-200'
                               }`}
                             >
-                              Test {idx + 1}: {result.passed ? 'Passed' : 'Failed'}
+                              <p className="font-medium">{result.name || `Test ${idx + 1}`}: {result.passed ? 'Passed' : 'Failed'}</p>
+                              {!result.passed && (
+                                <p className="mt-1 text-xs text-red-100">
+                                  Expected: {String(result.expected ?? '') || '(empty)'} | Actual: {String(result.actual ?? '') || '(empty)'}
+                                  {result.error ? ` | Error: ${result.error}` : ''}
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2397,8 +2870,9 @@ export default function LessonViewer() {
             </div>
           </section>
 
-          <section className="xl:col-span-3">
-            <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
+          {(!editorFocusMode || isIntroMode) && (
+          <section className="xl:col-span-2">
+            <div className="flex h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
               <div className="border-b border-slate-800 px-4 py-3">
                 <p className="text-sm font-medium text-slate-200">{isIntroMode ? 'Intro Guide' : 'Assignment'}</p>
                 <p className="text-xs text-slate-400">
@@ -2433,7 +2907,7 @@ export default function LessonViewer() {
               <div className="flex-1 overflow-y-auto px-5 py-5">
                 {isIntroMode ? (
                   <div className="space-y-4">
-                    {isApcspCourse && frameworkOverview.length > 0 && (
+                    {isApcspCourse && !beginnerMode && frameworkOverview.length > 0 && (
                       <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 space-y-2">
                         {frameworkOverview.map((group) => (
                           <div key={group.label}>
@@ -2467,7 +2941,7 @@ export default function LessonViewer() {
                       </h3>
                       <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">{currentCheckpoint.points || 0} pts</Badge>
                     </div>
-                    {isApcspCourse && !useConcreteApcspLesson && frameworkTag && (
+                    {isApcspCourse && !beginnerMode && !useConcreteApcspLesson && frameworkTag && (
                       <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">AP CSP Alignment</p>
                         <p className="mt-1 text-sm text-cyan-100">{frameworkTag.unitLabel}</p>
@@ -2486,7 +2960,7 @@ export default function LessonViewer() {
                         <p className="mt-2 text-xs text-indigo-200">Translate these steps into Python in the editor.</p>
                       </div>
                     )}
-                    {isApcspCourse && !useConcreteApcspLesson && frameworkOverview.length > 0 && (
+                    {isApcspCourse && !beginnerMode && !useConcreteApcspLesson && frameworkOverview.length > 0 && (
                       <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 space-y-2">
                         {frameworkOverview.map((group) => (
                           <div key={group.label}>
@@ -2500,7 +2974,7 @@ export default function LessonViewer() {
                         ))}
                       </div>
                     )}
-                    <div className="space-y-3 text-sm text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
+                    <div className="space-y-3 text-base text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                         {checkpointMarkdown || 'No assignment instructions provided.'}
                       </ReactMarkdown>
@@ -2512,13 +2986,14 @@ export default function LessonViewer() {
               </div>
             </div>
           </section>
+          )}
         </div>
       </main>
 
       {notesOpen && (
         <div className="fixed inset-0 z-[60] flex">
           <button type="button" className="h-full flex-1 bg-black/60" onClick={() => setNotesOpen(false)} aria-label="Close notes" />
-          <div className="h-full w-full max-w-2xl border-l border-slate-700 bg-slate-950/98 backdrop-blur">
+          <div className="h-full w-full max-w-5xl border-l border-slate-700 bg-slate-950/98 backdrop-blur">
             <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-slate-200">Lesson Notes</p>
@@ -2541,7 +3016,10 @@ export default function LessonViewer() {
                   <button
                     key={`${section.title}-${index}`}
                     type="button"
-                    onClick={() => setActiveSectionIndex(index)}
+                    onClick={() => {
+                      trackLessonEvent('notes_step_changed', { from: activeSectionIndex, to: index })
+                      setActiveSectionIndex(index)
+                    }}
                     className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition ${
                       index === activeSectionIndex
                         ? 'bg-cyan-500/20 text-cyan-100 ring-1 ring-cyan-400/30'
@@ -2555,47 +3033,53 @@ export default function LessonViewer() {
             </div>
 
             <div className="h-[calc(100%-112px)] overflow-y-auto px-5 py-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-white">{activeSection?.title || 'Overview'}</h2>
-                <Badge className="border-slate-700 bg-slate-900 text-slate-200">
-                  Page {Math.min(activeSectionIndex + 1, sections.length)} / {sections.length}
-                </Badge>
-              </div>
-
-              <div className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                  {activeSection?.body || 'Lesson notes are loading.'}
-                </ReactMarkdown>
-              </div>
-
-              <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-cyan-300" />
-                  <p className="text-sm font-semibold text-white">Notions</p>
-                </div>
-                <p className="mb-3 text-xs text-slate-400">Typed responses auto-save on this device for this lesson.</p>
-
-                {sectionQuestions.length > 0 ? (
-                  <div className="space-y-3">
-                    {sectionQuestions.map((question, index) => {
-                      const key = getQuestionResponseKey(index)
-                      return (
-                        <div key={`${key}-${question}`} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
-                          <p className="mb-2 text-sm text-slate-100">Q{index + 1}. {question}</p>
-                          <textarea
-                            value={questionResponses[key] || ''}
-                            onChange={(event) => setQuestionResponses((prev) => ({ ...prev, [key]: event.target.value }))}
-                            placeholder="Write your response here..."
-                            rows={3}
-                            className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
-                          />
-                        </div>
-                      )
-                    })}
+              <div className="grid gap-5 lg:grid-cols-5">
+                <div className="lg:col-span-3">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold text-white">{activeSection?.title || 'Overview'}</h2>
+                    <Badge className="border-slate-700 bg-slate-900 text-slate-200">
+                      Page {Math.min(activeSectionIndex + 1, sections.length)} / {sections.length}
+                    </Badge>
                   </div>
-                ) : (
-                  <p className="text-sm text-slate-400">No notion prompts were found on this notes page yet.</p>
-                )}
+
+                  <div className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                      {activeSection?.body || 'Lesson notes are loading.'}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-cyan-300" />
+                      <p className="text-sm font-semibold text-white">Notions</p>
+                    </div>
+                    <p className="mb-3 text-xs text-slate-400">Typed responses auto-save on this device for this lesson.</p>
+
+                    {sectionQuestions.length > 0 ? (
+                      <div className="space-y-3">
+                        {sectionQuestions.map((question, index) => {
+                          const key = getQuestionResponseKey(index)
+                          return (
+                            <div key={`${key}-${question}`} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                              <p className="mb-2 text-sm text-slate-100">Q{index + 1}. {question}</p>
+                              <textarea
+                                value={questionResponses[key] || ''}
+                                onChange={(event) => setQuestionResponses((prev) => ({ ...prev, [key]: event.target.value }))}
+                                placeholder="Write your response here..."
+                                rows={3}
+                                className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-500"
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">No notion prompts were found on this notes page yet.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

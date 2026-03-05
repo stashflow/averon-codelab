@@ -137,14 +137,12 @@ function runLocalJavaScriptJudge(payload: JudgeRunRequest): JudgeResponse {
 
 async function runLocalPythonJudge(payload: JudgeRunRequest): Promise<JudgeResponse> {
   const functionName = inferFunctionName(payload.code, 'python')
-  if (!functionName) {
-    throw new Error('Could not find a Python function to test')
-  }
 
   const runner = `
 import json
 import traceback
 import sys
+import types
 
 payload = json.loads(sys.stdin.read())
 namespace = {}
@@ -166,7 +164,18 @@ except Exception as e:
     print(json.dumps({"results": results}))
     sys.exit(0)
 
-fn = namespace.get(payload["function_name"])
+fn_name = payload.get("function_name")
+fn = namespace.get(fn_name) if fn_name else None
+
+if not callable(fn):
+    # Fallback: discover the first user-defined function in globals.
+    discovered = [
+        (name, value) for name, value in namespace.items()
+        if isinstance(value, types.FunctionType) and not name.startswith("_")
+    ]
+    if discovered:
+        fn_name, fn = discovered[0]
+
 if not callable(fn):
     for t in payload["tests"]:
         results.append({
@@ -175,7 +184,7 @@ if not callable(fn):
             "passed": False,
             "expected": t["expected"],
             "actual": "",
-            "error": f'Function "{payload["function_name"]}" was not found'
+            "error": 'Could not find a Python function to test'
         })
     print(json.dumps({"results": results}))
     sys.exit(0)
@@ -209,7 +218,7 @@ print(json.dumps({"results": results}))
 
   const localPayload = {
     code: payload.code,
-    function_name: functionName,
+    function_name: functionName || undefined,
     tests: payload.tests.map((test) => ({
       id: test.id,
       name: test.name,
@@ -269,7 +278,8 @@ function runPython(script: string, stdin: string): Promise<string> {
 
 function inferFunctionName(code: string, language: 'python' | 'javascript'): string | null {
   if (language === 'python') {
-    const match = code.match(/def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/)
+    // Accept common Python forms, including line breaks before "(".
+    const match = code.match(/(?:^|\s)(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|\n)/m)
     return match?.[1] || null
   }
   const jsFnMatch = code.match(/function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/)
