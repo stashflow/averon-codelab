@@ -355,15 +355,15 @@ export default function TeacherDashboard() {
 
         {preferences.quick_actions_bar && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Button onClick={() => setShowNewClass(true)} className="justify-start gap-2 bg-background border">
+            <Button onClick={() => setShowNewClass(true)} variant="outline" className="justify-start gap-2">
               <Plus className="w-4 h-4 text-primary" /> Create Classroom
             </Button>
-            <Button asChild className="justify-start gap-2 bg-background border">
+            <Button asChild variant="outline" className="justify-start gap-2">
               <Link href="/teacher/join">
                 <BookOpen className="w-4 h-4 text-primary" /> Join Existing Class
               </Link>
             </Button>
-            <Button asChild className="justify-start gap-2 bg-background border">
+            <Button asChild variant="outline" className="justify-start gap-2">
               <Link href="/settings">
                 <Settings className="w-4 h-4 text-primary" /> Teacher Preferences
               </Link>
