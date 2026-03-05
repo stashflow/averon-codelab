@@ -6,96 +6,83 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { releasePlan } from '@/lib/version-changelog'
 import {
   ArrowRight,
-  Code,
+  Code2,
   Users,
-  Layers,
   Zap,
-  CheckCircle2,
-  Sparkles,
+  BarChart3,
+  Shield,
   BookOpen,
   Trophy,
-  TrendingUp,
-  Shield,
-  Globe,
-  Code2,
-  BarChart3,
-  Award,
+  CheckCircle,
+  Terminal,
+  GitBranch,
+  Layers,
 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
+
+const FEATURES = [
+  {
+    icon: Terminal,
+    title: 'Live Code Editor',
+    description: 'Professional IDE with syntax highlighting, auto-complete, and multi-language support built for classrooms.',
+  },
+  {
+    icon: Zap,
+    title: 'Instant Feedback',
+    description: 'Automated test execution gives students detailed results and improvement suggestions in real time.',
+  },
+  {
+    icon: Users,
+    title: 'Smart Classrooms',
+    description: 'Real-time student presence, intervention flags, progress heatmaps, and assignment queues in one view.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Advanced Analytics',
+    description: 'Comprehensive insights into learning patterns, performance trends, and skill development over time.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Assignment Hub',
+    description: 'Rich assignment creation with test cases, starter code scaffolds, and granular visibility controls.',
+  },
+  {
+    icon: GitBranch,
+    title: 'District Management',
+    description: 'Hierarchical access control across schools and districts with centralized oversight.',
+  },
+]
+
+const STATS = [
+  { value: '10k+', label: 'Active Students' },
+  { value: '500+', label: 'Teachers' },
+  { value: '50k+', label: 'Assignments Run' },
+  { value: '98%', label: 'Satisfaction Rate' },
+]
+
+const TOOLKIT = [
+  'Live Student Presence',
+  'Assignment Queue',
+  'Intervention Flags',
+  'Progress Heatmap',
+  'Quick Messaging',
+  'Teacher Notes',
+]
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const features = [
-    {
-      icon: Globe,
-      title: 'District Management',
-      description: 'Organize schools and districts with hierarchical access control and centralized oversight.',
-    },
-    {
-      icon: Users,
-      title: 'Smart Classrooms',
-      description: 'Live classroom command center with roster intelligence, assignment queueing, progress heatmaps, intervention flags, and real-time student momentum signals.',
-      highlights: ['Activity Timeline', 'Progress Heatmap', 'Intervention Alerts', 'Roster Intelligence'],
-    },
-    {
-      icon: Code,
-      title: 'Live Code Editor',
-      description: 'Professional IDE experience with syntax highlighting, auto-complete, and multi-language support.',
-    },
-    {
-      icon: Zap,
-      title: 'Instant Feedback',
-      description: 'Automated test execution with detailed results and suggestions for improvement.',
-    },
-    {
-      icon: TrendingUp,
-      title: 'Advanced Analytics',
-      description: 'Comprehensive insights into learning patterns, performance trends, and skill development.',
-    },
-    {
-      icon: Shield,
-      title: 'Secure & Reliable',
-      description: 'Enterprise-grade security with role-based permissions and data protection.',
-    },
-    {
-      icon: BookOpen,
-      title: 'Assignment Hub',
-      description: 'Rich assignment creation with test cases, starter code, and visibility controls.',
-    },
-    {
-      icon: Trophy,
-      title: 'Smart Grading',
-      description: 'Streamlined grading workflows with rubrics, feedback templates, and batch operations.',
-    },
-    {
-      icon: Sparkles,
-      title: 'Course Library',
-      description: 'Pre-built courses for Python, JavaScript, Java, and C++ with progressive difficulty levels.',
-    },
-  ]
-  const classroomToolkit = [
-    { label: 'Live Student Presence', detail: 'See who is active, idle, or stuck right now.' },
-    { label: 'Assignment Queue', detail: 'Prioritize upcoming, late, and graded work in one stream.' },
-    { label: 'Intervention Flags', detail: 'Auto-identify students with low score or low activity patterns.' },
-    { label: 'Progress Heatmap', detail: 'Visualize mastery by lesson, unit, and classroom cohorts.' },
-    { label: 'Quick Actions', detail: 'Message class, extend due dates, and re-open work instantly.' },
-    { label: 'Teacher Notes', detail: 'Track context per student to personalize next steps.' },
-  ]
 
   useEffect(() => {
     async function checkAuth() {
       const supabase = createClient()
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
 
       if (authUser) {
         let profile: { role?: string; school_id?: string | null } | null = null
@@ -126,281 +113,320 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
+        <div className="w-10 h-10 border-2 border-border border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Animated background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[128px] animate-float-slow" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-[128px] animate-float-reverse" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-full blur-3xl animate-pulse" />
-      </div>
+    <div className="min-h-screen bg-background text-foreground font-sans">
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2 group">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+            <Link href="/" className="flex items-center gap-2.5">
               <Image
                 src="/ACL.png"
-                alt="ACL Logo"
-                width={48}
-                height={48}
+                alt="Averon CodeLab"
+                width={32}
+                height={32}
                 priority
-                className="w-12 h-12 logo-theme-filter"
+                className="w-8 h-8 logo-theme-filter"
               />
-              <span className="hidden sm:block font-bold text-xl bg-gradient-to-r from-orange-400 via-orange-500 to-rose-500 bg-clip-text text-transparent group-hover:opacity-90 transition-all">
+              <span className="font-semibold text-base text-foreground tracking-tight">
                 Averon CodeLab
               </span>
             </Link>
+
+            <nav className="hidden md:flex items-center gap-8">
+              <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Features
+              </Link>
+              <Link href="#platform" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Platform
+              </Link>
+              <Link href="#stats" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Results
+              </Link>
+            </nav>
+
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <Link href="/auth/login">
-                <Button variant="ghost" className="text-sm font-medium">
+                <Button variant="ghost" size="sm" className="text-sm font-medium">
                   Sign In
                 </Button>
               </Link>
               <Link href="/auth/sign-up">
-                <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-lg shadow-primary/25 font-semibold">
+                <Button size="sm" className="text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 px-4">
                   Get Started
                 </Button>
               </Link>
             </div>
           </div>
-        </nav>
+        </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 sm:py-40 lg:py-48 relative">
-          <div className="text-center space-y-10">
-            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/15 to-accent/15 border border-primary/30 backdrop-blur-sm animate-fade-up">
-              <Sparkles className="w-5 h-5 text-primary" />
-              <span className="text-sm font-semibold text-primary">Next-Gen Coding Education</span>
-            </div>
+      {/* Hero */}
+      <section className="border-b border-border">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 min-h-[calc(100vh-56px)]">
 
-            <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-balance leading-[1.1] animate-fade-up" style={{ animationDelay: '80ms' }}>
-              <span className="block bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
-                The complete platform
-              </span>
-              <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                to teach code.
-              </span>
-            </h1>
-
-            <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed text-balance animate-fade-up" style={{ animationDelay: '140ms' }}>
-              Empowering educators and students with professional tools for teaching and learning programming.
-              Streamline assignments, grading, and progress tracking in one unified platform.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 animate-fade-up" style={{ animationDelay: '220ms' }}>
-              <Link href="/auth/sign-up">
-                <Button
-                  size="lg"
-                  className="text-base px-10 py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-2xl shadow-primary/25 gap-3 font-semibold rounded-xl"
-                >
-                  Get Started <ArrowRight className="w-5 h-5" />
-                </Button>
-              </Link>
-              <Link href="#features">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="text-base px-10 py-6 border-2 border-border hover:border-primary/40 gap-3 bg-background text-foreground hover:bg-accent rounded-xl font-semibold"
-                >
-                  Explore Features
-                </Button>
-              </Link>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-8 pt-12 text-base text-muted-foreground animate-fade-up" style={{ animationDelay: '280ms' }}>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Built for student success</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Learn at your own pace</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Start coding on day one</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Floating gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-[100px] animate-float-slow" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-accent/20 rounded-full blur-[100px] animate-float-reverse" />
-      </section>
-
-      {/* Features Experience */}
-      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 relative">
-        <div className="absolute -top-10 left-1/3 w-72 h-72 bg-primary/10 blur-[120px] rounded-full animate-float-slow pointer-events-none" />
-        <div className="absolute -bottom-16 right-1/4 w-72 h-72 bg-accent/10 blur-[120px] rounded-full animate-float-reverse pointer-events-none" />
-        <div className="text-center mb-20">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted border border-border mb-6">
-            <Layers className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold text-primary">Features</span>
-          </div>
-          <h2 className="text-5xl sm:text-6xl font-bold tracking-tight mb-6">
-            <span className="bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">
-              Everything you need
-            </span>
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Professional tools designed for educators and learners
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 relative overflow-hidden rounded-3xl border border-border bg-card/90 backdrop-blur-sm p-8 sm:p-10">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
-            <div className="relative space-y-6">
-              <div className="flex items-center justify-between gap-4">
-                <h3 className="text-2xl sm:text-3xl font-bold text-foreground">Explore Features</h3>
-                <span className="inline-flex items-center px-3 py-1 rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold text-primary">
-                  Platform Map
-                </span>
-              </div>
-              <p className="text-muted-foreground max-w-2xl">
-                Every part of the platform works together, from classroom setup to analytics and grading workflows.
-              </p>
-              <div className="space-y-3">
-                {features.slice(0, 6).map((feature, idx) => (
-                  <div
-                    key={feature.title}
-                    className="group flex items-center gap-4 rounded-2xl border border-border/80 bg-background/80 p-4 hover:border-primary/50 transition-all duration-300 animate-fade-up"
-                    style={{ animationDelay: `${idx * 70}ms` }}
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-md shadow-primary/25">
-                      <feature.icon className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground">{feature.title}</p>
-                      <p className="text-sm text-muted-foreground">{feature.description}</p>
-                      {feature.highlights?.length ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {feature.highlights.map((highlight) => (
-                            <span
-                              key={`${feature.title}-${highlight}`}
-                              className="px-2 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-[11px] font-medium text-primary"
-                            >
-                              {highlight}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-5 grid gap-6">
-            <div className="relative overflow-hidden rounded-3xl border border-border bg-card/90 backdrop-blur-sm p-8">
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10" />
-              <div className="relative space-y-5">
-                <h4 className="text-xl font-bold text-foreground">Capability Coverage</h4>
-                {features.slice(6).map((feature, idx) => (
-                  <div key={feature.title} className="space-y-2 animate-fade-up" style={{ animationDelay: `${(idx + 2) * 90}ms` }}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-foreground font-medium">{feature.title}</span>
-                      <span className="text-muted-foreground">{92 - idx * 4}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted/70 overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-primary to-accent animate-pulse" style={{ width: `${92 - idx * 4}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="relative overflow-hidden rounded-3xl border border-border bg-card/90 backdrop-blur-sm p-8">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />
-              <div className="relative">
-                <h4 className="text-xl font-bold text-foreground mb-2">Smart Classroom Toolkit</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Built to help teachers manage the room, spot gaps early, and keep every student moving.
+            {/* Left: headline */}
+            <div className="flex flex-col justify-center py-20 lg:py-0 lg:border-r border-border pr-0 lg:pr-16">
+              <div className="space-y-8">
+                <div className="inline-flex items-center gap-2 text-xs font-mono font-semibold text-primary uppercase tracking-widest">
+                  <span className="w-4 h-px bg-primary" />
+                  For Schools &amp; Districts
+                </div>
+                <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05] text-balance text-foreground">
+                  Where teachers
+                  <br />
+                  teach code.
+                  <br />
+                  <span className="text-primary">Seriously.</span>
+                </h1>
+                <p className="text-lg text-muted-foreground leading-relaxed max-w-md">
+                  Averon CodeLab gives educators a real command center — live editor, classroom intelligence, automated grading, and district-level control.
                 </p>
-                <div className="space-y-3">
-                  {classroomToolkit.map((item, idx) => (
-                    <div
-                      key={item.label}
-                      className="rounded-xl border border-border/70 bg-background/80 p-3 animate-fade-up"
-                      style={{ animationDelay: `${(idx + 1) * 70}ms` }}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle2 className="w-4 h-4 text-primary" />
-                        <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
-                    </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <Link href="/auth/sign-up">
+                    <Button size="lg" className="font-semibold gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-6">
+                      Start for Free <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                  <Link href="#features">
+                    <Button size="lg" variant="outline" className="font-semibold px-6 border-border text-foreground">
+                      See the Platform
+                    </Button>
+                  </Link>
+                </div>
+                <div className="flex flex-wrap gap-x-6 gap-y-2 pt-4">
+                  {['No setup cost', 'Works on day one', 'Built for K-12'].map((item) => (
+                    <span key={item} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                      {item}
+                    </span>
                   ))}
                 </div>
               </div>
             </div>
+
+            {/* Right: code terminal mockup */}
+            <div className="hidden lg:flex items-center justify-center pl-16">
+              <div className="w-full max-w-md">
+                <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-2xl">
+                  {/* Terminal header */}
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/50">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-border" />
+                      <div className="w-3 h-3 rounded-full bg-border" />
+                      <div className="w-3 h-3 rounded-full bg-border" />
+                    </div>
+                    <span className="text-xs font-mono text-muted-foreground ml-2">solution.py</span>
+                    <span className="ml-auto text-xs font-mono text-primary">● passing</span>
+                  </div>
+                  {/* Code */}
+                  <div className="p-5 font-mono text-sm leading-7">
+                    <div className="flex gap-4">
+                      <div className="text-muted-foreground/40 select-none text-right w-4 shrink-0">
+                        {[1,2,3,4,5,6,7,8,9,10].map(n => <div key={n}>{n}</div>)}
+                      </div>
+                      <div className="text-foreground/80">
+                        <div><span className="text-primary">def</span> <span className="text-accent">fibonacci</span>(n):</div>
+                        <div className="pl-4"><span className="text-muted-foreground"># Base cases</span></div>
+                        <div className="pl-4"><span className="text-primary">if</span> n {'<='} 1:</div>
+                        <div className="pl-8"><span className="text-primary">return</span> n</div>
+                        <div className="pl-4"><span className="text-primary">return</span> (</div>
+                        <div className="pl-8">fibonacci(n-1)</div>
+                        <div className="pl-8">+ fibonacci(n-2)</div>
+                        <div className="pl-4">)</div>
+                        <div>&nbsp;</div>
+                        <div><span className="text-muted-foreground">print</span>(fibonacci(10))</div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Test results */}
+                  <div className="px-5 pb-5 space-y-2">
+                    <div className="h-px bg-border mb-3" />
+                    {[
+                      { test: 'fibonacci(0) == 0', pass: true },
+                      { test: 'fibonacci(5) == 5', pass: true },
+                      { test: 'fibonacci(10) == 55', pass: true },
+                    ].map((t) => (
+                      <div key={t.test} className="flex items-center gap-2 text-xs font-mono">
+                        <span className={t.pass ? 'text-primary' : 'text-destructive'}>{t.pass ? '✓' : '✗'}</span>
+                        <span className="text-muted-foreground">{t.test}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2 text-xs font-mono pt-1">
+                      <span className="text-primary font-semibold">3/3 tests passed</span>
+                      <span className="text-muted-foreground ml-auto">14ms</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="relative overflow-hidden py-32">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
-            {[
-              { value: '10,000+', label: 'Students Learning' },
-              { value: '500+', label: 'Teachers' },
-              { value: '50,000+', label: 'Assignments' },
-              { value: '98%', label: 'Satisfaction' },
-            ].map((stat, idx) => (
-              <div key={idx} className="text-center space-y-3 group">
-                <div className="text-5xl sm:text-6xl font-bold bg-gradient-to-br from-primary via-accent to-primary bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300">
-                  {stat.value}
-                </div>
-                <div className="text-sm text-muted-foreground font-semibold uppercase tracking-wider">{stat.label}</div>
+      {/* Stats bar */}
+      <section id="stats" className="border-b border-border bg-muted/30">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
+            {STATS.map((stat) => (
+              <div key={stat.label} className="px-8 py-10 text-center">
+                <div className="text-4xl font-bold text-foreground tracking-tight">{stat.value}</div>
+                <div className="text-sm text-muted-foreground mt-1 font-medium">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
-        <div className="relative overflow-hidden rounded-3xl border border-border bg-card backdrop-blur-xl">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10" />
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
+      {/* Features grid */}
+      <section id="features" className="border-b border-border">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-24">
+          <div className="flex items-end justify-between mb-16 gap-8 flex-wrap">
+            <div>
+              <div className="text-xs font-mono font-semibold text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="w-4 h-px bg-primary" />
+                Platform Features
+              </div>
+              <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground text-balance">
+                Everything in one place.
+                <br />
+                <span className="text-muted-foreground font-normal">Nothing left out.</span>
+              </h2>
+            </div>
+            <Link href="/auth/sign-up">
+              <Button variant="outline" className="border-border text-foreground font-semibold gap-2 shrink-0">
+                Explore all features <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+          </div>
 
-          <div className="relative p-16 sm:p-20 text-center space-y-10">
-            <h2 className="text-5xl sm:text-6xl font-bold tracking-tight">
-              <span className="block bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent mb-2">
-                Ready to transform
-              </span>
-              <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                your classroom?
-              </span>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 border border-border rounded-2xl overflow-hidden">
+            {FEATURES.map((feature, idx) => (
+              <div
+                key={feature.title}
+                className={`p-8 space-y-4 border-border ${
+                  idx < FEATURES.length - (FEATURES.length % 3 === 0 ? 3 : FEATURES.length % 3) ? 'border-b' : ''
+                } ${idx % 3 !== 2 ? 'lg:border-r' : ''} ${idx % 2 !== 1 ? 'sm:border-r lg:border-r-0' : 'sm:border-r-0'} ${
+                  idx % 3 !== 2 ? 'lg:border-r' : ''
+                } hover:bg-muted/30 transition-colors`}
+              >
+                <div className="w-10 h-10 rounded-xl border border-border flex items-center justify-center bg-background">
+                  <feature.icon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Platform deep-dive — split layout */}
+      <section id="platform" className="border-b border-border">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border">
+
+            {/* Left */}
+            <div className="py-20 lg:pr-16 space-y-10">
+              <div>
+                <div className="text-xs font-mono font-semibold text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <span className="w-4 h-px bg-primary" />
+                  Smart Classroom
+                </div>
+                <h2 className="text-4xl font-bold tracking-tight text-foreground text-balance">
+                  See every student,
+                  <br />
+                  in real time.
+                </h2>
+                <p className="mt-4 text-muted-foreground leading-relaxed">
+                  The classroom dashboard surfaces everything a teacher needs — who is active, who is stuck, what needs grading, and where to intervene — without having to dig for it.
+                </p>
+              </div>
+              <div className="space-y-3">
+                {TOOLKIT.map((item) => (
+                  <div key={item} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors">
+                    <CheckCircle className="w-4 h-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium text-foreground">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right */}
+            <div className="py-20 lg:pl-16 space-y-10">
+              <div>
+                <div className="text-xs font-mono font-semibold text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <span className="w-4 h-px bg-primary" />
+                  For Districts
+                </div>
+                <h2 className="text-4xl font-bold tracking-tight text-foreground text-balance">
+                  Secure, scalable,
+                  <br />
+                  district-ready.
+                </h2>
+                <p className="mt-4 text-muted-foreground leading-relaxed">
+                  Built with enterprise-grade access control, role-based permissions, and the data standards K-12 administrators require.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { icon: Shield, title: 'Role-Based Access', desc: 'District, school, teacher, and student roles with scoped permissions.' },
+                  { icon: Layers, title: 'Multi-School Support', desc: 'Manage multiple campuses under a single district account.' },
+                  { icon: Trophy, title: 'Smart Grading', desc: 'Rubrics, feedback templates, and batch grading workflows.' },
+                  { icon: Code2, title: '4+ Languages', desc: 'Python, JavaScript, Java, and C++ with more coming.' },
+                ].map((item) => (
+                  <div key={item.title} className="p-5 rounded-xl border border-border bg-card space-y-3 hover:border-primary/40 transition-colors">
+                    <item.icon className="w-5 h-5 text-primary" />
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">{item.title}</div>
+                      <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="border-b border-border bg-muted/20">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-24">
+          <div className="max-w-3xl">
+            <div className="text-xs font-mono font-semibold text-primary uppercase tracking-widest mb-6 flex items-center gap-2">
+              <span className="w-4 h-px bg-primary" />
+              Get Started Today
+            </div>
+            <h2 className="text-5xl sm:text-6xl font-bold tracking-tight text-foreground text-balance leading-[1.05]">
+              Your classroom.
+              <br />
+              Your code.
+              <br />
+              <span className="text-primary">Your results.</span>
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Join educators and students worldwide using Averon CodeLab to revolutionize coding education.
+            <p className="mt-6 text-lg text-muted-foreground max-w-xl leading-relaxed">
+              Join educators and students who use Averon CodeLab every day. No procurement delays, no per-seat surprises — just a platform that works.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
+            <div className="flex flex-col sm:flex-row gap-3 mt-10">
               <Link href="/auth/sign-up">
-                <Button
-                  size="lg"
-                  className="text-base px-10 py-6 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-2xl shadow-primary/25 gap-3 font-semibold rounded-xl"
-                >
-                  Start for Free <ArrowRight className="w-5 h-5" />
+                <Button size="lg" className="font-semibold gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-8">
+                  Create a Free Account <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+              <Link href="/auth/login">
+                <Button size="lg" variant="outline" className="font-semibold px-8 border-border text-foreground">
+                  Sign In
                 </Button>
               </Link>
             </div>
@@ -409,19 +435,21 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-background/50 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
-              <span className="font-bold text-lg text-foreground">Averon CodeLab</span>
+      <footer className="bg-background">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-10">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <Image src="/ACL.png" alt="Averon CodeLab" width={28} height={28} className="w-7 h-7 logo-theme-filter" />
+              <span className="font-semibold text-sm text-foreground">Averon CodeLab</span>
             </div>
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-muted-foreground">
-                &copy; {new Date().getFullYear()} Averon CodeLab. All rights reserved.
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
+              <p className="text-xs text-muted-foreground">
+                &copy; {new Date().getFullYear()} Averon CodeLab
               </p>
               <Link href="/version">
-                <Button variant="outline" size="sm" className="font-semibold">
+                <Button variant="outline" size="sm" className="text-xs font-semibold h-7 px-2.5">
                   {releasePlan.currentVersion}
                 </Button>
               </Link>
