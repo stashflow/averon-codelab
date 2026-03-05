@@ -132,6 +132,7 @@ export default function Home() {
                 width={32}
                 height={32}
                 priority
+                loading="eager"
                 className="w-8 h-8 logo-theme-filter"
               />
               <span className="font-semibold text-base text-foreground tracking-tight">
