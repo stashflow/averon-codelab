@@ -18,9 +18,28 @@ import {
   mergePreferences,
   type UserFeaturePreferences,
 } from '@/lib/user-preferences'
-import { Plus, LogOut, BookOpen, Settings, Users, GraduationCap } from 'lucide-react'
+import { Plus, LogOut, BookOpen, Settings, Users, GraduationCap, ClipboardCheck, Clock3, Sparkles } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
+
+type TeacherAssignment = {
+  id: string
+  title: string
+  classroom_id: string | null
+  created_at?: string | null
+}
+
+type TeacherQueueItem = {
+  id: string
+  assignment_id: string
+  student_name: string
+  classroom_name: string
+  assignment_title: string
+  status: string
+  submitted_at: string | null
+  created_at: string | null
+  score: number | null
+}
 
 export default function TeacherDashboard() {
   const [user, setUser] = useState<any>(null)
@@ -33,6 +52,8 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [deletingClassId, setDeletingClassId] = useState<string | null>(null)
+  const [assignmentRows, setAssignmentRows] = useState<TeacherAssignment[]>([])
+  const [gradingQueue, setGradingQueue] = useState<TeacherQueueItem[]>([])
   const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
   const [savingPreferences, setSavingPreferences] = useState(false)
   const [classroomSearch, setClassroomSearch] = useState('')
@@ -48,6 +69,37 @@ export default function TeacherDashboard() {
   }, [enrollments])
 
   const totalStudents = useMemo(() => Object.values(studentsByClass).reduce((sum, c) => sum + c, 0), [studentsByClass])
+  const submissionsReadyToGrade = useMemo(
+    () => gradingQueue.filter((item) => item.status === 'submitted').length,
+    [gradingQueue],
+  )
+  const activeDraftSubmissions = useMemo(
+    () => gradingQueue.filter((item) => item.status === 'pending').length,
+    [gradingQueue],
+  )
+  const gradedSubmissionCount = useMemo(
+    () => gradingQueue.filter((item) => item.status === 'graded').length,
+    [gradingQueue],
+  )
+  const averageGradedScore = useMemo(() => {
+    const scores = gradingQueue
+      .map((item) => item.score)
+      .filter((score): score is number => typeof score === 'number')
+    if (scores.length === 0) return 0
+    return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+  }, [gradingQueue])
+  const recentQueueItems = useMemo(
+    () =>
+      gradingQueue
+        .filter((item) => item.status === 'submitted' || item.status === 'pending')
+        .sort((a, b) => {
+          const left = new Date(a.submitted_at || a.created_at || 0).getTime()
+          const right = new Date(b.submitted_at || b.created_at || 0).getTime()
+          return right - left
+        })
+        .slice(0, 6),
+    [gradingQueue],
+  )
   const prefsStorageKey = useMemo(() => (profile?.id ? getUserPreferencesStorageKey(profile.id) : ''), [profile])
   const classDraftKey = useMemo(() => (profile?.id ? `acl:teacher-class-draft:${profile.id}` : ''), [profile])
   const classViewKey = useMemo(() => (profile?.id ? `acl:teacher-class-view:${profile.id}` : ''), [profile])
@@ -174,10 +226,41 @@ export default function TeacherDashboard() {
 
       if (classData && classData.length > 0) {
         const classIds = classData.map((c) => c.id)
-        const { data: enrollmentData } = await supabase.from('enrollments').select('id, classroom_id').in('classroom_id', classIds)
+        const [{ data: enrollmentData }, { data: assignmentData }, { data: submissionData }] = await Promise.all([
+          supabase.from('enrollments').select('id, classroom_id').in('classroom_id', classIds),
+          supabase.from('assignments').select('id, title, classroom_id, created_at').in('classroom_id', classIds),
+          supabase
+            .from('submissions')
+            .select('id, assignment_id, status, submitted_at, created_at, score, profiles(full_name)')
+            .order('submitted_at', { ascending: false }),
+        ])
         setEnrollments(enrollmentData || [])
+        const nextAssignments = (assignmentData as TeacherAssignment[] | null) || []
+        setAssignmentRows(nextAssignments)
+
+        const assignmentById = Object.fromEntries(nextAssignments.map((assignment) => [assignment.id, assignment]))
+        const classroomById = Object.fromEntries((classData || []).map((classroom) => [classroom.id, classroom.name]))
+        const nextQueue = ((submissionData as any[]) || [])
+          .filter((row) => assignmentById[row.assignment_id])
+          .map((row) => {
+            const assignment = assignmentById[row.assignment_id]
+            return {
+              id: row.id,
+              assignment_id: row.assignment_id,
+              student_name: row.profiles?.full_name || 'Student',
+              classroom_name: assignment?.classroom_id ? classroomById[assignment.classroom_id] || 'Classroom' : 'Classroom',
+              assignment_title: assignment?.title || 'Assignment',
+              status: String(row.status || 'pending'),
+              submitted_at: row.submitted_at || null,
+              created_at: row.created_at || null,
+              score: typeof row.score === 'number' ? row.score : null,
+            }
+          })
+        setGradingQueue(nextQueue)
       } else {
         setEnrollments([])
+        setAssignmentRows([])
+        setGradingQueue([])
       }
 
       const key = getUserPreferencesStorageKey(authUser.id)
@@ -371,7 +454,7 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-sm">Classes</CardTitle>
@@ -392,11 +475,92 @@ export default function TeacherDashboard() {
           </Card>
           <Card>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm">School Linked</CardTitle>
-              <Badge variant={profile?.school_id ? 'default' : 'destructive'}>{profile?.school_id ? 'Yes' : 'No'}</Badge>
+              <CardTitle className="text-sm">Ready To Grade</CardTitle>
+              <ClipboardCheck className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-foreground/80">All teacher features require school assignment.</p>
+              <p className="text-3xl font-bold">{submissionsReadyToGrade}</p>
+              <p className="text-sm text-foreground/80 mt-1">submitted reviews waiting on teacher feedback</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">Draft Activity</CardTitle>
+              <Clock3 className="w-4 h-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{activeDraftSubmissions}</p>
+              <p className="text-sm text-foreground/80 mt-1">students currently working in saved drafts</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">Graded Average</CardTitle>
+              <Sparkles className="w-4 h-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{averageGradedScore}%</p>
+              <p className="text-sm text-foreground/80 mt-1">
+                {gradedSubmissionCount} graded submission{gradedSubmissionCount === 1 ? '' : 's'} across {assignmentRows.length} assignment{assignmentRows.length === 1 ? '' : 's'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <Card className="xl:col-span-2">
+            <CardHeader>
+              <CardTitle>Grading Queue</CardTitle>
+              <CardDescription>Latest student work that needs review or is still in progress.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentQueueItems.length === 0 ? (
+                <p className="text-sm text-foreground/80">No submission activity yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentQueueItems.map((item) => (
+                    <div key={item.id} className="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-center md:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{item.student_name}</p>
+                          <Badge variant={item.status === 'submitted' ? 'default' : 'secondary'}>
+                            {item.status === 'submitted' ? 'Ready to grade' : 'Draft in progress'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-foreground/80">{item.assignment_title} in {item.classroom_name}</p>
+                        <p className="text-xs text-foreground/70">
+                          {item.submitted_at ? `Submitted ${new Date(item.submitted_at).toLocaleString()}` : `Draft updated ${new Date(item.created_at || '').toLocaleString()}`}
+                        </p>
+                      </div>
+                      <Button asChild variant={item.status === 'submitted' ? 'default' : 'outline'}>
+                        <Link href={`/teacher/assignment/${item.assignment_id}`}>{item.status === 'submitted' ? 'Open grading' : 'Open assignment'}</Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Teaching Snapshot</CardTitle>
+              <CardDescription>Fast context for grading and classroom coverage.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-foreground/80">Assignments published</p>
+                <p className="text-2xl font-semibold">{assignmentRows.length}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-foreground/80">Graded submissions</p>
+                <p className="text-2xl font-semibold">{gradedSubmissionCount}</p>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-foreground/80">School linked</p>
+                <Badge variant={profile?.school_id ? 'default' : 'destructive'}>{profile?.school_id ? 'Yes' : 'No'}</Badge>
+                <p className="mt-2 text-xs text-foreground/70">All teacher features require school assignment.</p>
+              </div>
             </CardContent>
           </Card>
         </div>

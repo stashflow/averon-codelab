@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint app lib components --ext .ts,.tsx,.js,.jsx"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -68,6 +68,8 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "eslint": "^9.22.0",
+    "eslint-config-next": "16.1.6",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22",
     "@types/react": "^19",

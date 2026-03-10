@@ -24,13 +24,13 @@ export async function GET(request: Request) {
       // Check if profile exists
       const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).single()
 
-      // If no profile, create one. Role fallback remains student for OAuth.
+      // New OAuth users always start at the lowest privilege.
       if (!profile) {
         await supabase.from('profiles').insert({
           id: user.id,
           email: user.email,
           full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0],
-          role: user.user_metadata?.role || 'student',
+          role: 'student',
           is_active: true,
         })
       } else {

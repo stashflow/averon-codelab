@@ -88,28 +88,28 @@ export default function SettingsPage() {
         return
       }
 
+      const nextPrefsStorageKey = getUserPreferencesStorageKey(data.id)
+      const rawPreferences = localStorage.getItem(nextPrefsStorageKey)
+      let resolvedPreferences = defaultUserFeaturePreferences
+      if (rawPreferences) {
+        try {
+          resolvedPreferences = mergePreferences(JSON.parse(rawPreferences))
+        } catch {
+          resolvedPreferences = defaultUserFeaturePreferences
+        }
+      }
+
       setProfile(data)
       const effectiveEmail = data?.email || user.email || ''
       setForm({ full_name: data?.full_name || '', email: effectiveEmail })
       setNewEmail(effectiveEmail)
+      setPreferences(resolvedPreferences)
       setCustomColors(getStoredCustomThemeColors())
       setLoading(false)
     }
 
     load()
   }, [router])
-
-  useEffect(() => {
-    if (!prefsStorageKey) return
-    const raw = localStorage.getItem(prefsStorageKey)
-    if (!raw) return
-
-    try {
-      setPreferences(mergePreferences(JSON.parse(raw)))
-    } catch {
-      setPreferences(defaultUserFeaturePreferences)
-    }
-  }, [prefsStorageKey])
 
   function setFeaturePreference(key: keyof UserFeaturePreferences, value: boolean) {
     setPreferences((prev) => ({ ...prev, [key]: value }))

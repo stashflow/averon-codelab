@@ -36,10 +36,10 @@ export type JudgeRunRequest = {
 export async function runSandboxJudge(payload: JudgeRunRequest): Promise<JudgeResponse> {
   const judgeUrl = process.env.JUDGE_SERVICE_URL
   if (!judgeUrl) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (isLocalJudgeEnabled()) {
       return runLocalJudge(payload)
     }
-    throw new Error('Judge service is not configured')
+    throw new Error('Judge service is not configured. Set JUDGE_SERVICE_URL or explicitly enable the local judge for isolated development.')
   }
 
   const headers: Record<string, string> = {
@@ -78,6 +78,10 @@ export async function runSandboxJudge(payload: JudgeRunRequest): Promise<JudgeRe
       error: result?.error ? String(result.error) : null,
     })),
   }
+}
+
+function isLocalJudgeEnabled(): boolean {
+  return process.env.LOCAL_JUDGE_ENABLED === 'true'
 }
 
 async function runLocalJudge(payload: JudgeRunRequest): Promise<JudgeResponse> {

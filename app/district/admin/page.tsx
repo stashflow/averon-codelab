@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -24,11 +24,7 @@ export default function DistrictAdminPanel() {
   const [creating, setCreating] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    loadDistrictData()
-  }, [])
-
-  async function loadDistrictData() {
+  const loadDistrictData = useCallback(async () => {
     const supabase = createClient()
 
     try {
@@ -92,7 +88,11 @@ export default function DistrictAdminPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [newClass.school_id, router])
+
+  useEffect(() => {
+    void loadDistrictData()
+  }, [loadDistrictData])
 
   async function handleCreateClassRequest() {
     if (!newClass.name.trim() || !newClass.school_id) return
@@ -128,7 +128,7 @@ export default function DistrictAdminPanel() {
 
       setShowNewClass(false)
       setNewClass({ name: '', description: '', school_id: schools[0]?.id || '' })
-      loadDistrictData()
+      void loadDistrictData()
     } catch (err: any) {
       console.error('[v0] Error creating class request:', err)
       alert('Error creating class request: ' + (err.message || 'Unknown error'))

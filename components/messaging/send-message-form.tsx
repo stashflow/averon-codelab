@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,13 +25,7 @@ export function SendMessageForm({ classroomId }: { classroomId?: string }) {
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  useEffect(() => {
-    if (classroomId) {
-      loadStudents()
-    }
-  }, [classroomId])
-
-  async function loadStudents() {
+  const loadStudents = useEffectEvent(async () => {
     try {
       const supabase = createClient()
       const { data } = await supabase
@@ -47,7 +41,13 @@ export function SendMessageForm({ classroomId }: { classroomId?: string }) {
     } catch (error) {
       console.error('[v0] Error loading students:', error)
     }
-  }
+  })
+
+  useEffect(() => {
+    if (classroomId) {
+      void loadStudents()
+    }
+  }, [classroomId])
 
   async function sendMessage() {
     if (!selectedStudent || !content.trim()) return

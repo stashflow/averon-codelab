@@ -23,7 +23,7 @@ export default function TermsOfService() {
             <section className="space-y-4">
               <h2 className="text-2xl font-bold text-white">Acceptance of Terms</h2>
               <p className="text-white/70 leading-relaxed">
-                By accessing or using Averon CodeLab, you agree to be bound by these Terms of Service and our Privacy Policy. If you are under 18 or the age of majority in your jurisdiction, you must have your parent, guardian, or school's permission to use this service.
+                By accessing or using Averon CodeLab, you agree to be bound by these Terms of Service and our Privacy Policy. If you are under 18 or the age of majority in your jurisdiction, you must have your parent, guardian, or your school&apos;s permission to use this service.
               </p>
             </section>
 
@@ -121,7 +121,7 @@ export default function TermsOfService() {
                 </li>
                 <li className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-red-400 mt-2 flex-shrink-0" />
-                  <span>Plagiarize or submit another student's work as your own</span>
+                  <span>Plagiarize or submit another student&apos;s work as your own</span>
                 </li>
               </ul>
             </section>
@@ -143,7 +143,7 @@ export default function TermsOfService() {
             <section className="space-y-4">
               <h2 className="text-2xl font-bold text-white">Disclaimers</h2>
               <p className="text-white/70 leading-relaxed">
-                Averon CodeLab is provided "as is" without warranties of any kind. We do not guarantee uninterrupted service or error-free operation. While we strive for accuracy in automated grading, teachers should review all grades. We are not responsible for content created by users.
+                Averon CodeLab is provided &quot;as is&quot; without warranties of any kind. We do not guarantee uninterrupted service or error-free operation. While we strive for accuracy in automated grading, teachers should review all grades. We are not responsible for content created by users.
               </p>
             </section>
 

@@ -2,7 +2,7 @@
 
 import { Moon, Sun, Palette } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Button } from '@/components/ui/button'
 import { COLOR_THEMES, applyColorTheme, getStoredColorTheme, setStoredColorTheme, type ColorTheme } from '@/lib/color-theme'
 import {
@@ -22,16 +22,18 @@ const colorThemes: Array<{ name: string; value: ColorTheme; color: string }> = [
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  const [colorTheme, setColorTheme] = useState<ColorTheme>('sunset')
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => (
+    typeof window === 'undefined' ? 'sunset' : getStoredColorTheme()
+  ))
 
-  // Avoid hydration mismatch
   useEffect(() => {
-    setMounted(true)
-    const savedColorTheme = getStoredColorTheme()
-    setColorTheme(savedColorTheme)
-    applyColorTheme(savedColorTheme)
-  }, [])
+    applyColorTheme(colorTheme)
+  }, [colorTheme])
 
   const handleColorThemeChange = (newColorTheme: ColorTheme) => {
     setColorTheme(newColorTheme)

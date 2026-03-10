@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -20,87 +20,84 @@ export default function ClassroomPage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
 
-  useEffect(() => {
-    async function loadData() {
-      const supabase = createClient()
-      try {
-        const {
-          data: { user: authUser },
-          error: userError,
-        } = await supabase.auth.getUser()
+  const loadData = useEffectEvent(async () => {
+    const supabase = createClient()
+    try {
+      const {
+        data: { user: authUser },
+        error: userError,
+      } = await supabase.auth.getUser()
 
-        if (userError || !authUser) {
-          router.push('/auth/login')
-          return
-        }
-
-        setUser(authUser)
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', authUser.id)
-          .single()
-
-        if (profile?.role !== 'student') {
-          router.push('/protected')
-          return
-        }
-
-        const { data: enrollment } = await supabase
-          .from('enrollments')
-          .select('id')
-          .eq('classroom_id', classroomId)
-          .eq('student_id', authUser.id)
-          .maybeSingle()
-
-        if (!enrollment) {
-          router.push('/student/dashboard')
-          return
-        }
-
-        // Load classroom
-        const { data: classData, error: classError } = await supabase
-          .from('classrooms')
-          .select('*')
-          .eq('id', classroomId)
-          .single()
-
-        if (classError) throw classError
-        setClassroom(classData)
-
-        // Load assignments
-        const { data: assignmentData, error: assignmentError } = await supabase
-          .from('assignments')
-          .select('*')
-          .eq('classroom_id', classroomId)
-          .order('created_at', { ascending: false })
-
-        if (assignmentError) throw assignmentError
-        setAssignments(assignmentData || [])
-
-        // Load submissions
-        const assignmentIds = (assignmentData || []).map((a: any) => a.id)
-        if (assignmentIds.length === 0) {
-          setSubmissions([])
-        } else {
-          const { data: submissionData, error: submissionError } = await supabase
-            .from('submissions')
-            .select('*')
-            .eq('student_id', authUser.id)
-            .in('assignment_id', assignmentIds)
-
-          if (submissionError) throw submissionError
-          setSubmissions(submissionData || [])
-        }
-      } catch (err: any) {
-        console.error('Error loading data:', err)
-      } finally {
-        setLoading(false)
+      if (userError || !authUser) {
+        router.push('/auth/login')
+        return
       }
-    }
 
-    loadData()
+      setUser(authUser)
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .single()
+
+      if (profile?.role !== 'student') {
+        router.push('/protected')
+        return
+      }
+
+      const { data: enrollment } = await supabase
+        .from('enrollments')
+        .select('id')
+        .eq('classroom_id', classroomId)
+        .eq('student_id', authUser.id)
+        .maybeSingle()
+
+      if (!enrollment) {
+        router.push('/student/dashboard')
+        return
+      }
+
+      const { data: classData, error: classError } = await supabase
+        .from('classrooms')
+        .select('*')
+        .eq('id', classroomId)
+        .single()
+
+      if (classError) throw classError
+      setClassroom(classData)
+
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('classroom_id', classroomId)
+        .order('created_at', { ascending: false })
+
+      if (assignmentError) throw assignmentError
+      setAssignments(assignmentData || [])
+
+      const assignmentIds = (assignmentData || []).map((a: any) => a.id)
+      if (assignmentIds.length === 0) {
+        setSubmissions([])
+      } else {
+        const { data: submissionData, error: submissionError } = await supabase
+          .from('submissions')
+          .select('*')
+          .eq('student_id', authUser.id)
+          .in('assignment_id', assignmentIds)
+
+        if (submissionError) throw submissionError
+        setSubmissions(submissionData || [])
+      }
+    } catch (err: any) {
+      console.error('Error loading data:', err)
+    } finally {
+      setLoading(false)
+    }
+  })
+
+  useEffect(() => {
+    void loadData()
   }, [classroomId])
 
   if (loading) {

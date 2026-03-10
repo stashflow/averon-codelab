@@ -23,7 +23,7 @@ export default function PrivacyPolicy() {
             <section className="space-y-4">
               <h2 className="text-2xl font-bold text-white">Overview</h2>
               <p className="text-white/70 leading-relaxed">
-                Averon CodeLab ("we", "our", or "us") is committed to protecting the privacy of students, teachers, and educational institutions. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our educational coding platform.
+                Averon CodeLab (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting the privacy of students, teachers, and educational institutions. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our educational coding platform.
               </p>
             </section>
 
@@ -76,7 +76,7 @@ export default function PrivacyPolicy() {
             <section className="space-y-4">
               <h2 className="text-2xl font-bold text-white">Student Data & FERPA Compliance</h2>
               <p className="text-white/70 leading-relaxed">
-                We comply with the Family Educational Rights and Privacy Act (FERPA) and act as a "school official" with legitimate educational interests when providing services to educational institutions. Student educational records are only shared with authorized school personnel and are not disclosed to third parties without consent or legal authorization.
+                We comply with the Family Educational Rights and Privacy Act (FERPA) and act as a &quot;school official&quot; with legitimate educational interests when providing services to educational institutions. Student educational records are only shared with authorized school personnel and are not disclosed to third parties without consent or legal authorization.
               </p>
             </section>
 

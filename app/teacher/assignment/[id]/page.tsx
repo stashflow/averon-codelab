@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useEffectEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, CheckCircle2, Clock, Sparkles } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Clock, Filter, Search, Sparkles } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +24,25 @@ type QuizQuestion = {
 type QuizSubmissionPayload = {
   answers?: number[]
 }
+
+type QuizAutoGradeSummary = {
+  score: number
+  feedback: string
+  earned: number
+  possible: number
+  lineItems: Array<{
+    label: string
+    correct: boolean
+    points: number
+  }>
+}
+
+const QUICK_FEEDBACK_SNIPPETS = [
+  'Strong problem-solving and clear structure.',
+  'Good progress. Review edge cases and resubmit for a higher score.',
+  'Readable work overall. Add more comments or explanation for your choices.',
+  'You are close. Revisit the failing cases and verify your output carefully.',
+]
 
 function parseQuizQuestions(testCases: unknown): QuizQuestion[] {
   if (!Array.isArray(testCases)) return []
@@ -56,84 +77,84 @@ export default function TeacherAssignmentPage() {
   const [gradeFeedback, setGradeFeedback] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [submissionSearch, setSubmissionSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'submitted' | 'graded'>('all')
   const selectedSubmissionIdRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    async function loadData() {
-      const supabase = createClient()
-      try {
-        const {
-          data: { user: authUser },
-          error: userError,
-        } = await supabase.auth.getUser()
+  const loadData = useEffectEvent(async () => {
+    const supabase = createClient()
+    try {
+      const {
+        data: { user: authUser },
+        error: userError,
+      } = await supabase.auth.getUser()
 
-        if (userError || !authUser) {
-          router.push('/auth/login')
-          return
-        }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', authUser.id)
-          .single()
-
-        if (profile?.role !== 'teacher') {
-          router.push('/protected')
-          return
-        }
-
-        // Load assignment
-        const { data: assignmentData } = await supabase
-          .from('assignments')
-          .select('*, classroom:classroom_id(teacher_id), test_cases, language')
-          .eq('id', assignmentId)
-          .single()
-
-        if (!assignmentData || assignmentData.classroom?.teacher_id !== authUser.id) {
-          router.push('/protected/teacher')
-          return
-        }
-
-        setAssignment(assignmentData)
-
-        // Load all submissions for this assignment
-        const { data: submissionData } = await supabase
-          .from('submissions')
-          .select('*, profiles(email, full_name)')
-          .eq('assignment_id', assignmentId)
-          .order('created_at', { ascending: false })
-
-        const nextSubmissions = submissionData || []
-        setSubmissions(nextSubmissions)
-
-        const nextSelected =
-          (selectedSubmissionIdRef.current
-            ? nextSubmissions.find((submission) => submission.id === selectedSubmissionIdRef.current)
-            : null) || nextSubmissions[0] || null
-
-        if (!nextSelected) {
-          selectedSubmissionIdRef.current = null
-          setSelectedSubmission(null)
-          setGradeScore('')
-          setGradeFeedback('')
-        } else {
-          const selectionChanged = selectedSubmissionIdRef.current !== nextSelected.id
-          selectedSubmissionIdRef.current = nextSelected.id
-          setSelectedSubmission(nextSelected)
-          if (selectionChanged) {
-            setGradeScore(nextSelected.score?.toString() || '')
-            setGradeFeedback(nextSelected.feedback || '')
-          }
-        }
-      } catch (err: any) {
-        console.error('Error loading data:', err)
-      } finally {
-        setLoading(false)
+      if (userError || !authUser) {
+        router.push('/auth/login')
+        return
       }
-    }
 
-    loadData()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .single()
+
+      if (profile?.role !== 'teacher') {
+        router.push('/protected')
+        return
+      }
+
+      const { data: assignmentData } = await supabase
+        .from('assignments')
+        .select('*, classroom:classroom_id(teacher_id), test_cases, language')
+        .eq('id', assignmentId)
+        .single()
+
+      if (!assignmentData || assignmentData.classroom?.teacher_id !== authUser.id) {
+        router.push('/protected/teacher')
+        return
+      }
+
+      setAssignment(assignmentData)
+
+      const { data: submissionData } = await supabase
+        .from('submissions')
+        .select('*, profiles(email, full_name)')
+        .eq('assignment_id', assignmentId)
+        .order('created_at', { ascending: false })
+
+      const nextSubmissions = submissionData || []
+      setSubmissions(nextSubmissions)
+
+      const nextSelected =
+        (selectedSubmissionIdRef.current
+          ? nextSubmissions.find((submission) => submission.id === selectedSubmissionIdRef.current)
+          : null) || nextSubmissions[0] || null
+
+      if (!nextSelected) {
+        selectedSubmissionIdRef.current = null
+        setSelectedSubmission(null)
+        setGradeScore('')
+        setGradeFeedback('')
+      } else {
+        const selectionChanged = selectedSubmissionIdRef.current !== nextSelected.id
+        selectedSubmissionIdRef.current = nextSelected.id
+        setSelectedSubmission(nextSelected)
+        if (selectionChanged) {
+          setGradeScore(nextSelected.score?.toString() || '')
+          setGradeFeedback(nextSelected.feedback || '')
+        }
+      }
+    } catch (err: any) {
+      console.error('Error loading data:', err)
+    } finally {
+      setLoading(false)
+    }
+  })
+
+  useEffect(() => {
+    void loadData()
     const intervalId = window.setInterval(() => {
       void loadData()
     }, 15000)
@@ -165,7 +186,7 @@ export default function TeacherAssignmentPage() {
   const isQuizAssignment = assignment?.language === 'quiz'
   const quizQuestions = useMemo(() => parseQuizQuestions(assignment?.test_cases), [assignment?.test_cases])
 
-  function autoGradeQuiz(submission: any): { score: number; feedback: string } | null {
+  function autoGradeQuiz(submission: any): QuizAutoGradeSummary | null {
     if (!isQuizAssignment || quizQuestions.length === 0) return null
     const payload = parseQuizSubmission(submission?.code)
     const answers = Array.isArray(payload.answers) ? payload.answers : []
@@ -178,12 +199,55 @@ export default function TeacherAssignmentPage() {
       const selected = Number.isFinite(Number(answers[index])) ? Number(answers[index]) : -1
       const correct = selected === question.correctIndex
       if (correct) earned += points
-      return `${correct ? 'Correct' : 'Incorrect'} Q${index + 1}`
+      return {
+        label: `Q${index + 1}`,
+        correct,
+        points,
+      }
     })
 
     const score = possible > 0 ? Math.round((earned / possible) * 100) : 0
-    const feedback = `Auto-graded quiz. ${lineItems.join(' | ')}`
-    return { score, feedback }
+    const feedback = `Auto-graded quiz. ${lineItems.map((item) => `${item.correct ? 'Correct' : 'Incorrect'} ${item.label}`).join(' | ')}`
+    return { score, feedback, earned, possible, lineItems }
+  }
+
+  const filteredSubmissions = useMemo(() => {
+    const search = submissionSearch.trim().toLowerCase()
+    return orderedSubmissions.filter((submission) => {
+      if (statusFilter !== 'all' && submission.status !== statusFilter) return false
+      if (!search) return true
+      const haystack = `${submission.profiles?.full_name || ''} ${submission.profiles?.email || ''}`.toLowerCase()
+      return haystack.includes(search)
+    })
+  }, [orderedSubmissions, statusFilter, submissionSearch])
+
+  const selectedSubmissionIndex = useMemo(
+    () => filteredSubmissions.findIndex((submission) => submission.id === selectedSubmission?.id),
+    [filteredSubmissions, selectedSubmission?.id],
+  )
+  const selectedSubmissionAutoGrade = autoGradeQuiz(selectedSubmission)
+  const selectedCodeMetrics = useMemo(() => {
+    const rawCode = String(selectedSubmission?.code || '')
+    const trimmed = rawCode.trim()
+    if (!trimmed) return { characters: 0, lines: 0 }
+    return {
+      characters: rawCode.length,
+      lines: rawCode.split('\n').length,
+    }
+  }, [selectedSubmission?.code])
+
+  function applyQuickFeedback(snippet: string) {
+    setGradeFeedback((current) => (current ? `${current}\n\n${snippet}` : snippet))
+  }
+
+  function jumpToSubmission(direction: -1 | 1) {
+    if (selectedSubmissionIndex < 0) return
+    const next = filteredSubmissions[selectedSubmissionIndex + direction]
+    if (!next) return
+    selectedSubmissionIdRef.current = next.id
+    setSelectedSubmission(next)
+    setGradeScore(next.score?.toString() || '')
+    setGradeFeedback(next.feedback || '')
   }
 
   async function handleGradeSubmission() {
@@ -301,12 +365,41 @@ export default function TeacherAssignmentPage() {
           {/* Submissions List */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <h2 className="text-lg font-semibold text-white mb-3">Submissions</h2>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold text-white">Submissions</h2>
+                <Badge variant="secondary" className="border-white/10 bg-white/10 text-slate-200">
+                  {filteredSubmissions.length} shown
+                </Badge>
+              </div>
+              <div className="mb-3 space-y-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                  <Input
+                    value={submissionSearch}
+                    onChange={(event) => setSubmissionSearch(event.target.value)}
+                    placeholder="Search student"
+                    className="border-white/10 bg-white/5 pl-9 text-white placeholder:text-slate-500"
+                  />
+                </div>
+                <div className="relative">
+                  <Filter className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value as 'all' | 'pending' | 'submitted' | 'graded')}
+                    className="h-11 w-full rounded-md border border-white/10 bg-white/5 pl-9 pr-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="submitted">Ready to grade</option>
+                    <option value="pending">Drafts in progress</option>
+                    <option value="graded">Already graded</option>
+                  </select>
+                </div>
+              </div>
               <div className="space-y-2">
-                {orderedSubmissions.length === 0 ? (
+                {filteredSubmissions.length === 0 ? (
                   <p className="text-sm text-slate-400">No submissions yet</p>
                 ) : (
-                  orderedSubmissions.map((submission) => (
+                  filteredSubmissions.map((submission) => (
                     <div
                       key={submission.id}
                       className={`cursor-pointer transition-colors rounded-2xl backdrop-blur-xl border p-4 ${selectedSubmission?.id === submission.id ? 'border-blue-400/50 bg-gradient-to-br from-blue-500/20 to-blue-500/10' : 'border-white/10 bg-gradient-to-br from-white/10 to-white/5 hover:border-blue-400/30'}`}
@@ -335,6 +428,10 @@ export default function TeacherAssignmentPage() {
                             ? 'Ready to grade'
                             : 'Graded'}
                       </p>
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                        <span>{new Date(submission.submitted_at || submission.updated_at || submission.created_at).toLocaleDateString()}</span>
+                        {typeof submission.score === 'number' && <span>{submission.score}%</span>}
+                      </div>
                     </div>
                   ))
                 )}
@@ -349,11 +446,60 @@ export default function TeacherAssignmentPage() {
                 {/* Code Display */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
                   <div className="space-y-4">
-                    <div>
-                      <h3 className="text-xl font-semibold text-white">Student Code</h3>
-                      <p className="text-sm text-slate-400 mt-1">
-                        Last activity: {new Date(selectedSubmission.submitted_at || selectedSubmission.updated_at || selectedSubmission.created_at).toLocaleString()}
-                      </p>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-semibold text-white">{selectedSubmission.profiles?.full_name || 'Student submission'}</h3>
+                          <Badge variant={selectedSubmission.status === 'graded' ? 'default' : 'secondary'}>
+                            {selectedSubmission.status === 'graded' ? 'Graded' : selectedSubmission.status === 'submitted' ? 'Ready to grade' : 'Draft in progress'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-slate-400 mt-1">{selectedSubmission.profiles?.email}</p>
+                        <p className="text-sm text-slate-400 mt-1">
+                          Last activity: {new Date(selectedSubmission.submitted_at || selectedSubmission.updated_at || selectedSubmission.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => jumpToSubmission(-1)} disabled={selectedSubmissionIndex <= 0} className="border-white/10 bg-white/5 text-white hover:bg-white/10">
+                          <ChevronLeft className="mr-2 h-4 w-4" />
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => jumpToSubmission(1)}
+                          disabled={selectedSubmissionIndex < 0 || selectedSubmissionIndex >= filteredSubmissions.length - 1}
+                          className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                        >
+                          Next
+                          <ChevronRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                      <Card className="border-white/10 bg-slate-950/30">
+                        <CardContent className="pt-4">
+                          <p className="text-xs uppercase tracking-wide text-slate-400">Status</p>
+                          <p className="mt-1 text-sm font-medium text-white">{selectedSubmission.status || 'pending'}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-white/10 bg-slate-950/30">
+                        <CardContent className="pt-4">
+                          <p className="text-xs uppercase tracking-wide text-slate-400">Current score</p>
+                          <p className="mt-1 text-sm font-medium text-white">{typeof selectedSubmission.score === 'number' ? `${selectedSubmission.score}%` : 'Not graded'}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-white/10 bg-slate-950/30">
+                        <CardContent className="pt-4">
+                          <p className="text-xs uppercase tracking-wide text-slate-400">Lines</p>
+                          <p className="mt-1 text-sm font-medium text-white">{selectedCodeMetrics.lines}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-white/10 bg-slate-950/30">
+                        <CardContent className="pt-4">
+                          <p className="text-xs uppercase tracking-wide text-slate-400">Characters</p>
+                          <p className="mt-1 text-sm font-medium text-white">{selectedCodeMetrics.characters}</p>
+                        </CardContent>
+                      </Card>
                     </div>
                     <pre className="bg-slate-950/50 p-4 rounded-lg overflow-auto max-h-96 text-sm font-mono text-slate-200 border border-white/10">
                       {selectedSubmission.code}
@@ -396,6 +542,27 @@ export default function TeacherAssignmentPage() {
                         })}
                       </div>
                     )}
+                    {selectedSubmissionAutoGrade && (
+                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-white">Autograde Preview</p>
+                            <p className="text-xs text-emerald-200">Auto-grading remains enabled. Teachers can review the breakdown before saving.</p>
+                          </div>
+                          <Badge className="bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/20">
+                            {selectedSubmissionAutoGrade.score}% ({selectedSubmissionAutoGrade.earned}/{selectedSubmissionAutoGrade.possible} pts)
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          {selectedSubmissionAutoGrade.lineItems.map((item) => (
+                            <div key={item.label} className="rounded-md border border-white/10 bg-slate-950/30 px-3 py-2 text-sm text-slate-200">
+                              <span className={item.correct ? 'text-emerald-300' : 'text-orange-300'}>{item.correct ? 'Correct' : 'Incorrect'}</span>{' '}
+                              {item.label} · {item.points} pt{item.points === 1 ? '' : 's'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -425,15 +592,45 @@ export default function TeacherAssignmentPage() {
 
                     <div>
                       <Label htmlFor="feedback" className="text-slate-300">Feedback</Label>
-                      <textarea
+                      <Textarea
                         id="feedback"
                         value={gradeFeedback}
                         onChange={(e) => setGradeFeedback(e.target.value)}
                         disabled={saving}
                         placeholder="Provide constructive feedback..."
-                        className="w-full px-3 py-2 border rounded-md bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:border-blue-400/50 focus:ring-blue-400/20"
                         rows={6}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:ring-blue-400/20"
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-300">Quick feedback</p>
+                      <div className="flex flex-wrap gap-2">
+                        {QUICK_FEEDBACK_SNIPPETS.map((snippet) => (
+                          <Button
+                            key={snippet}
+                            type="button"
+                            variant="outline"
+                            onClick={() => applyQuickFeedback(snippet)}
+                            className="border-white/10 bg-white/5 text-xs text-slate-200 hover:bg-white/10"
+                          >
+                            {snippet}
+                          </Button>
+                        ))}
+                        {selectedSubmissionAutoGrade && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setGradeScore(String(selectedSubmissionAutoGrade.score))
+                              setGradeFeedback(selectedSubmissionAutoGrade.feedback)
+                            }}
+                            className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-100 hover:bg-emerald-500/20"
+                          >
+                            Use autograde preview
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     <Button

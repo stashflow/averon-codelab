@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -40,11 +40,7 @@ export default function TeacherJoinPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const supabase = createClient()
 
     try {
@@ -96,7 +92,11 @@ export default function TeacherJoinPage() {
     } catch (err: any) {
       console.error('[v0] Error loading data:', err)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   async function handleSearchCode() {
     if (!classCode.trim() || !user) return

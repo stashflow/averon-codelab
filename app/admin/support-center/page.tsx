@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useEffectEvent } from 'react'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -108,16 +108,12 @@ export default function AdminSupportCenter() {
     activeUsers24h: 0
   })
 
-  useEffect(() => {
-    verifyAccessAndLoad()
-  }, [])
-
   const loading = pendingRequests > 0
 
   const beginRequest = () => setPendingRequests((prev) => prev + 1)
   const endRequest = () => setPendingRequests((prev) => Math.max(0, prev - 1))
 
-  const verifyAccessAndLoad = async () => {
+  const verifyAccessAndLoad = useEffectEvent(async () => {
     try {
       const statsResponse = await fetch('/api/admin/support/stats')
       if (statsResponse.status === 401) {
@@ -144,7 +140,11 @@ export default function AdminSupportCenter() {
       console.error('Error verifying support access:', error)
       showAlert('error', 'Unable to verify admin access')
     }
-  }
+  })
+
+  useEffect(() => {
+    void verifyAccessAndLoad()
+  }, [])
 
   const loadStats = async (prefetchedResponse?: Response) => {
     try {

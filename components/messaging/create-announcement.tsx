@@ -84,7 +84,7 @@ export function CreateAnnouncement({ classroomId }: { classroomId: string }) {
             rows={4}
           />
           <p className="text-xs text-muted-foreground">
-            Will be displayed as: "{message || 'Your message'}" - Your Name
+            Will be displayed as: &quot;{message || 'Your message'}&quot; - Your Name
           </p>
         </div>
 
