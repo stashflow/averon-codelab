@@ -50,6 +50,10 @@ function isMissingColumnError(error: unknown, columnName: string) {
   return typedError?.code === '42703' || message.includes(columnName.toLowerCase())
 }
 
+function castProfile<TProfile extends ClientProfile>(value: unknown): TProfile | null {
+  return (value as TProfile | null) ?? null
+}
+
 export function hasAppRole(role: string | null | undefined): role is AppRole {
   return VALID_APP_ROLES.has(role as AppRole)
 }
@@ -69,7 +73,7 @@ export async function getClientProfile<TProfile extends ClientProfile = ClientPr
 
   if (!profileWithSchool.error) {
     return {
-      profile: (profileWithSchool.data as TProfile | null) || null,
+      profile: castProfile<TProfile>(profileWithSchool.data),
       missingSchoolIdColumn: false,
     }
   }
@@ -91,10 +95,10 @@ export async function getClientProfile<TProfile extends ClientProfile = ClientPr
 
   return {
     profile: fallbackProfile.data
-      ? ({
+      ? castProfile<TProfile>({
           ...fallbackProfile.data,
           school_id: null,
-        } as TProfile)
+        })
       : null,
     missingSchoolIdColumn: true,
   }
