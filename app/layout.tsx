@@ -10,9 +10,13 @@ export const metadata: Metadata = {
   description: 'A professional coding education platform for schools. Teachers create assignments, students solve problems, and everyone learns together.',
   generator: 'v0.app',
   icons: {
-    icon: '/brandmark.svg',
-    shortcut: '/brandmark.svg',
-    apple: '/brandmark.svg',
+    icon: [
+      { url: '/ACL.png', type: 'image/png', sizes: '32x32' },
+      { url: '/ACL.png', type: 'image/png', sizes: '192x192' },
+      { url: '/ACL.png', type: 'image/png', sizes: '512x512' },
+    ],
+    shortcut: '/ACL.png',
+    apple: '/ACL.png',
   },
 }
 
