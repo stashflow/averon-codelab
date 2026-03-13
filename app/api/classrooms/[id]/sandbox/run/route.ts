@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 
-import { normalizeSandboxLanguage, normalizeSandboxRecord } from '@/lib/classroom-sandbox'
+import {
+  SANDBOX_SETUP_MESSAGE,
+  isMissingSandboxTableError,
+  normalizeSandboxLanguage,
+  normalizeSandboxRecord,
+} from '@/lib/classroom-sandbox'
 import { ensureValidCsrf } from '@/lib/security/csrf'
 import { canUserAccessClassroom } from '@/lib/security/role-scope'
 import { runSandboxExecution } from '@/lib/sandbox-runtime'
@@ -82,6 +87,10 @@ export async function POST(request: Request, context: RouteContext) {
       .single()
 
     if (saveError) {
+      if (isMissingSandboxTableError(saveError)) {
+        return NextResponse.json({ error: SANDBOX_SETUP_MESSAGE }, { status: 503 })
+      }
+
       return NextResponse.json({ error: saveError.message || 'Failed to persist sandbox run' }, { status: 500 })
     }
 
@@ -90,6 +99,10 @@ export async function POST(request: Request, context: RouteContext) {
       sandbox,
     })
   } catch (error: any) {
+    if (isMissingSandboxTableError(error)) {
+      return NextResponse.json({ error: SANDBOX_SETUP_MESSAGE }, { status: 503 })
+    }
+
     return NextResponse.json({ error: error?.message || 'Failed to run classroom sandbox' }, { status: 500 })
   }
 }

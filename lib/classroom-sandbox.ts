@@ -1,5 +1,8 @@
 export type SandboxLanguage = 'python' | 'javascript'
 
+export const SANDBOX_SETUP_MESSAGE =
+  'Sandbox mode is not set up in Supabase yet. Apply scripts/049_student_sandbox_mode.sql to create public.student_sandboxes.'
+
 export type StudentSandboxRecord = {
   id: string
   classroom_id: string
@@ -80,4 +83,15 @@ export function normalizeSandboxRecord(
     created_at: record?.created_at,
     updated_at: record?.updated_at,
   }
+}
+
+export function isMissingSandboxTableError(error: unknown): boolean {
+  const typedError = error as { code?: string; message?: string } | null
+  const message = String(typedError?.message || '').toLowerCase()
+
+  return (
+    typedError?.code === 'PGRST205' ||
+    message.includes('public.student_sandboxes') ||
+    message.includes('student_sandboxes') && message.includes('schema cache')
+  )
 }

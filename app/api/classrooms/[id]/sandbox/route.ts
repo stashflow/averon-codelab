@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 
-import { normalizeSandboxLanguage, normalizeSandboxRecord } from '@/lib/classroom-sandbox'
+import {
+  SANDBOX_SETUP_MESSAGE,
+  isMissingSandboxTableError,
+  normalizeSandboxLanguage,
+  normalizeSandboxRecord,
+} from '@/lib/classroom-sandbox'
 import { ensureValidCsrf } from '@/lib/security/csrf'
 import { canUserAccessClassroom } from '@/lib/security/role-scope'
 import { createClient } from '@/lib/supabase/server'
@@ -85,6 +90,10 @@ export async function GET(_request: Request, context: RouteContext) {
       sandbox,
     })
   } catch (error: any) {
+    if (isMissingSandboxTableError(error)) {
+      return NextResponse.json({ error: SANDBOX_SETUP_MESSAGE }, { status: 503 })
+    }
+
     return NextResponse.json({ error: error?.message || 'Failed to load sandbox mode' }, { status: 500 })
   }
 }
@@ -124,11 +133,19 @@ export async function PUT(request: Request, context: RouteContext) {
       .single()
 
     if (error) {
+      if (isMissingSandboxTableError(error)) {
+        return NextResponse.json({ error: SANDBOX_SETUP_MESSAGE }, { status: 503 })
+      }
+
       return NextResponse.json({ error: error.message || 'Failed to save sandbox' }, { status: 500 })
     }
 
     return NextResponse.json({ sandbox })
   } catch (error: any) {
+    if (isMissingSandboxTableError(error)) {
+      return NextResponse.json({ error: SANDBOX_SETUP_MESSAGE }, { status: 503 })
+    }
+
     return NextResponse.json({ error: error?.message || 'Failed to save sandbox mode' }, { status: 500 })
   }
 }
