@@ -106,34 +106,6 @@ export default function SignUp() {
 
   return (
     <AppShell className="flex bg-background text-foreground">
-      {/* Left Side - Visual */}
-      <div className="hidden lg:flex flex-1 items-center justify-center p-12 border-r border-border/70 bg-background/30">
-        <div className="max-w-md space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-4xl font-bold tracking-tight">
-              <span className="text-gradient-premium">
-                Start Your Journey
-              </span>
-            </h2>
-            <p className="text-lg text-slate-700 dark:text-slate-300 leading-relaxed">
-              Join Averon CodeLab and unlock your potential with hands-on coding exercises, instant feedback, and
-              expert-designed curriculum.
-            </p>
-          </div>
-          <div className="space-y-3 pt-4">
-            {['School-ready platform', 'Role-based access', 'Instant access'].map((item, idx) => (
-              <div key={idx} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                </div>
-                <span className="text-sm text-slate-600 dark:text-slate-300">{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-3">
@@ -143,12 +115,24 @@ export default function SignUp() {
             </Link>
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Create Account</h1>
-              <p className="text-slate-600 dark:text-slate-300 mt-2">Sign up to start learning today</p>
+              <p className="mt-2 text-slate-600 dark:text-slate-300">
+                Build your workspace and start learning in minutes.
+              </p>
             </div>
           </div>
 
           <div className="site-panel relative overflow-hidden p-6">
             <div className="space-y-5">
+              <div className="rounded-lg border border-primary/20 bg-primary/8 p-4">
+                <p className="text-sm font-medium text-foreground">Your account includes</p>
+                <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Guided coding lessons</div>
+                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Saved classroom progress</div>
+                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Instant assignment access</div>
+                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Teacher onboarding tools</div>
+                </div>
+              </div>
+
               <form onSubmit={handleSignUp} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="fullName" className="text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -202,19 +186,51 @@ export default function SignUp() {
                   <Label htmlFor="role" className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     I am a...
                   </Label>
-                  <select
-                    id="role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    disabled={loading}
-                    className="w-full h-11 px-3 border border-input rounded-lg bg-background/88 text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    <option value="student">Student</option>
-                    <option value="teacher">Teacher</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      {
+                        value: 'student',
+                        label: 'Student',
+                        description: 'Join classes, complete lessons, and code in your workspace.',
+                      },
+                      {
+                        value: 'teacher',
+                        label: 'Teacher',
+                        description: 'Create classes, assign work, and guide student progress.',
+                      },
+                    ].map((option) => {
+                      const isSelected = role === option.value
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setRole(option.value)}
+                          disabled={loading}
+                          className={`rounded-xl border px-4 py-3 text-left transition ${
+                            isSelected
+                              ? 'border-primary/45 bg-primary/10 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]'
+                              : 'border-border/70 bg-background/70 hover:border-primary/25 hover:bg-background'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-semibold text-foreground">{option.label}</span>
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${
+                                isSelected ? 'bg-primary' : 'bg-border'
+                              }`}
+                            />
+                          </div>
+                          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{option.description}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3 rounded-xl border border-border/70 bg-background/55 p-4">
+                  <p className="text-sm font-medium text-foreground">Before you continue</p>
+
                   <div className="flex items-start gap-3">
                     <Checkbox
                       id="terms"
@@ -223,7 +239,7 @@ export default function SignUp() {
                       disabled={loading}
                       className="mt-1 border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
-                    <label htmlFor="terms" className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed cursor-pointer">
+                    <label htmlFor="terms" className="cursor-pointer text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                       I agree to the{' '}
                       <Link href="/terms" target="_blank" className="text-primary hover:text-foreground hover:underline font-medium">
                         Terms of Service
@@ -239,7 +255,7 @@ export default function SignUp() {
                       disabled={loading}
                       className="mt-1 border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
-                    <label htmlFor="privacy" className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed cursor-pointer">
+                    <label htmlFor="privacy" className="cursor-pointer text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                       I agree to the{' '}
                       <Link href="/privacy" target="_blank" className="text-primary hover:text-foreground hover:underline font-medium">
                         Privacy Policy
@@ -259,7 +275,7 @@ export default function SignUp() {
                   className="w-full h-11"
                   disabled={loading || !acceptedTerms || !acceptedPrivacy}
                 >
-                  {loading ? 'Creating account...' : 'Create Account'}
+                  {loading ? 'Creating account...' : role === 'teacher' ? 'Continue as Teacher' : 'Create Account'}
                 </Button>
 
                 <div className="relative">
@@ -308,6 +324,36 @@ export default function SignUp() {
               Sign in
             </Link>
           </p>
+        </div>
+      </div>
+
+      <div className="hidden lg:flex flex-1 items-center justify-center p-12 border-l border-border/70 bg-background/30">
+        <div className="max-w-md space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-4xl font-bold tracking-tight">
+              <span className="text-gradient-premium">
+                Start Strong From Day One.
+              </span>
+            </h2>
+            <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+              Sign up with the same polished workflow students and teachers use every day, then move straight into
+              classes, assignments, and guided coding.
+            </p>
+          </div>
+          <div className="space-y-3 pt-4">
+            {[
+              'Professional classroom-ready experience',
+              'Fast onboarding for students and teachers',
+              'Progress, coding, and assignments in one place',
+            ].map((item, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
+                  <div className="h-2 w-2 rounded-full bg-primary" />
+                </div>
+                <span className="text-sm text-slate-600 dark:text-slate-300">{item}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </AppShell>
