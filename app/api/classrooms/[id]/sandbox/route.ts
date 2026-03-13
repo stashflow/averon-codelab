@@ -114,6 +114,17 @@ export async function PUT(request: Request, context: RouteContext) {
     const code = hasCode ? String(body.code ?? '') : defaults.code
     const stdin = Object.prototype.hasOwnProperty.call(body, 'stdin') ? String(body.stdin ?? '') : ''
     const entryFilename = String(body.entryFilename || '').trim()
+    const now = new Date().toISOString()
+    const lastRun =
+      body.lastRun && typeof body.lastRun === 'object'
+        ? (body.lastRun as {
+            status?: string
+            stdout?: string
+            stderr?: string
+            runtime?: string
+            durationMs?: number
+          })
+        : null
 
     const { data: sandbox, error } = await access.supabase
       .from('student_sandboxes')
@@ -125,7 +136,13 @@ export async function PUT(request: Request, context: RouteContext) {
           entry_filename: entryFilename || defaults.entry_filename,
           code,
           stdin,
-          updated_at: new Date().toISOString(),
+          last_run_status: lastRun?.status === 'success' || lastRun?.status === 'timeout' ? lastRun.status : lastRun?.status ? 'error' : undefined,
+          last_run_output: typeof lastRun?.stdout === 'string' ? lastRun.stdout : undefined,
+          last_run_error: typeof lastRun?.stderr === 'string' ? lastRun.stderr : undefined,
+          last_run_runtime: typeof lastRun?.runtime === 'string' ? lastRun.runtime : undefined,
+          last_run_duration_ms: typeof lastRun?.durationMs === 'number' ? lastRun.durationMs : undefined,
+          last_run_at: lastRun ? now : undefined,
+          updated_at: now,
         },
         { onConflict: 'classroom_id,student_id' },
       )

@@ -15,13 +15,14 @@ import {
   SANDBOX_LANGUAGE_OPTIONS,
   getSandboxEntryFilename,
   getSandboxStarterCode,
-  normalizeSandboxLanguage,
   type SandboxLanguage,
   type StudentSandboxRecord,
 } from '@/lib/classroom-sandbox'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 const MonacoEditor = nextDynamic(() => import('@monaco-editor/react'), { ssr: false })
+const PYODIDE_SCRIPT_URL = 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js'
+const PYODIDE_ASSET_BASE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/'
 
 type ClassroomSummary = {
   id: string
@@ -36,6 +37,21 @@ type SandboxRunResult = {
   exitCode: number | null
   durationMs: number
   runtime: string
+}
+
+type PyodideInstance = {
+  globals: {
+    get: (name: string) => unknown
+    set: (name: string, value: unknown) => void
+  }
+  runPythonAsync: (code: string) => Promise<unknown>
+}
+
+declare global {
+  interface Window {
+    loadPyodide?: (options: { indexURL: string }) => Promise<PyodideInstance>
+    __averonPyodidePromise?: Promise<PyodideInstance>
+  }
 }
 
 export default function ClassroomSandboxPage() {
@@ -143,8 +159,12 @@ export default function ClassroomSandboxPage() {
   )
   const editorTheme = resolvedTheme === 'light' ? 'light' : 'vs-dark'
 
-  async function persistSandbox(isAutosave = false) {
-    if (!readyToPersist) return
+  async function persistSandbox(
+    isAutosave = false,
+    lastRun?: SandboxRunResult | null,
+    successMessage?: string,
+  ): Promise<StudentSandboxRecord | null> {
+    if (!readyToPersist) return null
 
     setSaving(true)
     setRuntimeError(null)
@@ -158,6 +178,7 @@ export default function ClassroomSandboxPage() {
           code,
           stdin,
           entryFilename,
+          lastRun,
         }),
       })
 
@@ -166,12 +187,16 @@ export default function ClassroomSandboxPage() {
         throw new Error(payload?.error || 'Failed to save sandbox')
       }
 
-      setSandbox(payload.sandbox as StudentSandboxRecord)
-      setLastSavedAt((payload.sandbox as StudentSandboxRecord).updated_at || new Date().toISOString())
-      setSaveMessage(isAutosave ? 'Autosaved to Supabase.' : 'Saved to Supabase.')
+      const savedSandbox = payload.sandbox as StudentSandboxRecord
+
+      setSandbox(savedSandbox)
+      setLastSavedAt(savedSandbox.updated_at || new Date().toISOString())
+      setSaveMessage(successMessage || (isAutosave ? 'Autosaved to Supabase.' : 'Saved to Supabase.'))
+      return savedSandbox
     } catch (error: any) {
       setRuntimeError(error?.message || 'Failed to save sandbox')
       setSaveMessage('Save failed.')
+      return null
     } finally {
       setSaving(false)
     }
@@ -203,13 +228,36 @@ export default function ClassroomSandboxPage() {
       setLastSavedAt((payload.sandbox as StudentSandboxRecord).updated_at || new Date().toISOString())
       setSaveMessage('Run synced to Supabase.')
     } catch (error: any) {
-      setRuntimeError(error?.message || 'Failed to run sandbox')
+      const message = error?.message || 'Failed to run sandbox'
+
+      if (shouldUseBrowserPythonFallback(message)) {
+        try {
+          const browserResult = await runPythonInBrowser(code, stdin)
+          const savedSandbox = await persistSandbox(
+            false,
+            browserResult,
+            'Server runtime unavailable, so this run executed in your browser and synced to Supabase.',
+          )
+
+          setRunResult(browserResult)
+          if (savedSandbox) {
+            setSandbox(savedSandbox)
+            setLastSavedAt(savedSandbox.updated_at || new Date().toISOString())
+          }
+          return
+        } catch (browserError: any) {
+          setRuntimeError(browserError?.message || message)
+          return
+        }
+      }
+
+      setRuntimeError(message)
     } finally {
       setRunning(false)
     }
   }
 
-  function loadStarterForLanguage(nextLanguage: SandboxLanguage) {
+  function loadStarterForLanguage() {
     setLanguage('python')
     setEntryFilename(getSandboxEntryFilename('python'))
     setCode(getSandboxStarterCode('python', classroom?.name))
@@ -254,7 +302,7 @@ export default function ClassroomSandboxPage() {
                 Back to Class
               </Button>
             </Link>
-            <Button variant="outline" size="sm" onClick={() => loadStarterForLanguage(language)}>
+            <Button variant="outline" size="sm" onClick={() => loadStarterForLanguage()}>
               <RotateCcw className="h-4 w-4" />
               Reset Starter
             </Button>
@@ -283,7 +331,7 @@ export default function ClassroomSandboxPage() {
               </h1>
               <p className="site-subtitle max-w-2xl">
                 Every enrolled student gets a personal sandbox for each class. Code is persisted to Supabase, and runs can
-                execute locally in development or through a configured remote runtime.
+                execute on the server when available or fall back to an in-browser Python runtime when needed.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -307,7 +355,7 @@ export default function ClassroomSandboxPage() {
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>Each class gets its own saved workspace and stdin history.</li>
                   <li>Runs save the latest output, runtime, and status back to Supabase.</li>
-                  <li>Python and JavaScript starters are included for quick experimentation.</li>
+                  <li>Python starter code and a Python-only runtime keep each classroom experience consistent.</li>
                 </ul>
               </div>
             </div>
@@ -418,4 +466,144 @@ export default function ClassroomSandboxPage() {
       </main>
     </div>
   )
+}
+
+function shouldUseBrowserPythonFallback(message: string): boolean {
+  const normalizedMessage = message.toLowerCase()
+
+  return (
+    normalizedMessage.includes('sandbox runtime "python3" is not available on this server') ||
+    normalizedMessage.includes('sandbox execution is not configured') ||
+    normalizedMessage.includes('install python3 for local execution')
+  )
+}
+
+async function runPythonInBrowser(code: string, stdin: string): Promise<SandboxRunResult> {
+  const pyodide = await ensurePyodideLoaded()
+  const startedAt = performance.now()
+
+  pyodide.globals.set('__averon_code', code)
+  pyodide.globals.set('__averon_stdin', stdin)
+
+  await pyodide.runPythonAsync(`
+import builtins
+import contextlib
+import io
+import traceback
+
+_stdout_capture = io.StringIO()
+_stderr_capture = io.StringIO()
+_stdin_lines = __averon_stdin.splitlines()
+_stdin_index = 0
+
+def _averon_input(prompt=""):
+    global _stdin_index
+    if prompt:
+        print(prompt, end="", file=_stdout_capture)
+    if _stdin_index < len(_stdin_lines):
+        value = _stdin_lines[_stdin_index]
+        _stdin_index += 1
+        return value
+    raise EOFError("EOF when reading a line")
+
+builtins.input = _averon_input
+_globals = {"__name__": "__main__"}
+_status = "success"
+
+try:
+    with contextlib.redirect_stdout(_stdout_capture), contextlib.redirect_stderr(_stderr_capture):
+        exec(__averon_code, _globals)
+except Exception:
+    _status = "error"
+    traceback.print_exc(file=_stderr_capture)
+
+__averon_status = _status
+__averon_stdout = _stdout_capture.getvalue()
+__averon_stderr = _stderr_capture.getvalue()
+  `)
+
+  return {
+    status: readPyodideString(pyodide, '__averon_status') === 'success' ? 'success' : 'error',
+    stdout: readPyodideString(pyodide, '__averon_stdout'),
+    stderr: readPyodideString(pyodide, '__averon_stderr'),
+    exitCode: null,
+    durationMs: Math.round(performance.now() - startedAt),
+    runtime: 'browser-python',
+  }
+}
+
+async function ensurePyodideLoaded(): Promise<PyodideInstance> {
+  if (typeof window === 'undefined') {
+    throw new Error('Browser Python fallback is only available in the classroom sandbox page.')
+  }
+
+  if (!window.__averonPyodidePromise) {
+    window.__averonPyodidePromise = (async () => {
+      if (!window.loadPyodide) {
+        await loadExternalScript(PYODIDE_SCRIPT_URL)
+      }
+
+      if (!window.loadPyodide) {
+        throw new Error('Unable to load the browser Python runtime for sandbox mode.')
+      }
+
+      return window.loadPyodide({ indexURL: PYODIDE_ASSET_BASE_URL })
+    })()
+  }
+
+  try {
+    return await window.__averonPyodidePromise
+  } catch (error) {
+    window.__averonPyodidePromise = undefined
+    throw error
+  }
+}
+
+async function loadExternalScript(src: string): Promise<void> {
+  const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`)
+  if (existingScript) {
+    await waitForScript(existingScript)
+    return
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = src
+    script.async = true
+    script.onload = () => {
+      script.dataset.loaded = 'true'
+      resolve()
+    }
+    script.onerror = () => reject(new Error('Unable to load the browser Python runtime for sandbox mode.'))
+    document.head.appendChild(script)
+  })
+}
+
+async function waitForScript(script: HTMLScriptElement): Promise<void> {
+  if (script.dataset.loaded === 'true') return
+
+  await new Promise<void>((resolve, reject) => {
+    const handleLoad = () => {
+      script.dataset.loaded = 'true'
+      resolve()
+    }
+    const handleError = () => reject(new Error('Unable to load the browser Python runtime for sandbox mode.'))
+
+    script.addEventListener('load', handleLoad, { once: true })
+    script.addEventListener('error', handleError, { once: true })
+  })
+}
+
+function readPyodideString(pyodide: PyodideInstance, key: string): string {
+  const value = pyodide.globals.get(key)
+
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (value && typeof value === 'object' && 'toString' in value && typeof value.toString === 'function') {
+    return value.toString()
+  }
+
+  return value == null ? '' : String(value)
 }
