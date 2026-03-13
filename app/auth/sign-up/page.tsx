@@ -106,7 +106,7 @@ export default function SignUp() {
 
   return (
     <AppShell className="flex bg-background text-foreground">
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="relative z-10 flex flex-1 items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-3">
             <Link href="/" className="inline-flex items-center gap-2 group">
@@ -114,8 +114,8 @@ export default function SignUp() {
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Create Account</h1>
-              <p className="mt-2 text-slate-600 dark:text-slate-300">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">Create Account</h1>
+              <p className="mt-2 text-muted-foreground">
                 Build your workspace and start learning in minutes.
               </p>
             </div>
@@ -318,7 +318,7 @@ export default function SignUp() {
             </div>
           </div>
 
-          <p className="text-sm text-center text-slate-600 dark:text-slate-300">
+          <p className="text-center text-sm text-muted-foreground">
             Already have an account?{' '}
             <Link href="/auth/login" className="text-primary hover:text-foreground hover:underline font-semibold">
               Sign in
@@ -327,15 +327,16 @@ export default function SignUp() {
         </div>
       </div>
 
-      <div className="hidden lg:flex flex-1 items-center justify-center p-12 border-l border-border/70 bg-background/30">
-        <div className="max-w-md space-y-6">
+      <div className="relative z-10 hidden flex-1 items-center justify-center border-l border-border/70 bg-background/35 lg:flex">
+        <div className="absolute inset-0 bg-gradient-to-br from-background/10 via-transparent to-background/30" />
+        <div className="relative z-10 max-w-md space-y-6 p-12">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold tracking-tight">
               <span className="text-gradient-premium">
                 Start Strong From Day One.
               </span>
             </h2>
-            <p className="text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+            <p className="text-lg leading-relaxed text-foreground/80">
               Sign up with the same polished workflow students and teachers use every day, then move straight into
               classes, assignments, and guided coding.
             </p>
@@ -350,7 +351,7 @@ export default function SignUp() {
                 <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
                   <div className="h-2 w-2 rounded-full bg-primary" />
                 </div>
-                <span className="text-sm text-slate-600 dark:text-slate-300">{item}</span>
+                <span className="text-sm text-foreground/75">{item}</span>
               </div>
             ))}
           </div>
