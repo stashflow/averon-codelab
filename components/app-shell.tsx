@@ -41,9 +41,9 @@ type PageIntroProps = {
 
 export function AppShell({ children, className }: AppShellProps) {
   return (
-    <div className={cn('min-h-screen warm-aurora text-foreground', className)}>
+    <div className={cn('relative isolate min-h-screen warm-aurora text-foreground', className)}>
       <SiteBackdrop />
-      {children}
+      <div className="relative z-10">{children}</div>
     </div>
   )
 }
