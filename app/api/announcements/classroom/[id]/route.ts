@@ -27,6 +27,8 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const nowIso = new Date().toISOString()
+
     // Get active announcements with teacher info
     const { data: announcements, error } = await supabase
       .from('class_announcements')
@@ -36,7 +38,6 @@ export async function GET(
       `)
       .eq('classroom_id', classroom_id)
       .eq('is_active', true)
-      .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -47,7 +48,11 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ announcements })
+    return NextResponse.json({
+      announcements: ((announcements as any[]) || []).filter(
+        (announcement) => !announcement?.expires_at || announcement.expires_at > nowIso,
+      ),
+    })
   } catch (error) {
     console.error('[v0] Error in get announcements route:', error)
     return NextResponse.json(

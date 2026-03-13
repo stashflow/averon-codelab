@@ -114,7 +114,7 @@ export default function SignUp() {
               <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
-            <div>
+            <div className="lg:hidden">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Get started</p>
               <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Create your account</h1>
               <p className="mt-3 text-base leading-relaxed text-muted-foreground">
@@ -320,9 +320,9 @@ export default function SignUp() {
       </div>
 
       <AuthShowcase
-        eyebrow="Code. Learn. Excel."
-        title="The same refined entry point, built for both students and teachers."
-        description="Sign-up now mirrors login with the stronger center line, a richer visual pattern, and a more intentional workspace preview instead of extra clutter under the form."
+        eyebrow="Get started"
+        title="Create your account"
+        description="Set up your workspace, choose your role, and move straight into lessons and class projects from the same clean split layout, with the supporting content living on the opposite side of the card."
         points={['Guided onboarding for every role', 'Saved classroom and sandbox progress', 'Assignments, feedback, and grading in one flow', 'A calmer first-run experience']}
       />
     </AppShell>

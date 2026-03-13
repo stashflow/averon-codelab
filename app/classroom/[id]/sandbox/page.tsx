@@ -192,14 +192,18 @@ export default function ClassroomSandboxPage() {
     }
   }, [activeFile, entryFilename, workspaceFiles])
 
-  useEffect(() => {
-    setWorkspaceFiles((currentFiles) =>
-      currentFiles.map((file) => {
-        if (file.path !== activeFile || file.content === code) return file
-        return { ...file, content: code }
-      }),
-    )
-  }, [activeFile, code])
+  function handleCodeChange(nextCode: string) {
+    setCode(nextCode)
+    setWorkspaceFiles((currentFiles) => {
+      let changed = false
+      const nextFiles = currentFiles.map((file) => {
+        if (file.path !== activeFile || file.content === nextCode) return file
+        changed = true
+        return { ...file, content: nextCode }
+      })
+      return changed ? nextFiles : currentFiles
+    })
+  }
 
   async function persistSandbox(
     isAutosave = false,
@@ -539,7 +543,7 @@ export default function ClassroomSandboxPage() {
                         {editorLoadFailed ? (
                           <textarea
                             value={code}
-                            onChange={(event) => setCode(event.target.value)}
+                            onChange={(event) => handleCodeChange(event.target.value)}
                             spellCheck={false}
                             className="h-full min-h-[420px] w-full resize-none border-0 bg-[#0d1117] px-4 py-4 font-mono text-sm text-slate-100 outline-none"
                           />
@@ -548,7 +552,7 @@ export default function ClassroomSandboxPage() {
                             height="100%"
                             language="python"
                             value={code}
-                            onChange={(value) => setCode(value ?? '')}
+                            onChange={(value) => handleCodeChange(value ?? '')}
                             onMount={() => setEditorLoadFailed(false)}
                             loading={
                               <div className="flex h-full min-h-[420px] items-center justify-center text-sm text-slate-500">

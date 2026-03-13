@@ -88,7 +88,7 @@ export default function Login() {
               <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
-            <div>
+            <div className="lg:hidden">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Welcome back</p>
               <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Sign in to your workspace</h1>
               <p className="mt-3 text-base leading-relaxed text-muted-foreground">
@@ -213,9 +213,9 @@ export default function Login() {
       </div>
 
       <AuthShowcase
-        eyebrow="Code. Learn. Excel."
-        title="A polished coding classroom that feels ready the moment you arrive."
-        description="The right side now carries the visual weight again: a clean divider, a stronger pattern, and a calmer workspace preview that matches the rest of the product."
+        eyebrow="Welcome back"
+        title="Sign in to your workspace"
+        description="Pick up where you left off with classes, lessons, and your saved coding progress, all from a cleaner split-screen entry that keeps the supporting content on the opposite side of the form."
         points={['Interactive coding lessons', 'Instant feedback and grading', 'Progress that stays in sync', 'A cleaner, more focused workspace']}
       />
     </AppShell>

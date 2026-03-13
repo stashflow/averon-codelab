@@ -338,6 +338,7 @@ export default function StudentDashboard() {
 
       if (classEnrollmentData && classEnrollmentData.length > 0) {
         const classroomIds = classEnrollmentData.map((e: any) => e.classroom_id)
+        const nowIso = new Date().toISOString()
         const { data: assignmentData } = await supabase
           .from('assignments')
           .select(`
@@ -368,11 +369,14 @@ export default function StudentDashboard() {
           `)
           .in('classroom_id', classroomIds)
           .eq('is_active', true)
-          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(20)
 
-        setAnnouncements((announcementsData as any) || [])
+        setAnnouncements(
+          ((announcementsData as any[]) || [])
+            .filter((announcement) => !announcement?.expires_at || announcement.expires_at > nowIso)
+            .slice(0, 5),
+        )
         setAssignments(
           ((assignmentData as any[]) || []).map((row: any) => ({
             ...row,
