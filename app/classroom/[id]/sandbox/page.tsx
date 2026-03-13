@@ -381,8 +381,8 @@ export default function ClassroomSandboxPage() {
         </div>
       </header>
 
-      <main className="relative z-10 h-[calc(100vh-4rem)] px-4 py-4 sm:px-6 lg:px-8">
-        <div className="h-full overflow-hidden rounded-[28px] border border-border/80 bg-[#11151c]/95 text-slate-100 shadow-[0_32px_120px_-60px_rgba(15,23,42,0.85)]">
+      <main className="relative z-10 h-[calc(100vh-4rem)] w-full p-0">
+        <div className="h-full overflow-hidden border-t border-border/60 bg-[#11151c]/95 text-slate-100">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#161b22] px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">

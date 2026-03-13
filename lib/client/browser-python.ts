@@ -204,8 +204,6 @@ import runpy
 import sys
 import traceback
 
-import js
-
 class _AveronStream:
     def __init__(self, bridge):
         self.bridge = bridge
@@ -220,7 +218,7 @@ class _AveronStream:
         return None
 
 async def _averon_input_async(prompt=""):
-    response = await js.__averon_input_bridge(str(prompt or ""))
+    response = await __averon_input_bridge(str(prompt or ""))
     if response is None:
         raise EOFError("Input cancelled.")
     return str(response)
@@ -235,8 +233,8 @@ _original_cwd = os.getcwd()
 _entry_dir = os.path.dirname(__averon_entry_filename)
 _status = "success"
 
-sys.stdout = _AveronStream(js.__averon_stdout_bridge)
-sys.stderr = _AveronStream(js.__averon_stderr_bridge)
+sys.stdout = _AveronStream(__averon_stdout_bridge)
+sys.stderr = _AveronStream(__averon_stderr_bridge)
 builtins.input = _averon_input
 sys.path.insert(0, _entry_dir)
 
