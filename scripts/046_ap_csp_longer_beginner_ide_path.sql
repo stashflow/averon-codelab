@@ -1,4 +1,5 @@
 -- AP CSP Longer Beginner Path Rewrite
+-- Canonical AP CSP content rewrite for the live beginner-first experience.
 -- Starts at Hello World fundamentals, then grows gradually to AP CSP applications.
 -- Keeps lessons concrete, less open-ended, and test-focused.
 -- Safe to run multiple times.

@@ -6,9 +6,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeRaw from 'rehype-raw'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +33,7 @@ import { withCsrfHeaders } from '@/lib/security/csrf-client'
 import type { editor } from 'monaco-editor'
 
 const MonacoEditor = nextDynamic(() => import('@monaco-editor/react'), { ssr: false })
+const MarkdownContent = nextDynamic(() => import('@/components/markdown-content'), { ssr: false })
 
 type MonacoLanguage = 'python' | 'javascript' | 'typescript' | 'java' | 'cpp' | 'c' | 'json'
 type CheckpointKind = 'hello_world' | 'function' | 'loops' | 'conditionals' | 'data' | 'unknown'
@@ -2358,11 +2356,9 @@ export default function LessonViewer() {
                         >
                           <p className="text-xs uppercase tracking-wide text-cyan-300">Notes {index + 1}</p>
                           <h4 className="mt-1 text-base font-semibold text-white">{section.title}</h4>
-                          <div className="mt-2 text-sm text-slate-200 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                              {section.body}
-                            </ReactMarkdown>
-                          </div>
+                          <MarkdownContent className="mt-2 text-sm text-slate-200 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6">
+                            {section.body}
+                          </MarkdownContent>
                         </article>
                       ))}
                     </div>
@@ -2489,11 +2485,9 @@ export default function LessonViewer() {
                               </Button>
                             </div>
                             <p className="text-sm font-semibold text-white">{activeSection?.title || 'Overview'}</p>
-                            <div className="mt-2 text-sm text-slate-200 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                                {activeSection?.body || 'Lesson notes are loading.'}
-                              </ReactMarkdown>
-                            </div>
+                            <MarkdownContent className="mt-2 text-sm text-slate-200 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6">
+                              {activeSection?.body || 'Lesson notes are loading.'}
+                            </MarkdownContent>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
@@ -2974,11 +2968,9 @@ export default function LessonViewer() {
                         ))}
                       </div>
                     )}
-                    <div className="space-y-3 text-base text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                        {checkpointMarkdown || 'No assignment instructions provided.'}
-                      </ReactMarkdown>
-                    </div>
+                    <MarkdownContent className="space-y-3 text-base text-slate-200 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-900 [&_pre]:p-3 [&_strong]:text-white">
+                      {checkpointMarkdown || 'No assignment instructions provided.'}
+                    </MarkdownContent>
                   </div>
                 ) : (
                   <p className="text-sm text-slate-400">No assignment instructions available for this lesson.</p>
@@ -3042,11 +3034,9 @@ export default function LessonViewer() {
                     </Badge>
                   </div>
 
-                  <div className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                      {activeSection?.body || 'Lesson notes are loading.'}
-                    </ReactMarkdown>
-                  </div>
+                  <MarkdownContent className="space-y-3 text-slate-200 [&_a]:text-cyan-300 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400/60 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-700 [&_td]:p-2 [&_th]:border [&_th]:border-slate-700 [&_th]:bg-slate-800 [&_th]:p-2">
+                    {activeSection?.body || 'Lesson notes are loading.'}
+                  </MarkdownContent>
                 </div>
 
                 <div className="lg:col-span-2">

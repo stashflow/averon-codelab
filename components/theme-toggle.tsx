@@ -4,7 +4,14 @@ import { Moon, Sun, Palette } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Button } from '@/components/ui/button'
-import { COLOR_THEMES, applyColorTheme, getStoredColorTheme, setStoredColorTheme, type ColorTheme } from '@/lib/color-theme'
+import {
+  COLOR_THEME_META,
+  COLOR_THEMES,
+  applyColorTheme,
+  getStoredColorTheme,
+  setStoredColorTheme,
+  type ColorTheme,
+} from '@/lib/color-theme'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,12 +20,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-
-const colorThemes: Array<{ name: string; value: ColorTheme; color: string }> = [
-  { name: 'Regular', value: 'sunset', color: 'bg-gradient-to-r from-pink-500 to-orange-500' },
-  { name: 'Rose', value: 'rose', color: 'bg-rose-500' },
-  { name: 'Forest', value: 'forest', color: 'bg-emerald-500' },
-]
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -81,7 +82,7 @@ export function ThemeToggle() {
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Color Themes</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {colorThemes
+          {COLOR_THEME_META
             .filter((ct) => COLOR_THEMES.includes(ct.value))
             .map((ct) => (
             <DropdownMenuItem
@@ -89,7 +90,7 @@ export function ThemeToggle() {
               onClick={() => handleColorThemeChange(ct.value)}
               className="flex items-center gap-3 cursor-pointer"
             >
-              <div className={`w-4 h-4 rounded-full ${ct.color}`} />
+              <div className={`w-4 h-4 rounded-full ${ct.swatch}`} />
               <span>{ct.name}</span>
               {colorTheme === ct.value && (
                 <span className="ml-auto text-xs">✓</span>

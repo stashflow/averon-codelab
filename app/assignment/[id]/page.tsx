@@ -4,18 +4,19 @@ import nextDynamic from 'next/dynamic'
 import type { OnMount } from '@monaco-editor/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeRaw from 'rehype-raw'
+import { SiteBackdrop } from '@/components/site-backdrop'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Send, Play, CheckCircle2, XCircle, Code2, Braces, AlertCircle } from 'lucide-react'
+import { getAssignmentAvailability, parseQuizQuestions, parseQuizSubmission } from '@/lib/assignment-workflow'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
 import type { editor } from 'monaco-editor'
 
 const MonacoEditor = nextDynamic(() => import('@monaco-editor/react'), { ssr: false })
+const MarkdownContent = nextDynamic(() => import('@/components/markdown-content'), { ssr: false })
 
 type MonacoLanguage = 'python' | 'javascript' | 'typescript' | 'java' | 'cpp' | 'c' | 'json'
 
@@ -28,6 +29,9 @@ type Assignment = {
   classroom_id: string
   starter_code: string | null
   test_cases: unknown
+  is_visible?: boolean | null
+  visible_from?: string | null
+  visible_until?: string | null
 }
 
 type Submission = {
@@ -53,18 +57,6 @@ type JudgePayload = {
   passed: boolean
   score: number
   results: JudgeResult[]
-}
-
-type QuizQuestion = {
-  prompt: string
-  options: string[]
-  correctIndex: number
-  explanation?: string
-  points?: number
-}
-
-type QuizSubmissionPayload = {
-  answers?: number[]
 }
 
 const LANGUAGE_BADGE_SRC: Record<MonacoLanguage, string> = {
@@ -153,27 +145,6 @@ function normalizeMarkdown(raw: string | null | undefined): string {
   }
 }
 
-function parseQuizQuestions(testCases: unknown): QuizQuestion[] {
-  if (!Array.isArray(testCases)) return []
-  return testCases
-    .map((item: any) => ({
-      prompt: String(item?.prompt || ''),
-      options: Array.isArray(item?.options) ? item.options.map((option: unknown) => String(option || '')) : [],
-      correctIndex: Number.isFinite(Number(item?.correctIndex)) ? Number(item.correctIndex) : 0,
-      explanation: String(item?.explanation || ''),
-      points: Number.isFinite(Number(item?.points)) ? Number(item.points) : 1,
-    }))
-    .filter((item) => item.prompt && item.options.length >= 2)
-}
-
-function parseQuizSubmission(code: string | null | undefined): QuizSubmissionPayload {
-  try {
-    return JSON.parse(String(code || '{}')) as QuizSubmissionPayload
-  } catch {
-    return {}
-  }
-}
-
 export const dynamic = 'force-dynamic'
 
 export default function AssignmentPage() {
@@ -207,6 +178,8 @@ export default function AssignmentPage() {
   const feedbackMarkdown = useMemo(() => normalizeMarkdown(submission?.feedback), [submission?.feedback])
   const isQuizAssignment = assignment?.language === 'quiz'
   const quizQuestions = useMemo(() => parseQuizQuestions(assignment?.test_cases), [assignment?.test_cases])
+  const availability = useMemo(() => getAssignmentAvailability(assignment || {}), [assignment])
+  const isSubmissionBlocked = availability.state !== 'open'
   const quizPreviewScore = useMemo(() => {
     if (!isQuizAssignment || quizQuestions.length === 0) return 0
     let earned = 0
@@ -384,53 +357,44 @@ export default function AssignmentPage() {
   async function handleSubmit() {
     if (!userId) return
     if (!isQuizAssignment && !code.trim()) return
+    if (isSubmissionBlocked) {
+      alert(availability.detail || 'This assignment is not currently accepting submissions.')
+      return
+    }
 
     setSubmitting(true)
-    const supabase = createClient()
 
     try {
-      const submissionCode = draftPayload
+      const response = await fetch('/api/assignments/submit', {
+        method: 'POST',
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          assignmentId,
+          code: draftPayload,
+        }),
+      })
 
-      if (submission) {
-        const { error } = await supabase
-          .from('submissions')
-          .update({
-            code: submissionCode,
-            status: 'submitted',
-            submitted_at: new Date().toISOString(),
-          })
-          .eq('id', submission.id)
-
-        if (error) throw error
-        setSubmission((prev) =>
-          prev
-            ? {
-                ...prev,
-                code: submissionCode,
-                status: 'submitted',
-                submitted_at: new Date().toISOString(),
-              }
-            : prev,
-        )
-      } else {
-        const { data, error } = await supabase
-          .from('submissions')
-          .insert({
-            assignment_id: assignmentId,
-            student_id: userId,
-            code: submissionCode,
-            status: 'submitted',
-            submitted_at: new Date().toISOString(),
-          })
-          .select()
-
-        if (error) throw error
-        setSubmission(data?.[0] || null)
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to submit assignment')
       }
 
-      setLastAutosavedPayload(submissionCode)
+      setSubmission(payload.submission || null)
+      setLastAutosavedPayload(draftPayload)
 
-      alert('Submission successful. Your teacher can now review it.')
+      if (Array.isArray(payload.results) && payload.results.length > 0) {
+        setTestResults({
+          passed: payload.results.every((result: any) => result?.passed !== false),
+          score: Number(payload.submission?.score || 0),
+          results: payload.results,
+        })
+      }
+
+      if (payload.autoGraded && typeof payload.submission?.score === 'number') {
+        alert(`Submission successful. Auto-graded at ${payload.submission.score}%.`)
+      } else {
+        alert('Submission successful. Your teacher can now review it.')
+      }
     } catch (err: any) {
       alert('Error submitting: ' + (err.message || 'Unknown error'))
     } finally {
@@ -517,8 +481,10 @@ export default function AssignmentPage() {
     : 'Unknown'
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-950/95 backdrop-blur sticky top-0 z-50">
+    <div className="min-h-screen warm-aurora text-slate-100">
+      <SiteBackdrop />
+
+      <header className="border-b border-slate-800 bg-slate-950/88 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4 min-w-0">
             <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-slate-200 hover:text-white hover:bg-slate-800">
@@ -530,14 +496,24 @@ export default function AssignmentPage() {
                 {displayLanguage}
                 {assignment.due_date && ` • Due: ${new Date(assignment.due_date).toLocaleDateString()}`}
               </p>
+              {availability.detail && <p className="text-xs text-slate-500 mt-1">{availability.detail}</p>}
             </div>
           </div>
-          {submission?.status === 'graded' && (
-            <div className="text-right">
-              <p className="text-sm text-slate-400">Score</p>
-              <p className="text-2xl font-bold text-cyan-300">{submission.score ?? 0}%</p>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {assignment.classroom_id && (
+              <Link href={`/classroom/${assignment.classroom_id}/sandbox`}>
+                <Button variant="outline" className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800">
+                  Open Sandbox
+                </Button>
+              </Link>
+            )}
+            {submission?.status === 'graded' && (
+              <div className="text-right">
+                <p className="text-sm text-slate-400">Score</p>
+                <p className="text-2xl font-bold text-cyan-300">{submission.score ?? 0}%</p>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -547,24 +523,39 @@ export default function AssignmentPage() {
             <div className="rounded-2xl bg-slate-900/70 border border-slate-800 shadow-xl p-6 sticky top-24 space-y-5">
               <div>
                 <h3 className="text-lg font-semibold text-white mb-2">Assignment</h3>
-                <div className="space-y-3 text-slate-200 text-sm [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-3 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{assignmentMarkdown}</ReactMarkdown>
-                </div>
+                <MarkdownContent className="space-y-3 text-slate-200 text-sm [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-slate-700 [&_pre]:bg-slate-950 [&_pre]:p-3 [&_code]:rounded [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:py-0.5">
+                  {assignmentMarkdown}
+                </MarkdownContent>
               </div>
 
               <div>
                 <p className="text-sm text-slate-400 mb-1">Status</p>
-                <Badge className="bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
-                  {submission?.status === 'graded'
-                    ? 'Graded'
-                    : submission?.status === 'pending'
-                      ? 'In Progress'
-                    : submission?.status === 'submitted'
-                      ? 'Submitted'
-                      : 'Not Submitted'}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
+                    {submission?.status === 'graded'
+                      ? 'Graded'
+                      : submission?.status === 'pending'
+                        ? 'In Progress'
+                      : submission?.status === 'submitted'
+                        ? 'Submitted'
+                        : 'Not Submitted'}
+                  </Badge>
+                  <Badge
+                    className={
+                      availability.state === 'open'
+                        ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-100'
+                        : availability.state === 'scheduled'
+                          ? 'border border-blue-500/30 bg-blue-500/20 text-blue-100'
+                          : 'border border-orange-500/30 bg-orange-500/20 text-orange-100'
+                    }
+                  >
+                    {availability.label}
+                  </Badge>
+                </div>
                 <p className="mt-2 text-xs text-slate-400">
-                  {draftSaving
+                  {submission?.status === 'graded'
+                    ? 'Your latest submission has immediate results and teacher-visible feedback.'
+                    : draftSaving
                     ? 'Saving draft...'
                     : lastDraftSavedAt
                       ? `Draft saved ${new Date(lastDraftSavedAt).toLocaleTimeString()}`
@@ -575,9 +566,9 @@ export default function AssignmentPage() {
               {submission?.feedback && (
                 <div>
                   <p className="text-sm text-slate-400 mb-2">Teacher Feedback</p>
-                  <div className="rounded-lg border border-slate-700 bg-slate-950/70 p-3 text-sm text-slate-200 [&_p]:leading-6">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{feedbackMarkdown}</ReactMarkdown>
-                  </div>
+                  <MarkdownContent className="rounded-lg border border-slate-700 bg-slate-950/70 p-3 text-sm text-slate-200 [&_p]:leading-6">
+                    {feedbackMarkdown}
+                  </MarkdownContent>
                 </div>
               )}
             </div>
@@ -629,7 +620,7 @@ export default function AssignmentPage() {
                     <Button
                       onClick={handleSubmit}
                       className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-0 gap-2"
-                      disabled={submitting}
+                      disabled={submitting || isSubmissionBlocked}
                     >
                       <Send className="w-4 h-4" />
                       {submitting ? 'Submitting...' : 'Submit Quiz'}
@@ -731,7 +722,7 @@ export default function AssignmentPage() {
                       onClick={handleRunTests}
                       variant="outline"
                       className="gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                      disabled={testingCode || !code.trim()}
+                      disabled={testingCode || isSubmissionBlocked || !code.trim()}
                     >
                       <Play className="w-4 h-4" />
                       {testingCode ? 'Running Tests...' : 'Run Tests'}
@@ -739,7 +730,7 @@ export default function AssignmentPage() {
                     <Button
                       onClick={handleSubmit}
                       className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-0 gap-2"
-                      disabled={submitting || !code.trim()}
+                      disabled={submitting || isSubmissionBlocked || !code.trim()}
                     >
                       <Send className="w-4 h-4" />
                       {submitting ? 'Submitting...' : 'Submit Solution'}

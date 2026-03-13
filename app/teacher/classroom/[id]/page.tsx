@@ -3,12 +3,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { SiteBackdrop } from '@/components/site-backdrop'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, Users, ClipboardCheck, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Plus, Users, ClipboardCheck, BarChart3, Download, Code2 } from 'lucide-react'
+import { getAssignmentAvailability } from '@/lib/assignment-workflow'
+import {
+  CANONICAL_AP_CSP_COURSE_ID,
+  dedupeCoursesByName,
+  isApcspCourse,
+} from '@/lib/curriculum/course-catalog'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +64,10 @@ export default function TeacherClassroomPage() {
     description: '',
     language: 'python',
     starterCode: '',
+    dueDate: '',
+    visibleFrom: '',
+    visibleUntil: '',
+    isVisible: true,
     assignmentType: 'coding' as 'coding' | 'quiz',
     quizQuestions: [
       {
@@ -204,8 +215,13 @@ export default function TeacherClassroomPage() {
           profiles: profileById[row.student_id] || null,
         })),
       )
+      const rawCourses = (courseData || []) as any[]
+      const apCspAliasIds = new Set(rawCourses.filter((course) => isApcspCourse(course)).map((course) => course.id))
+      const canonicalizeCourseId = (courseId: string) =>
+        apCspAliasIds.has(courseId) ? CANONICAL_AP_CSP_COURSE_ID : courseId
+
       setAssignments(assignmentData || [])
-      setCourses(courseData || [])
+      setCourses(dedupeCoursesByName(rawCourses))
       setPortionAssignments(portionAssignmentsData || [])
 
       const assignedLessonIds = Array.from(new Set((portionAssignmentsData || []).map((row: any) => row.lesson_id).filter(Boolean)))
@@ -280,7 +296,7 @@ export default function TeacherClassroomPage() {
 
       const mapped: Record<string, { id: string; is_active: boolean }> = {}
       ;(offeringsData || []).forEach((offering: any) => {
-        mapped[offering.course_id] = { id: offering.id, is_active: offering.is_active }
+        mapped[canonicalizeCourseId(String(offering.course_id))] = { id: offering.id, is_active: offering.is_active }
       })
       setOfferingsByCourseId(mapped)
     } catch (err: any) {
@@ -324,6 +340,10 @@ export default function TeacherClassroomPage() {
           starter_code: isQuiz ? '' : newAssignmentData.starterCode,
           language: isQuiz ? 'quiz' : newAssignmentData.language,
           test_cases: isQuiz ? normalizedQuizQuestions : [],
+          due_date: newAssignmentData.dueDate ? new Date(newAssignmentData.dueDate).toISOString() : null,
+          visible_from: newAssignmentData.visibleFrom ? new Date(newAssignmentData.visibleFrom).toISOString() : null,
+          visible_until: newAssignmentData.visibleUntil ? new Date(newAssignmentData.visibleUntil).toISOString() : null,
+          is_visible: newAssignmentData.isVisible,
         })
         .select()
 
@@ -335,6 +355,10 @@ export default function TeacherClassroomPage() {
         description: '',
         language: 'python',
         starterCode: '',
+        dueDate: '',
+        visibleFrom: '',
+        visibleUntil: '',
+        isVisible: true,
         assignmentType: 'coding',
         quizQuestions: [
           {
@@ -353,6 +377,10 @@ export default function TeacherClassroomPage() {
     } finally {
       setCreatingAssignment(false)
     }
+  }
+
+  function exportGradebook() {
+    window.open(`/api/teacher/classroom/${classroomId}/gradebook`, '_blank', 'noopener,noreferrer')
   }
 
   async function setAllowNonRelatedCourses(value: boolean) {
@@ -599,20 +627,42 @@ export default function TeacherClassroomPage() {
   const selectedLessonCount = Object.values(selectedLessonIds).filter(Boolean).length
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
-      <header className="border-b border-white/5 bg-slate-950/40 backdrop-blur-xl sticky top-0 z-50">
+    <div className="min-h-screen warm-aurora">
+      <SiteBackdrop />
+
+      <header className="border-b border-border/70 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-slate-200 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-white">{classroom?.name}</h1>
-            <p className="text-sm text-slate-400">Class Code: {classroom?.code}</p>
+            <p className="site-kicker mb-2">
+              <span className="w-4 h-px bg-primary" />
+              Teacher Classroom
+            </p>
+            <h1 className="text-2xl font-bold text-foreground">{classroom?.name}</h1>
+            <p className="text-sm text-muted-foreground">Class Code: {classroom?.code}</p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 py-8 space-y-8">
+        <div className="site-panel p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <h2 className="text-xl font-semibold text-foreground">Landing-page classroom control center</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Every enrolled student now has a private sandbox mode attached to this class. Students can experiment safely,
+                save work to Supabase, and move into graded assignments when ready.
+              </p>
+            </div>
+            <Badge className="gap-2 border-primary/30 bg-primary/10 px-3 py-1.5 text-primary">
+              <Code2 className="h-4 w-4" />
+              Sandbox Enabled for Enrolled Students
+            </Badge>
+          </div>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Course Access Controls</CardTitle>
@@ -950,13 +1000,19 @@ export default function TeacherClassroomPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">Assignments</h2>
-            <Button
-              onClick={() => setShowNewAssignment(!showNewAssignment)}
-              className="bg-primary hover:bg-primary/90 gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              New Assignment
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={exportGradebook} className="gap-2">
+                <Download className="w-4 h-4" />
+                Export Gradebook
+              </Button>
+              <Button
+                onClick={() => setShowNewAssignment(!showNewAssignment)}
+                className="bg-primary hover:bg-primary/90 gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                New Assignment
+              </Button>
+            </div>
           </div>
 
           {showNewAssignment && (
@@ -988,6 +1044,49 @@ export default function TeacherClassroomPage() {
                     rows={4}
                   />
                 </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div>
+                    <Label htmlFor="due-date">Due Date</Label>
+                    <Input
+                      id="due-date"
+                      type="datetime-local"
+                      value={newAssignmentData.dueDate}
+                      onChange={(e) => setNewAssignmentData({ ...newAssignmentData, dueDate: e.target.value })}
+                      disabled={creatingAssignment}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="visible-from">Visible From</Label>
+                    <Input
+                      id="visible-from"
+                      type="datetime-local"
+                      value={newAssignmentData.visibleFrom}
+                      onChange={(e) => setNewAssignmentData({ ...newAssignmentData, visibleFrom: e.target.value })}
+                      disabled={creatingAssignment}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="visible-until">Visible Until</Label>
+                    <Input
+                      id="visible-until"
+                      type="datetime-local"
+                      value={newAssignmentData.visibleUntil}
+                      onChange={(e) => setNewAssignmentData({ ...newAssignmentData, visibleUntil: e.target.value })}
+                      disabled={creatingAssignment}
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={newAssignmentData.isVisible}
+                    onChange={(e) => setNewAssignmentData({ ...newAssignmentData, isVisible: e.target.checked })}
+                    disabled={creatingAssignment}
+                  />
+                  Visible to students right now
+                </label>
 
                 <div>
                   <Label htmlFor="assignment-type">Assignment Type</Label>
@@ -1159,6 +1258,24 @@ export default function TeacherClassroomPage() {
                       <div>
                         <CardTitle className="text-white">{assignment.title}</CardTitle>
                         <CardDescription className="text-slate-300">{assignment.description}</CardDescription>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge
+                            className={
+                              getAssignmentAvailability(assignment).state === 'open'
+                                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
+                                : getAssignmentAvailability(assignment).state === 'scheduled'
+                                  ? 'border-blue-500/40 bg-blue-500/15 text-blue-200'
+                                  : 'border-orange-500/40 bg-orange-500/15 text-orange-200'
+                            }
+                          >
+                            {getAssignmentAvailability(assignment).label}
+                          </Badge>
+                          {assignment.due_date && (
+                            <Badge variant="outline" className="border-white/10 text-slate-300">
+                              Due {new Date(assignment.due_date).toLocaleString()}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right">
                         {assignment.language === 'quiz' ? (

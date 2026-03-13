@@ -1,8 +1,46 @@
 export const COLOR_THEME_STORAGE_KEY = 'color-theme'
 export const CUSTOM_THEME_COLORS_STORAGE_KEY = 'custom-theme-colors'
 
-export const COLOR_THEMES = ['sunset', 'rose', 'forest'] as const
+export const COLOR_THEMES = ['sunset', 'rose', 'forest', 'ocean', 'graphite'] as const
 export type ColorTheme = (typeof COLOR_THEMES)[number]
+
+export const COLOR_THEME_META: Array<{
+  value: ColorTheme
+  name: string
+  description: string
+  swatch: string
+}> = [
+  {
+    value: 'sunset',
+    name: 'Sunset',
+    description: 'Warm editorial pinks and oranges with a polished studio feel.',
+    swatch: 'bg-[linear-gradient(135deg,#ef476f_0%,#ff7b54_100%)]',
+  },
+  {
+    value: 'rose',
+    name: 'Rose',
+    description: 'Sharper fashion-forward reds and pinks with elegant contrast.',
+    swatch: 'bg-[linear-gradient(135deg,#e11d48_0%,#fb7185_100%)]',
+  },
+  {
+    value: 'forest',
+    name: 'Forest',
+    description: 'Calm academic greens with a grounded, trustworthy finish.',
+    swatch: 'bg-[linear-gradient(135deg,#059669_0%,#22c55e_100%)]',
+  },
+  {
+    value: 'ocean',
+    name: 'Ocean',
+    description: 'Cool cyan and cobalt tones for a crisp, technical workspace.',
+    swatch: 'bg-[linear-gradient(135deg,#0891b2_0%,#2563eb_100%)]',
+  },
+  {
+    value: 'graphite',
+    name: 'Graphite',
+    description: 'Refined neutrals with premium copper highlights and low noise.',
+    swatch: 'bg-[linear-gradient(135deg,#475569_0%,#f97316_100%)]',
+  },
+]
 
 export type CustomThemeColors = {
   primary: string
@@ -107,4 +145,3 @@ export function resetStoredCustomThemeColors() {
   }
   applyCustomThemeColors(defaultCustomThemeColors)
 }
-

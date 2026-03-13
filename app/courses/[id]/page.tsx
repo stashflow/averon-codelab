@@ -1,5 +1,6 @@
 'use client'
 
+import nextDynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -10,9 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ArrowLeft, BookOpen, CheckCircle2, Lock, Play } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeRaw from 'rehype-raw'
+import { CANONICAL_AP_CSP_COURSE_ID, isApcspCourse } from '@/lib/curriculum/course-catalog'
+
+const MarkdownContent = nextDynamic(() => import('@/components/markdown-content'), { ssr: false })
 
 interface Lesson {
   order_index: number
@@ -101,6 +102,20 @@ export default function CourseDetailPage() {
           .single()
 
         if (courseError) throw courseError
+
+        if (courseData && isApcspCourse(courseData) && courseId !== CANONICAL_AP_CSP_COURSE_ID) {
+          const { data: canonicalCourse } = await supabase
+            .from('courses')
+            .select('id')
+            .eq('id', CANONICAL_AP_CSP_COURSE_ID)
+            .maybeSingle()
+
+          if (canonicalCourse?.id) {
+            router.replace(`/courses/${CANONICAL_AP_CSP_COURSE_ID}`)
+            return
+          }
+        }
+
         setCourse(courseData)
 
         // Load units and lessons
@@ -202,7 +217,7 @@ export default function CourseDetailPage() {
   }
 
   const progressPercent = calculateCourseProgress()
-  const isApcspCourse = /ap computer science principles|ap csp/i.test(String(course?.name || ''))
+  const isApcspCoursePage = /ap computer science principles|ap csp/i.test(String(course?.name || ''))
   const firstLessonId =
     units
       .flatMap((unit) => unit.lessons || [])
@@ -250,11 +265,9 @@ export default function CourseDetailPage() {
               <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-700 via-sky-600 to-blue-600 dark:from-white dark:via-cyan-200 dark:to-blue-200 bg-clip-text text-transparent">
                 {course.name}
               </h1>
-              <div className="text-xl text-muted-foreground font-light mb-6 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/50 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-8 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                  {normalizeMarkdown(course.description)}
-                </ReactMarkdown>
-              </div>
+              <MarkdownContent className="text-xl text-muted-foreground font-light mb-6 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/50 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-semibold [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-8 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2">
+                {normalizeMarkdown(course.description)}
+              </MarkdownContent>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <BookOpen className="w-4 h-4" />
                 <span>{units.length} units</span>
@@ -272,7 +285,7 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {isApcspCourse && firstLessonId && (
+          {isApcspCoursePage && firstLessonId && (
             <div className="mt-6 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
               <p className="text-sm font-semibold text-cyan-700 dark:text-cyan-200">Start Here</p>
               <p className="text-sm text-cyan-800 dark:text-cyan-100 mt-1">Open Lesson 1.0 course intro notes before Lesson 1.1.</p>
@@ -298,9 +311,7 @@ export default function CourseDetailPage() {
                     <div className="text-cyan-400 text-sm font-semibold mb-2">Unit {unitIndex + 1}</div>
                     <CardTitle className="text-foreground text-2xl mb-2">{unit.title}</CardTitle>
                     <CardDescription className="text-muted-foreground [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-500/40 [&_blockquote]:bg-cyan-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_li]:ml-5 [&_li]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:leading-6 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-3">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                        {normalizeMarkdown(unit.description)}
-                      </ReactMarkdown>
+                      <MarkdownContent>{normalizeMarkdown(unit.description)}</MarkdownContent>
                     </CardDescription>
                   </div>
                 </div>
@@ -310,7 +321,7 @@ export default function CourseDetailPage() {
                   {unit.lessons?.map((lesson: any, lessonIndex: number) => {
                     const status = getLessonStatus(lesson.id)
                     const lessonHref =
-                      isApcspCourse && lesson.id === firstLessonId
+                      isApcspCoursePage && lesson.id === firstLessonId
                         ? `/lesson/${lesson.id}?view=course-intro`
                         : `/lesson/${lesson.id}`
                     return (

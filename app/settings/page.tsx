@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
+import { Reveal } from '@/components/reveal'
+import { SiteBackdrop } from '@/components/site-backdrop'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -14,10 +16,14 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LearnAveronCodeLab } from '@/components/learn-averon-codelab'
 import {
+  COLOR_THEME_META,
   defaultCustomThemeColors,
+  getStoredColorTheme,
   getStoredCustomThemeColors,
   resetStoredCustomThemeColors,
+  setStoredColorTheme,
   setStoredCustomThemeColors,
+  type ColorTheme,
   type CustomThemeColors,
 } from '@/lib/color-theme'
 import {
@@ -47,6 +53,7 @@ export default function SettingsPage() {
   const [passwords, setPasswords] = useState({ newPassword: '', confirmPassword: '' })
   const [preferences, setPreferences] = useState<UserFeaturePreferences>(defaultUserFeaturePreferences)
   const [customColors, setCustomColors] = useState<CustomThemeColors>(defaultCustomThemeColors)
+  const [colorTheme, setColorTheme] = useState<ColorTheme>('sunset')
   const router = useRouter()
   const { theme, setTheme } = useTheme()
 
@@ -105,6 +112,7 @@ export default function SettingsPage() {
       setNewEmail(effectiveEmail)
       setPreferences(resolvedPreferences)
       setCustomColors(getStoredCustomThemeColors())
+      setColorTheme(getStoredColorTheme())
       setLoading(false)
     }
 
@@ -117,6 +125,12 @@ export default function SettingsPage() {
 
   function setCustomColorValue(key: keyof CustomThemeColors, value: string) {
     setCustomColors((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function applyColorThemeSelection(nextTheme: ColorTheme) {
+    setColorTheme(nextTheme)
+    setStoredColorTheme(nextTheme)
+    setStatusMessage(`${COLOR_THEME_META.find((item) => item.value === nextTheme)?.name || 'Theme'} activated.`)
   }
 
   function applyThemeColors() {
@@ -236,6 +250,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SiteBackdrop />
       <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
@@ -255,7 +270,44 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+      <main className="relative z-10 max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+        <Reveal className="site-panel p-6 md:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+            <div>
+              <p className="site-kicker mb-3">
+                <span className="w-4 h-px bg-primary" />
+                Theme Studio
+              </p>
+              <h2 className="site-title text-3xl sm:text-4xl">Refine the workspace to match your style.</h2>
+              <p className="site-subtitle mt-3 max-w-2xl">
+                Switch between curated color systems, keep dark or light mode in sync, and tune your workspace without sacrificing clarity.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {COLOR_THEME_META.map((item, index) => (
+                <Reveal key={item.value} delay={index * 55}>
+                  <button
+                    type="button"
+                    onClick={() => applyColorThemeSelection(item.value)}
+                    className={`text-left rounded-2xl border p-4 transition-all duration-500 ${
+                      colorTheme === item.value
+                        ? 'border-primary/40 bg-primary/10 shadow-[0_24px_80px_-56px_hsl(var(--primary)/0.65)]'
+                        : 'border-border/70 bg-background/80 hover:-translate-y-1 hover:border-primary/25'
+                    }`}
+                  >
+                    <div className={`mb-3 h-12 rounded-xl ${item.swatch}`} />
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-foreground">{item.name}</p>
+                      {colorTheme === item.value && <Badge>Active</Badge>}
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
+                  </button>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
         {statusMessage && (
           <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-primary text-sm flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
@@ -265,7 +317,8 @@ export default function SettingsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Card>
+            <Reveal>
+            <Card className="sheen-surface">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><UserCircle2 className="w-5 h-5 text-primary" /> Profile</CardTitle>
                 <CardDescription>Update your name and theme preferences.</CardDescription>
@@ -302,9 +355,11 @@ export default function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
+            </Reveal>
 
             {profile?.role === 'student' && (
-              <Card>
+              <Reveal delay={60}>
+              <Card className="sheen-surface">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><Settings2 className="w-5 h-5 text-primary" /> Student Theme Colors</CardTitle>
                   <CardDescription>Use CSS HSL values to customize your theme. Example: `337 84% 56%`.</CardDescription>
@@ -360,9 +415,11 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+              </Reveal>
             )}
 
-            <Card>
+            <Reveal delay={110}>
+            <Card className="sheen-surface">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5 text-primary" /> Email Address</CardTitle>
                 <CardDescription>Change your email and confirm via inbox.</CardDescription>
@@ -381,8 +438,10 @@ export default function SettingsPage() {
                 {emailStatus && <p className="text-sm text-muted-foreground">{emailStatus}</p>}
               </CardContent>
             </Card>
+            </Reveal>
 
-            <Card>
+            <Reveal delay={160}>
+            <Card className="sheen-surface">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><KeyRound className="w-5 h-5 text-primary" /> Security</CardTitle>
                 <CardDescription>Update your account password.</CardDescription>
@@ -409,10 +468,12 @@ export default function SettingsPage() {
                 <Button onClick={updatePassword} disabled={savingPassword}>{savingPassword ? 'Updating...' : 'Update Password'}</Button>
               </CardContent>
             </Card>
+            </Reveal>
           </div>
 
           <div className="space-y-6">
-            <Card>
+            <Reveal delay={90}>
+            <Card className="sheen-surface">
               <CardHeader>
                 <CardTitle>Notifications</CardTitle>
                 <CardDescription>Control update and reminder behavior.</CardDescription>
@@ -435,8 +496,10 @@ export default function SettingsPage() {
                 <Button onClick={savePreferences} disabled={savingPrefs} className="w-full">{savingPrefs ? 'Saving...' : 'Save Preferences'}</Button>
               </CardContent>
             </Card>
+            </Reveal>
 
-            <Card>
+            <Reveal delay={140}>
+            <Card className="sheen-surface">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Account Info</CardTitle>
               </CardHeader>
@@ -459,13 +522,16 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+            </Reveal>
           </div>
         </div>
 
-        <LearnAveronCodeLab
-          preferences={preferences}
-          onPreferenceChange={setFeaturePreference}
-        />
+        <Reveal delay={180}>
+          <LearnAveronCodeLab
+            preferences={preferences}
+            onPreferenceChange={setFeaturePreference}
+          />
+        </Reveal>
 
         <div className="flex justify-end">
           <Button onClick={savePreferences} disabled={savingPrefs} className="gap-2">

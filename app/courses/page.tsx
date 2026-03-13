@@ -10,6 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Code, BookOpen, Users, ArrowRight, LogOut, GraduationCap, Database, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  CANONICAL_AP_CSP_COURSE_ID,
+  dedupeCoursesByName,
+  isApcspCourse,
+} from '@/lib/curriculum/course-catalog'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,27 +95,14 @@ export default function CoursesPage() {
         const allowUnrelated = (classroomEnrollments || []).some((row: any) => row.classrooms?.allow_non_related_courses === true)
         setAllowNonRelatedCourses(allowUnrelated)
 
+        let offeringsData: any[] = []
         if (classIds.length > 0) {
-          const { data: offeringsData } = await supabase
+          const { data } = await supabase
             .from('classroom_course_offerings')
             .select('course_id, classroom_id')
             .in('classroom_id', classIds)
             .eq('is_active', true)
-
-          const offeredRows = (offeringsData || []).filter((row: any) => row.course_id && row.classroom_id)
-          setOfferedCourseIds(new Set(offeredRows.map((row: any) => row.course_id)))
-          const courseClassroomMap = new Map<string, string[]>()
-          offeredRows.forEach((row: any) => {
-            const courseId = String(row.course_id)
-            const classroomId = String(row.classroom_id)
-            const existing = courseClassroomMap.get(courseId) || []
-            if (!existing.includes(classroomId)) existing.push(classroomId)
-            courseClassroomMap.set(courseId, existing)
-          })
-          setOfferedCourseClassrooms(courseClassroomMap)
-        } else {
-          setOfferedCourseIds(new Set())
-          setOfferedCourseClassrooms(new Map())
+          offeringsData = data || []
         }
 
         // Load course categories
@@ -135,9 +127,26 @@ export default function CoursesPage() {
           .order('difficulty_level')
 
         if (coursesError) throw coursesError
+        const rawCourses = (coursesData || []) as Course[]
+        const apCspAliasIds = new Set(rawCourses.filter((course) => isApcspCourse(course)).map((course) => course.id))
+        const canonicalizeCourseId = (courseId: string) =>
+          apCspAliasIds.has(courseId) ? CANONICAL_AP_CSP_COURSE_ID : courseId
+
+        const offeredRows = offeringsData.filter((row: any) => row.course_id && row.classroom_id)
+        const normalizedOfferedCourseIds = new Set(offeredRows.map((row: any) => canonicalizeCourseId(String(row.course_id))))
+        setOfferedCourseIds(normalizedOfferedCourseIds)
+        const courseClassroomMap = new Map<string, string[]>()
+        offeredRows.forEach((row: any) => {
+          const courseId = canonicalizeCourseId(String(row.course_id))
+          const classroomId = String(row.classroom_id)
+          const existing = courseClassroomMap.get(courseId) || []
+          if (!existing.includes(classroomId)) existing.push(classroomId)
+          courseClassroomMap.set(courseId, existing)
+        })
+        setOfferedCourseClassrooms(courseClassroomMap)
 
         // Group courses by category
-        const grouped = (coursesData || []).reduce((acc: Record<string, Course[]>, course: Course) => {
+        const grouped = dedupeCoursesByName(rawCourses).reduce((acc: Record<string, Course[]>, course: Course) => {
           const categoryId = course.category_id || 'uncategorized'
           if (!acc[categoryId]) {
             acc[categoryId] = []
@@ -156,7 +165,7 @@ export default function CoursesPage() {
 
         const enrollmentMap = new Map<string, Enrollment>()
         enrollmentsData?.forEach((e: Enrollment) => {
-          enrollmentMap.set(e.course_id, e)
+          enrollmentMap.set(canonicalizeCourseId(e.course_id), e)
         })
         setEnrollments(enrollmentMap)
       } catch (err: any) {

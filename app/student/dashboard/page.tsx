@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { SiteBackdrop } from '@/components/site-backdrop'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +13,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LearnAveronCodeLab } from '@/components/learn-averon-codelab'
+import { getAssignmentAvailability } from '@/lib/assignment-workflow'
 import {
   defaultUserFeaturePreferences,
   getUserPreferencesStorageKey,
@@ -21,6 +23,7 @@ import {
 import {
   BookOpen,
   Award,
+  Code2,
   LogOut,
   ArrowRight,
   Plus,
@@ -73,6 +76,25 @@ interface ClassroomCodeLookup {
   code: string
 }
 
+type StudentAssignmentCard = {
+  id: string
+  title: string
+  description: string | null
+  due_date: string | null
+  language: string | null
+  classroom_id: string
+  classroom_name: string
+  is_visible?: boolean | null
+  visible_from?: string | null
+  visible_until?: string | null
+  submission?: {
+    status: string | null
+    score: number | null
+    feedback: string | null
+    submitted_at?: string | null
+  } | null
+}
+
 type ProgressRow = {
   status: string | null
   score: number | null
@@ -100,6 +122,7 @@ export default function StudentDashboard() {
   const [progressRows, setProgressRows] = useState<ProgressRow[]>([])
   const [submissionRows, setSubmissionRows] = useState<SubmissionRow[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [assignments, setAssignments] = useState<StudentAssignmentCard[]>([])
   const [loading, setLoading] = useState(true)
   const [joinCode, setJoinCode] = useState('')
   const [joining, setJoining] = useState(false)
@@ -124,6 +147,31 @@ export default function StudentDashboard() {
     if (scores.length === 0) return 0
     return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
   }, [submissionRows])
+  const visibleAssignments = useMemo(
+    () => assignments.filter((assignment) => getAssignmentAvailability(assignment).state !== 'hidden'),
+    [assignments],
+  )
+  const dueSoonAssignments = useMemo(() => {
+    const now = Date.now()
+    const soon = now + 1000 * 60 * 60 * 24 * 3
+    return visibleAssignments
+      .filter((assignment) => {
+        if (!assignment.due_date) return false
+        const due = new Date(assignment.due_date).getTime()
+        return due >= now && due <= soon
+      })
+      .slice(0, 4)
+  }, [visibleAssignments])
+  const overdueAssignments = useMemo(() => {
+    const now = Date.now()
+    return visibleAssignments
+      .filter((assignment) => assignment.due_date && new Date(assignment.due_date).getTime() < now && assignment.submission?.status !== 'graded')
+      .slice(0, 4)
+  }, [visibleAssignments])
+  const recentGradedAssignments = useMemo(
+    () => visibleAssignments.filter((assignment) => assignment.submission?.status === 'graded').slice(0, 4),
+    [visibleAssignments],
+  )
 
   const achievementBadges = useMemo<AchievementBadge[]>(() => {
     const badgeTypeSet = new Set((badges || []).map((badge: any) => String(badge.badge_type || '').toLowerCase()))
@@ -289,6 +337,24 @@ export default function StudentDashboard() {
 
       if (classEnrollmentData && classEnrollmentData.length > 0) {
         const classroomIds = classEnrollmentData.map((e: any) => e.classroom_id)
+        const { data: assignmentData } = await supabase
+          .from('assignments')
+          .select(`
+            id,
+            title,
+            description,
+            due_date,
+            language,
+            classroom_id,
+            is_visible,
+            visible_from,
+            visible_until,
+            classroom:classroom_id(name),
+            submissions(id, status, score, feedback, submitted_at)
+          `)
+          .in('classroom_id', classroomIds)
+          .order('due_date', { ascending: true, nullsFirst: false })
+
         const { data: announcementsData } = await supabase
           .from('class_announcements')
           .select(`
@@ -306,6 +372,15 @@ export default function StudentDashboard() {
           .limit(5)
 
         setAnnouncements((announcementsData as any) || [])
+        setAssignments(
+          ((assignmentData as any[]) || []).map((row: any) => ({
+            ...row,
+            classroom_name: row.classroom?.name || 'Classroom',
+            submission: Array.isArray(row.submissions) ? row.submissions[0] || null : row.submissions || null,
+          })),
+        )
+      } else {
+        setAssignments([])
       }
 
       const key = getUserPreferencesStorageKey(authUser.id)
@@ -461,8 +536,10 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
+    <div className="min-h-screen warm-aurora">
+      <SiteBackdrop />
+
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-3">
@@ -489,10 +566,35 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {profile?.full_name || 'Student'}</h1>
-          <p className="text-muted-foreground mt-1">Track your progress, join classes, and keep learning.</p>
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        <div className="grid gap-6 lg:grid-cols-[1.5fr_0.95fr]">
+          <div>
+            <p className="site-kicker mb-3">
+              <span className="w-4 h-px bg-primary" />
+              Student Dashboard
+            </p>
+            <h1 className="site-title text-3xl sm:text-5xl">Welcome back, {profile?.full_name || 'Student'}.</h1>
+            <p className="site-subtitle mt-3 max-w-2xl">
+              Track your progress, join classes, and move between assignments and private class sandboxes without losing momentum.
+            </p>
+          </div>
+          <div className="site-panel p-6">
+            <h3 className="text-lg font-semibold text-foreground">Daily Coding Flow</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Start in your class sandbox, test ideas, then jump into assignments when you are ready to submit.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href="/courses">
+                <Button>Browse Courses</Button>
+              </Link>
+              <Link href={classEnrollments[0]?.classroom_id ? `/classroom/${classEnrollments[0].classroom_id}/sandbox` : '/courses'}>
+                <Button variant="outline" className="gap-2">
+                  <Code2 className="w-4 h-4" />
+                  Open Sandbox
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {announcements.length > 0 && (
@@ -605,6 +707,59 @@ export default function StudentDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-3 relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
+            <div className="relative z-10 space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold text-foreground">Assignment Hub</h3>
+                <p className="text-sm text-muted-foreground mt-1">Stay on top of what is due, overdue, and already graded.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-foreground">Due Soon</p>
+                  {dueSoonAssignments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nothing due in the next 3 days.</p>
+                  ) : (
+                    dueSoonAssignments.map((assignment) => (
+                      <Link key={`soon-${assignment.id}`} href={`/assignment/${assignment.id}`} className="block rounded-xl bg-muted/20 border border-border p-4 hover:border-primary/30 transition-colors">
+                        <p className="font-medium text-foreground">{assignment.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{assignment.classroom_name}</p>
+                        <p className="text-xs text-primary mt-2">Due {assignment.due_date ? new Date(assignment.due_date).toLocaleString() : 'soon'}</p>
+                      </Link>
+                    ))
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-foreground">Needs Attention</p>
+                  {overdueAssignments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No overdue assignments right now.</p>
+                  ) : (
+                    overdueAssignments.map((assignment) => (
+                      <Link key={`late-${assignment.id}`} href={`/assignment/${assignment.id}`} className="block rounded-xl bg-red-500/5 border border-red-500/20 p-4 hover:border-red-500/40 transition-colors">
+                        <p className="font-medium text-foreground">{assignment.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{assignment.classroom_name}</p>
+                        <p className="text-xs text-red-300 mt-2">Past due {assignment.due_date ? new Date(assignment.due_date).toLocaleString() : ''}</p>
+                      </Link>
+                    ))
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-foreground">Recently Graded</p>
+                  {recentGradedAssignments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Graded work will appear here.</p>
+                  ) : (
+                    recentGradedAssignments.map((assignment) => (
+                      <Link key={`graded-${assignment.id}`} href={`/assignment/${assignment.id}`} className="block rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-4 hover:border-emerald-500/40 transition-colors">
+                        <p className="font-medium text-foreground">{assignment.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{assignment.classroom_name}</p>
+                        <p className="text-xs text-emerald-300 mt-2">Score {assignment.submission?.score ?? 0}%</p>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="lg:col-span-1 relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm p-6">
             <div className="relative z-10 space-y-4">
               <div>
@@ -641,6 +796,19 @@ export default function StudentDashboard() {
                       <p className="text-sm text-muted-foreground">Code: <span className="font-mono text-primary">{enrollment.classrooms?.code}</span></p>
                     </div>
                     <div className="flex items-center gap-2">
+                      {enrollment.classroom_id && (
+                        <>
+                          <Link href={`/classroom/${enrollment.classroom_id}`}>
+                            <Button size="sm" variant="outline">Open Class</Button>
+                          </Link>
+                          <Link href={`/classroom/${enrollment.classroom_id}/sandbox`}>
+                            <Button size="sm" variant="outline" className="gap-2">
+                              <Code2 className="w-3.5 h-3.5" />
+                              Sandbox
+                            </Button>
+                          </Link>
+                        </>
+                      )}
                       <Badge variant="secondary" className="gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30"><Users className="w-3 h-3" /> Enrolled</Badge>
                       <Button size="sm" variant="outline" onClick={() => handleLeaveClass(enrollment.id)} disabled={leavingClassroomId === enrollment.id} className="border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200 bg-transparent">
                         {leavingClassroomId === enrollment.id ? 'Leaving...' : 'Leave Class'}
