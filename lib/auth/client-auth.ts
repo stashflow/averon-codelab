@@ -54,6 +54,14 @@ function castProfile<TProfile extends ClientProfile>(value: unknown): TProfile |
   return (value as TProfile | null) ?? null
 }
 
+function asProfileRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  return value as Record<string, unknown>
+}
+
 export function hasAppRole(role: string | null | undefined): role is AppRole {
   return VALID_APP_ROLES.has(role as AppRole)
 }
@@ -94,9 +102,9 @@ export async function getClientProfile<TProfile extends ClientProfile = ClientPr
   }
 
   return {
-    profile: fallbackProfile.data
+    profile: asProfileRecord(fallbackProfile.data)
       ? castProfile<TProfile>({
-          ...fallbackProfile.data,
+          ...asProfileRecord(fallbackProfile.data),
           school_id: null,
         })
       : null,
