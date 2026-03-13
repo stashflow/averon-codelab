@@ -78,9 +78,9 @@ export default function ClassroomSandboxPage() {
 
         setClassroom(loadedClassroom)
         setSandbox(loadedSandbox)
-        setLanguage(normalizeSandboxLanguage(loadedSandbox.language))
-        setEntryFilename(loadedSandbox.entry_filename || getSandboxEntryFilename(normalizeSandboxLanguage(loadedSandbox.language)))
-        setCode(loadedSandbox.code || getSandboxStarterCode(normalizeSandboxLanguage(loadedSandbox.language), loadedClassroom?.name))
+        setLanguage('python')
+        setEntryFilename(getSandboxEntryFilename('python'))
+        setCode(loadedSandbox.code || getSandboxStarterCode('python', loadedClassroom?.name))
         setStdin(loadedSandbox.stdin || '')
         setLastSavedAt(loadedSandbox.updated_at || null)
         if (loadedSandbox.last_run_at) {
@@ -210,9 +210,9 @@ export default function ClassroomSandboxPage() {
   }
 
   function loadStarterForLanguage(nextLanguage: SandboxLanguage) {
-    setLanguage(nextLanguage)
-    setEntryFilename(getSandboxEntryFilename(nextLanguage))
-    setCode(getSandboxStarterCode(nextLanguage, classroom?.name))
+    setLanguage('python')
+    setEntryFilename(getSandboxEntryFilename('python'))
+    setCode(getSandboxStarterCode('python', classroom?.name))
     setRunResult(null)
   }
 
@@ -289,7 +289,7 @@ export default function ClassroomSandboxPage() {
             <div className="flex flex-wrap gap-3">
               <Badge className="border-primary/30 bg-primary/10 text-primary">Class Code: {classroom?.code || 'N/A'}</Badge>
               <Badge variant="outline" className="border-border/70 bg-background/70">
-                {selectedLanguageMeta?.label || 'Python'}
+                Python
               </Badge>
               <Badge variant="outline" className="border-border/70 bg-background/70">
                 {saveLabel}
@@ -322,17 +322,7 @@ export default function ClassroomSandboxPage() {
                 <p className="text-xs text-muted-foreground">{selectedLanguageMeta?.description}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {SANDBOX_LANGUAGE_OPTIONS.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    size="sm"
-                    variant={option.value === language ? 'default' : 'outline'}
-                    onClick={() => loadStarterForLanguage(option.value)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
+                <Badge className="border-primary/30 bg-primary/10 text-primary">Python Only</Badge>
               </div>
             </div>
             {editorLoadFailed ? (
@@ -345,7 +335,7 @@ export default function ClassroomSandboxPage() {
             ) : (
               <MonacoEditor
                 height="620px"
-                language={language}
+                language="python"
                 value={code}
                 onChange={(value) => setCode(value ?? '')}
                 onMount={() => setEditorLoadFailed(false)}

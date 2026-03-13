@@ -1,4 +1,4 @@
-export type SandboxLanguage = 'python' | 'javascript'
+export type SandboxLanguage = 'python'
 
 export const SANDBOX_SETUP_MESSAGE =
   'Sandbox mode is not set up in Supabase yet. Apply scripts/049_student_sandbox_mode.sql to create public.student_sandboxes.'
@@ -23,31 +23,18 @@ export type StudentSandboxRecord = {
 
 export const SANDBOX_LANGUAGE_OPTIONS: Array<{ value: SandboxLanguage; label: string; description: string }> = [
   { value: 'python', label: 'Python', description: 'Fast scripting and beginner-friendly problem solving.' },
-  { value: 'javascript', label: 'JavaScript', description: 'Browser-style scripting and full-stack logic practice.' },
 ]
 
 export function normalizeSandboxLanguage(value: string | null | undefined): SandboxLanguage {
-  return value === 'javascript' ? 'javascript' : 'python'
+  return 'python'
 }
 
 export function getSandboxEntryFilename(language: SandboxLanguage): string {
-  return language === 'javascript' ? 'main.js' : 'main.py'
+  return 'main.py'
 }
 
 export function getSandboxStarterCode(language: SandboxLanguage, classroomName?: string | null): string {
   const label = classroomName ? JSON.stringify(classroomName) : '"your classroom"'
-
-  if (language === 'javascript') {
-    return [
-      `const classroom = ${label};`,
-      '',
-      'function greet(name) {',
-      '  return `Welcome to ${classroom}, ${name}!`;',
-      '}',
-      '',
-      "console.log(greet('Coder'));",
-    ].join('\n')
-  }
 
   return [
     `classroom = ${label}`,

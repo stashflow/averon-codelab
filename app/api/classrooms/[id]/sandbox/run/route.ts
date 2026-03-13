@@ -47,7 +47,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const body = await request.json()
-    const language = normalizeSandboxLanguage(String(body.language || 'python'))
+    const language = normalizeSandboxLanguage('python')
     const code = String(body.code || '')
     const stdin = String(body.stdin || '')
     const defaults = normalizeSandboxRecord(null, classroomId, user.id, classroom.name)

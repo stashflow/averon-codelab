@@ -28,12 +28,12 @@ export async function runSandboxExecution(input: SandboxExecutionRequest): Promi
   }
 
   throw new Error(
-    'Sandbox execution is not configured. Set SANDBOX_EXECUTION_URL or enable LOCAL_SANDBOX_EXECUTION_ENABLED.',
+    'Sandbox execution is not configured. Set SANDBOX_EXECUTION_URL or install python3 for local execution.',
   )
 }
 
 function isLocalSandboxEnabled(): boolean {
-  return process.env.LOCAL_SANDBOX_EXECUTION_ENABLED === 'true' || process.env.NODE_ENV !== 'production'
+  return process.env.LOCAL_SANDBOX_EXECUTION_ENABLED !== 'false'
 }
 
 async function runRemoteSandboxExecution(
@@ -74,11 +74,6 @@ async function runRemoteSandboxExecution(
 
 async function runLocalSandboxExecution(input: SandboxExecutionRequest): Promise<SandboxExecutionResult> {
   const language = normalizeSandboxLanguage(input.language)
-
-  if (language === 'javascript') {
-    return runLocalProcess('node', ['-e', input.code], input.stdin || '', 'local-node')
-  }
-
   return runLocalProcess('python3', ['-c', input.code], input.stdin || '', 'local-python')
 }
 
@@ -113,6 +108,10 @@ function runLocalProcess(
     })
 
     child.on('error', (error) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        reject(new Error(`Sandbox runtime "${command}" is not available on this server.`))
+        return
+      }
       reject(error)
     })
 

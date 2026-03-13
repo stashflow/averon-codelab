@@ -109,7 +109,7 @@ export async function PUT(request: Request, context: RouteContext) {
 
     const body = await request.json()
     const defaults = normalizeSandboxRecord(null, classroomId, access.user.id, access.classroom?.name)
-    const language = normalizeSandboxLanguage(String(body.language || 'python'))
+    const language = normalizeSandboxLanguage('python')
     const hasCode = Object.prototype.hasOwnProperty.call(body, 'code')
     const code = hasCode ? String(body.code ?? '') : defaults.code
     const stdin = Object.prototype.hasOwnProperty.call(body, 'stdin') ? String(body.stdin ?? '') : ''
