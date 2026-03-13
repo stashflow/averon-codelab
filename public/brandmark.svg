@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="averon-blue" x1="104" y1="112" x2="404" y2="396" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8ED8FF"/>
+      <stop offset="0.52" stop-color="#3FA3FF"/>
+      <stop offset="1" stop-color="#2858FF"/>
+    </linearGradient>
+    <linearGradient id="averon-blue-soft" x1="156" y1="136" x2="366" y2="334" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A5E4FF"/>
+      <stop offset="1" stop-color="#4096FF"/>
+    </linearGradient>
+  </defs>
+  <path
+    d="M258 72C271 72 283 78 291 88L404 231C412 240 416 252 416 264V354C416 375 405 394 387 405L284 467C267 477 245 477 228 467L117 404C99 393 88 374 88 353V266C88 252 92 239 101 229L226 87C234 77 246 72 258 72Z"
+    fill="url(#averon-blue)"
+  />
+  <path
+    d="M262 121L353 282L315 304L258 204L198 307L160 286L254 122C256 118 260 118 262 121Z"
+    fill="#04111F"
+    fill-opacity="0.94"
+  />
+  <path
+    d="M116 323L212 273C226 266 243 267 257 274L351 324L274 443C266 454 250 454 242 443L116 323Z"
+    fill="#04111F"
+    fill-opacity="0.94"
+  />
+  <path
+    d="M325 129L401 237C408 247 402 261 389 264L312 284L261 194L325 129Z"
+    fill="url(#averon-blue-soft)"
+  />
+  <path
+    d="M111 322L212 273C226 266 243 267 257 274L336 317L289 367L200 316L151 345L111 322Z"
+    fill="#2E66FF"
+    fill-opacity="0.96"
+  />
+</svg>
