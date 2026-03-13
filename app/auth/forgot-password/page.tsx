@@ -6,6 +6,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,45 +44,45 @@ export default function ForgotPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-8">
+      <AppShell className="flex items-center justify-center bg-background p-8 text-foreground">
         <div className="w-full max-w-md space-y-8">
-          <Link href="/auth/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors">
+          <Link href="/auth/login" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-4 h-4" />
             Back to login
           </Link>
 
-          <Card className="border-white/10 bg-white/5 backdrop-blur-sm">
+          <Card className="site-panel">
             <CardContent className="pt-6 text-center space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                <Mail className="w-8 h-8 text-white" />
+              <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                <Mail className="w-8 h-8" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-white">Check Your Email</h2>
-                <p className="text-white/60">
-                  We&apos;ve sent a password reset link to <span className="text-cyan-400 font-medium">{email}</span>
+                <h2 className="text-2xl font-bold text-foreground">Check Your Email</h2>
+                <p className="text-muted-foreground">
+                  We&apos;ve sent a password reset link to <span className="text-primary font-medium">{email}</span>
                 </p>
               </div>
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-muted-foreground">
                 Didn&apos;t receive the email? Check your spam folder or try again.
               </p>
               <Button
                 onClick={() => setSuccess(false)}
                 variant="outline"
-                className="w-full border-white/10 text-white/80 hover:bg-white/5"
+                className="w-full"
               >
                 Try Another Email
               </Button>
             </CardContent>
           </Card>
         </div>
-      </div>
+      </AppShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-8">
+    <AppShell className="flex items-center justify-center bg-background p-8 text-foreground">
       <div className="w-full max-w-md space-y-8">
-        <Link href="/auth/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors">
+        <Link href="/auth/login" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="w-4 h-4" />
           Back to login
         </Link>
@@ -89,19 +90,19 @@ export default function ForgotPassword() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
-            <span className="font-bold text-2xl text-white">Averon CodeLab</span>
+            <span className="font-bold text-2xl text-foreground">Averon CodeLab</span>
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Reset Password</h1>
-            <p className="text-white/60 mt-2">Enter your email and we&apos;ll send you a reset link</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Reset Password</h1>
+            <p className="text-muted-foreground mt-2">Enter your email and we&apos;ll send you a reset link</p>
           </div>
         </div>
 
-        <Card className="border-white/10 bg-white/5 backdrop-blur-sm">
+        <Card className="site-panel">
           <CardContent className="pt-6">
             <form onSubmit={handleResetPassword} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-white">
+                <Label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email Address
                 </Label>
                 <Input
@@ -112,19 +113,19 @@ export default function ForgotPassword() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
-                  className="h-11 bg-black border-white/10 text-white"
+                  className="h-11"
                 />
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm">
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-lg text-sm">
                   {error}
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white"
+                className="w-full h-11"
                 disabled={loading}
               >
                 {loading ? 'Sending...' : 'Send Reset Link'}
@@ -133,6 +134,6 @@ export default function ForgotPassword() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AppShell>
   )
 }

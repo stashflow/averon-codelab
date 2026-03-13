@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTheme } from 'next-themes'
 import { ArrowLeft, CheckCircle2, Code2, Loader2, Play, RotateCcw, Save, TerminalSquare } from 'lucide-react'
 
 import { SiteBackdrop } from '@/components/site-backdrop'
@@ -41,6 +42,7 @@ export default function ClassroomSandboxPage() {
   const router = useRouter()
   const params = useParams()
   const classroomId = params.id as string
+  const { resolvedTheme } = useTheme()
 
   const [classroom, setClassroom] = useState<ClassroomSummary | null>(null)
   const [sandbox, setSandbox] = useState<StudentSandboxRecord | null>(null)
@@ -56,6 +58,7 @@ export default function ClassroomSandboxPage() {
   const [runResult, setRunResult] = useState<SandboxRunResult | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
   const [readyToPersist, setReadyToPersist] = useState(false)
+  const [editorLoadFailed, setEditorLoadFailed] = useState(false)
   const saveTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -138,6 +141,7 @@ export default function ClassroomSandboxPage() {
     () => SANDBOX_LANGUAGE_OPTIONS.find((option) => option.value === language),
     [language],
   )
+  const editorTheme = resolvedTheme === 'light' ? 'light' : 'vs-dark'
 
   async function persistSandbox(isAutosave = false) {
     if (!readyToPersist) return
@@ -331,22 +335,42 @@ export default function ClassroomSandboxPage() {
                 ))}
               </div>
             </div>
-            <MonacoEditor
-              height="620px"
-              language={language}
-              value={code}
-              onChange={(value) => setCode(value ?? '')}
-              theme="vs-dark"
-              options={{
-                minimap: { enabled: true },
-                fontSize: 14,
-                automaticLayout: true,
-                wordWrap: 'on',
-                smoothScrolling: true,
-                tabSize: 2,
-                padding: { top: 16 },
-              }}
-            />
+            {editorLoadFailed ? (
+              <textarea
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                spellCheck={false}
+                className="h-[620px] w-full resize-none border-0 bg-background/80 px-4 py-4 font-mono text-sm text-foreground outline-none"
+              />
+            ) : (
+              <MonacoEditor
+                height="620px"
+                language={language}
+                value={code}
+                onChange={(value) => setCode(value ?? '')}
+                onMount={() => setEditorLoadFailed(false)}
+                loading={
+                  <div className="flex h-[620px] items-center justify-center text-sm text-muted-foreground">
+                    Loading code editor...
+                  </div>
+                }
+                theme={editorTheme}
+                options={{
+                  minimap: { enabled: true },
+                  fontSize: 14,
+                  automaticLayout: true,
+                  wordWrap: 'on',
+                  smoothScrolling: true,
+                  tabSize: 2,
+                  padding: { top: 16 },
+                }}
+              />
+            )}
+            {editorLoadFailed && (
+              <div className="border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
+                Monaco is unavailable in this session, so a plain text editor is being used instead.
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">

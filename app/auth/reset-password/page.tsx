@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -56,26 +57,26 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-8">
+    <AppShell className="flex items-center justify-center bg-background p-8 text-foreground">
       <div className="w-full max-w-md space-y-8">
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <Lock className="w-5 h-5" />
             </div>
-            <span className="font-bold text-xl text-white">Averon CodeLab</span>
+            <span className="font-bold text-xl text-foreground">Averon CodeLab</span>
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Create New Password</h1>
-            <p className="text-white/60 mt-2">Enter your new password below</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Create New Password</h1>
+            <p className="text-muted-foreground mt-2">Enter your new password below</p>
           </div>
         </div>
 
-        <Card className="border-white/10 bg-white/5 backdrop-blur-sm">
+        <Card className="site-panel">
           <CardContent className="pt-6">
             <form onSubmit={handleResetPassword} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-white">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">
                   New Password
                 </Label>
                 <Input
@@ -86,12 +87,12 @@ export default function ResetPassword() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  className="h-11 bg-black border-white/10 text-white"
+                  className="h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-medium text-white">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
                   Confirm New Password
                 </Label>
                 <Input
@@ -102,19 +103,19 @@ export default function ResetPassword() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   disabled={loading}
-                  className="h-11 bg-black border-white/10 text-white"
+                  className="h-11"
                 />
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm">
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-lg text-sm">
                   {error}
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white"
+                className="w-full h-11"
                 disabled={loading}
               >
                 {loading ? 'Resetting...' : 'Reset Password'}
@@ -125,11 +126,11 @@ export default function ResetPassword() {
 
         <p className="text-sm text-center text-white/60">
           Remember your password?{' '}
-          <Link href="/auth/login" className="text-cyan-400 hover:underline font-semibold">
+          <Link href="/auth/login" className="text-primary hover:text-foreground hover:underline font-semibold">
             Sign in
           </Link>
         </p>
       </div>
-    </div>
+    </AppShell>
   )
 }

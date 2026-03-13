@@ -33,6 +33,39 @@ type EnrollmentRow = {
   id: string
 }
 
+async function selectProfileWithFallback(
+  supabase: SupabaseClient<any, 'public', any>,
+  userId: string,
+): Promise<ProfileRow | null> {
+  const fieldAttempts = [
+    'role, district_id, school_id',
+    'role, school_id',
+    'role, district_id',
+    'role',
+  ]
+
+  for (const fields of fieldAttempts) {
+    const result = await supabase.from('profiles').select(fields).eq('id', userId).maybeSingle()
+
+    if (!result.error) {
+      const profile = (result.data as ProfileRow | null) || null
+      return profile
+        ? {
+            role: profile.role || null,
+            district_id: profile.district_id || null,
+            school_id: profile.school_id || null,
+          }
+        : null
+    }
+
+    if (!isMissingColumnError(result.error)) {
+      throw result.error
+    }
+  }
+
+  return null
+}
+
 function isMissingColumnError(error: any) {
   return error?.code === '42703'
 }
@@ -91,15 +124,7 @@ export async function getActorScope(
   supabase: SupabaseClient<any, 'public', any>,
   userId: string
 ): Promise<ActorScope | null> {
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role, district_id, school_id')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (profileError) throw profileError
-
-  const typedProfile = (profile as ProfileRow | null) || null
+  const typedProfile = await selectProfileWithFallback(supabase, userId)
   const role = String(typedProfile?.role || '').trim()
   if (!role) return null
 

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -78,7 +79,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-rose-50/40 to-orange-50/60 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 flex warm-aurora">
+    <AppShell className="flex bg-background text-foreground">
       {/* Left Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
@@ -93,15 +94,15 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/90 shadow-xl dark:shadow-black/30 p-6 backdrop-blur-sm">
+          <div className="site-panel relative overflow-hidden p-6">
             <div className="space-y-5">
               {showConfirmNotice && (
-                <div className="rounded-lg border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200 flex items-start justify-between gap-3">
+                <div className="rounded-lg border border-primary/25 bg-primary/10 p-3 text-sm text-foreground flex items-start justify-between gap-3">
                   <p>Before signing in, confirm your email from the verification message we sent you.</p>
                   <button
                     type="button"
                     onClick={() => setShowConfirmNotice(false)}
-                    className="text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 text-xs"
+                    className="text-primary hover:text-foreground text-xs"
                   >
                     Dismiss
                   </button>
@@ -120,7 +121,7 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-pink-500 dark:focus:border-pink-400 focus:ring-pink-500/20 dark:focus:ring-pink-400/30"
+                    className="h-11"
                   />
                 </div>
 
@@ -129,7 +130,7 @@ export default function Login() {
                     <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">
                       Password
                     </Label>
-                    <Link href="/auth/forgot-password" className="text-xs text-pink-700 dark:text-pink-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline">
+                    <Link href="/auth/forgot-password" className="text-xs text-primary hover:text-foreground hover:underline">
                       Forgot password?
                     </Link>
                   </div>
@@ -141,19 +142,19 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950/70 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-pink-500 dark:focus:border-pink-400 focus:ring-pink-500/20 dark:focus:ring-pink-400/30"
+                    className="h-11"
                   />
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 text-red-700 dark:text-red-300 p-3 rounded-lg text-sm">
+                  <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-lg text-sm">
                     {error}
                   </div>
                 )}
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 hover:from-fuchsia-600 hover:via-pink-600 hover:to-orange-600 text-white shadow-lg shadow-pink-500/25 border-0"
+                  className="w-full h-11"
                   disabled={loading}
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
@@ -164,7 +165,7 @@ export default function Login() {
                     <div className="w-full border-t border-slate-200 dark:border-slate-700" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white dark:bg-slate-900 px-2 text-slate-500 dark:text-slate-400">Or continue with</span>
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
                   </div>
                 </div>
 
@@ -173,7 +174,7 @@ export default function Login() {
                   variant="outline"
                   onClick={() => handleOAuthLogin('google')}
                   disabled={loading}
-                  className="w-full h-11 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
+                  className="w-full h-11"
                 >
                   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path
@@ -201,7 +202,7 @@ export default function Login() {
 
           <p className="text-sm text-center text-slate-600 dark:text-slate-300">
             Don&apos;t have an account?{' '}
-            <Link href="/auth/sign-up" className="text-pink-700 dark:text-pink-400 hover:text-orange-700 dark:hover:text-orange-300 hover:underline font-semibold">
+            <Link href="/auth/sign-up" className="text-primary hover:text-foreground hover:underline font-semibold">
               Create account
             </Link>
           </p>
@@ -209,11 +210,11 @@ export default function Login() {
       </div>
 
       {/* Right Side - Visual */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-white via-rose-50/40 to-orange-50/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 items-center justify-center p-12 border-l border-slate-200/70 dark:border-slate-800/80">
+      <div className="hidden lg:flex flex-1 items-center justify-center p-12 border-l border-border/70 bg-background/30">
         <div className="max-w-md space-y-6">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-fuchsia-600 via-pink-600 to-orange-600 bg-clip-text text-transparent">
+              <span className="text-gradient-premium">
                 Code. Learn. Excel.
               </span>
             </h2>
@@ -225,8 +226,8 @@ export default function Login() {
           <div className="space-y-3 pt-4">
             {['Interactive coding environment', 'Real-time feedback', 'Track your progress'].map((item, idx) => (
               <div key={idx} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-rose-100 border border-rose-200 dark:bg-rose-500/15 dark:border-rose-400/30 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-pink-600 dark:bg-pink-400" />
+                <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-primary" />
                 </div>
                 <span className="text-sm text-slate-600 dark:text-slate-300">{item}</span>
               </div>
@@ -234,6 +235,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   )
 }
