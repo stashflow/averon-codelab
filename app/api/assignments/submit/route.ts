@@ -9,7 +9,8 @@ import {
   parseQuizQuestions,
   parseQuizSubmission,
 } from '@/lib/assignment-workflow'
-import { normalizeTestCases, runSandboxJudge } from '@/lib/judge/service'
+import { runSandboxJudge } from '@/lib/judge/service'
+import { normalizeTestCases } from '@/lib/judge/shared'
 
 export async function POST(request: Request) {
   try {

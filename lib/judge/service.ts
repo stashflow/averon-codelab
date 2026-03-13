@@ -1,13 +1,6 @@
 import { spawn } from 'node:child_process'
 import vm from 'node:vm'
-
-type JudgeTestCase = {
-  id: string
-  name: string
-  input: string
-  expected: string
-  hidden?: boolean
-}
+import { type JudgeTestCase } from '@/lib/judge/shared'
 
 type JudgeResultCase = {
   id: string
@@ -98,30 +91,38 @@ async function runLocalJudge(payload: JudgeRunRequest): Promise<JudgeResponse> {
 
 function runLocalJavaScriptJudge(payload: JudgeRunRequest): JudgeResponse {
   const functionName = inferFunctionName(payload.code, 'javascript')
-  if (!functionName) {
-    throw new Error('Could not find a JavaScript function to test')
-  }
-
-  const context = vm.createContext({})
-  new vm.Script(payload.code).runInContext(context, { timeout: 500 })
-  const candidate = (context as Record<string, unknown>)[functionName]
-  if (typeof candidate !== 'function') {
-    throw new Error(`Function "${functionName}" was not found`)
-  }
-
-  const fn = candidate as (...args: any[]) => any
   const results = payload.tests.map((test) => {
     try {
-      const args = parseInputArgs(test.input)
-      const expected = parseLiteral(test.expected)
-      const actual = fn(...args)
-      const passed = deepEqual(actual, expected)
+      if (functionName) {
+        const context = vm.createContext({})
+        new vm.Script(payload.code).runInContext(context, { timeout: 500 })
+        const candidate = (context as Record<string, unknown>)[functionName]
+
+        if (typeof candidate === 'function') {
+          const fn = candidate as (...args: any[]) => any
+          const args = parseInputArgs(test.input)
+          const expected = parseLiteral(test.expected)
+          const actual = fn(...args)
+          const passed = deepEqual(actual, expected)
+          return {
+            id: test.id,
+            name: test.name,
+            passed,
+            expected: stringifyValue(expected),
+            actual: stringifyValue(actual),
+            error: null,
+          }
+        }
+      }
+
+      const actualOutput = captureJavaScriptStdout(payload.code).trim()
+      const expectedOutput = String(test.expected || '').trim()
       return {
         id: test.id,
         name: test.name,
-        passed,
-        expected: stringifyValue(expected),
-        actual: stringifyValue(actual),
+        passed: actualOutput === expectedOutput,
+        expected: expectedOutput,
+        actual: actualOutput,
         error: null,
       }
     } catch (error: any) {
@@ -143,6 +144,9 @@ async function runLocalPythonJudge(payload: JudgeRunRequest): Promise<JudgeRespo
   const functionName = inferFunctionName(payload.code, 'python')
 
   const runner = `
+import builtins
+import contextlib
+import io
 import json
 import traceback
 import sys
@@ -180,33 +184,60 @@ if not callable(fn):
     if discovered:
         fn_name, fn = discovered[0]
 
-if not callable(fn):
-    for t in payload["tests"]:
-        results.append({
-            "id": t["id"],
-            "name": t["name"],
-            "passed": False,
-            "expected": t["expected"],
-            "actual": "",
-            "error": 'Could not find a Python function to test'
-        })
-    print(json.dumps({"results": results}))
-    sys.exit(0)
+def run_program(raw_input):
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+    stdin_lines = str(raw_input or "").splitlines()
+    stdin_index = 0
+
+    def fake_input(prompt=""):
+        nonlocal stdin_index
+        if prompt:
+            print(prompt, end="", file=stdout_capture)
+        if stdin_index < len(stdin_lines):
+            value = stdin_lines[stdin_index]
+            stdin_index += 1
+            return value
+        raise EOFError("EOF when reading a line")
+
+    original_input = builtins.input
+    try:
+        builtins.input = fake_input
+        with contextlib.redirect_stdout(stdout_capture), contextlib.redirect_stderr(stderr_capture):
+            exec(payload["code"], {"__name__": "__main__"})
+        return stdout_capture.getvalue().strip(), stderr_capture.getvalue().strip(), None
+    except Exception:
+        return stdout_capture.getvalue().strip(), stderr_capture.getvalue().strip(), traceback.format_exc()
+    finally:
+        builtins.input = original_input
 
 for t in payload["tests"]:
     try:
-        args = t["args"]
-        expected = t["expected_parsed"]
-        actual = fn(*args)
-        passed = actual == expected
-        results.append({
-            "id": t["id"],
-            "name": t["name"],
-            "passed": bool(passed),
-            "expected": json.dumps(expected),
-            "actual": json.dumps(actual),
-            "error": None
-        })
+        if callable(fn):
+            args = t["args"]
+            expected = t["expected_parsed"]
+            actual = fn(*args)
+            passed = actual == expected
+            results.append({
+                "id": t["id"],
+                "name": t["name"],
+                "passed": bool(passed),
+                "expected": json.dumps(expected),
+                "actual": json.dumps(actual),
+                "error": None
+            })
+        else:
+            stdout, stderr, error = run_program(t["input"])
+            expected_output = str(t["expected"]).strip()
+            actual_output = str(stdout or "").strip()
+            results.append({
+                "id": t["id"],
+                "name": t["name"],
+                "passed": error is None and actual_output == expected_output,
+                "expected": expected_output,
+                "actual": actual_output,
+                "error": error or (stderr if stderr else None)
+            })
     except Exception as e:
         results.append({
             "id": t["id"],
@@ -382,30 +413,15 @@ function stringifyValue(value: unknown): string {
   }
 }
 
-export function normalizeTestCases(raw: unknown): JudgeTestCase[] {
-  if (!Array.isArray(raw)) return []
-
-  return raw
-    .map((test, index) => {
-      const item = (test ?? {}) as Record<string, unknown>
-      return {
-        id: String(item.id ?? index),
-        name: String(item.name ?? `Test ${index + 1}`),
-        input: String(item.input ?? ''),
-        expected: String(item.expected ?? item.expected_output ?? ''),
-        hidden: Boolean(item.hidden),
-      }
-    })
-    .filter((test) => test.expected.length > 0 || test.input.length > 0)
-}
-
-export function inferLanguage(input: { code?: string | null; starterCode?: string | null; language?: string | null }): string {
-  if (input.language && input.language.trim()) return input.language.trim().toLowerCase()
-
-  const source = `${input.code || ''}\n${input.starterCode || ''}`.toLowerCase()
-  if (/\b(def |import |print\()/.test(source)) return 'python'
-  if (/\b(function |const |let |=>|console\.log)/.test(source)) return 'javascript'
-  if (/\bpublic class |system\.out\.println/.test(source)) return 'java'
-  if (/\b#include|std::|cout\s*<</.test(source)) return 'cpp'
-  return 'python'
+function captureJavaScriptStdout(code: string): string {
+  let stdout = ''
+  const context = vm.createContext({
+    console: {
+      log: (...args: unknown[]) => {
+        stdout += `${args.map((value) => String(value)).join(' ')}\n`
+      },
+    },
+  })
+  new vm.Script(code).runInContext(context, { timeout: 500 })
+  return stdout
 }

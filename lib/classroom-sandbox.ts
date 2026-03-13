@@ -8,6 +8,9 @@ export type StudentSandboxRecord = {
   classroom_id: string
   student_id: string
   language: SandboxLanguage
+  project_name: string | null
+  active_file: string | null
+  workspace_files: StudentSandboxFile[] | null
   entry_filename: string
   code: string
   stdin: string
@@ -19,6 +22,11 @@ export type StudentSandboxRecord = {
   last_run_at: string | null
   created_at: string
   updated_at: string
+}
+
+export type StudentSandboxFile = {
+  path: string
+  content: string
 }
 
 export const SANDBOX_LANGUAGE_OPTIONS: Array<{ value: SandboxLanguage; label: string; description: string }> = [
@@ -46,6 +54,44 @@ export function getSandboxStarterCode(language: SandboxLanguage, classroomName?:
   ].join('\n')
 }
 
+export function getDefaultSandboxFiles(language: SandboxLanguage, classroomName?: string | null): StudentSandboxFile[] {
+  return [
+    {
+      path: getSandboxEntryFilename(language),
+      content: getSandboxStarterCode(language, classroomName),
+    },
+    {
+      path: 'helpers.py',
+      content: ['def banner(title: str) -> str:', '    return f"== {title} =="' ].join('\n'),
+    },
+  ]
+}
+
+export function normalizeSandboxFiles(
+  files: Partial<StudentSandboxFile>[] | null | undefined,
+  classroomName?: string | null,
+): StudentSandboxFile[] {
+  const fallback = getDefaultSandboxFiles('python', classroomName)
+  if (!Array.isArray(files) || files.length === 0) return fallback
+
+  const normalized = files
+    .map((file) => ({
+      path: String(file?.path || '').trim().replace(/^\/+/, ''),
+      content: String(file?.content || ''),
+    }))
+    .filter((file) => file.path.endsWith('.py'))
+
+  if (normalized.length === 0) return fallback
+  if (!normalized.some((file) => file.path === 'main.py')) {
+    normalized.unshift({
+      path: 'main.py',
+      content: getSandboxStarterCode('python', classroomName),
+    })
+  }
+
+  return normalized
+}
+
 export function normalizeSandboxRecord(
   record: Partial<StudentSandboxRecord> | null | undefined,
   classroomId: string,
@@ -58,6 +104,9 @@ export function normalizeSandboxRecord(
     classroom_id: classroomId,
     student_id: studentId,
     language,
+    project_name: record?.project_name || 'Class Sandbox Project',
+    active_file: record?.active_file || getSandboxEntryFilename(language),
+    workspace_files: normalizeSandboxFiles(record?.workspace_files, classroomName),
     entry_filename: record?.entry_filename || getSandboxEntryFilename(language),
     code: record?.code || getSandboxStarterCode(language, classroomName),
     stdin: record?.stdin || '',

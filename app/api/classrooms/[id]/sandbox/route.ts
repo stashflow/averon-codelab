@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import {
   SANDBOX_SETUP_MESSAGE,
   isMissingSandboxTableError,
+  normalizeSandboxFiles,
   normalizeSandboxLanguage,
   normalizeSandboxRecord,
 } from '@/lib/classroom-sandbox'
@@ -114,6 +115,10 @@ export async function PUT(request: Request, context: RouteContext) {
     const code = hasCode ? String(body.code ?? '') : defaults.code
     const stdin = Object.prototype.hasOwnProperty.call(body, 'stdin') ? String(body.stdin ?? '') : ''
     const entryFilename = String(body.entryFilename || '').trim()
+    const projectName = String(body.projectName || '').trim() || defaults.project_name || 'Class Sandbox Project'
+    const activeFile = String(body.activeFile || '').trim() || entryFilename || defaults.active_file || defaults.entry_filename
+    const workspaceFiles = normalizeSandboxFiles(body.workspaceFiles, access.classroom?.name)
+    const primaryCode = workspaceFiles.find((file) => file.path === (entryFilename || defaults.entry_filename))?.content || code
     const now = new Date().toISOString()
     const lastRun =
       body.lastRun && typeof body.lastRun === 'object'
@@ -133,8 +138,11 @@ export async function PUT(request: Request, context: RouteContext) {
           classroom_id: classroomId,
           student_id: access.user.id,
           language,
+          project_name: projectName,
+          active_file: activeFile,
+          workspace_files: workspaceFiles,
           entry_filename: entryFilename || defaults.entry_filename,
-          code,
+          code: primaryCode,
           stdin,
           last_run_status: lastRun?.status === 'success' || lastRun?.status === 'timeout' ? lastRun.status : lastRun?.status ? 'error' : undefined,
           last_run_output: typeof lastRun?.stdout === 'string' ? lastRun.stdout : undefined,

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ensureValidCsrf } from '@/lib/security/csrf'
-import { inferLanguage, normalizeTestCases, runSandboxJudge } from '@/lib/judge/service'
+import { runSandboxJudge } from '@/lib/judge/service'
+import { inferLanguage, normalizeTestCases } from '@/lib/judge/shared'
 
 export async function POST(request: Request) {
   try {
@@ -60,14 +61,16 @@ export async function POST(request: Request) {
     })
 
     const resultsForUi = visibleResults.length > 0 ? visibleResults : judge.results
-    const passedCount = resultsForUi.filter((test) => test.passed).length
-    const totalCount = resultsForUi.length
+    const passedCount = judge.results.filter((test) => test.passed).length
+    const totalCount = judge.results.length
     const passed = totalCount > 0 && passedCount === totalCount
     const score = totalCount > 0 ? (passedCount / totalCount) * 100 : 0
 
     return NextResponse.json({
       passed,
       score,
+      passedCount,
+      total: totalCount,
       results: resultsForUi,
     })
   } catch (error: any) {

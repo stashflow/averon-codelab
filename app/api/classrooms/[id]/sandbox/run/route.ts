@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import {
   SANDBOX_SETUP_MESSAGE,
   isMissingSandboxTableError,
+  normalizeSandboxFiles,
   normalizeSandboxLanguage,
   normalizeSandboxRecord,
 } from '@/lib/classroom-sandbox'
@@ -52,15 +53,21 @@ export async function POST(request: Request, context: RouteContext) {
     const stdin = String(body.stdin || '')
     const defaults = normalizeSandboxRecord(null, classroomId, user.id, classroom.name)
     const entryFilename = String(body.entryFilename || '').trim() || defaults.entry_filename
+    const projectName = String(body.projectName || '').trim() || defaults.project_name || 'Class Sandbox Project'
+    const activeFile = String(body.activeFile || '').trim() || entryFilename || defaults.active_file || defaults.entry_filename
+    const workspaceFiles = normalizeSandboxFiles(body.workspaceFiles, classroom.name)
+    const primaryCode = workspaceFiles.find((file) => file.path === entryFilename)?.content || code
 
-    if (!code.trim()) {
+    if (!primaryCode.trim()) {
       return NextResponse.json({ error: 'Code is required to run the sandbox.' }, { status: 400 })
     }
 
     const result = await runSandboxExecution({
       language,
-      code,
+      code: primaryCode,
       stdin,
+      entryFilename,
+      files: workspaceFiles,
     })
 
     const { data: sandbox, error: saveError } = await supabase
@@ -70,8 +77,11 @@ export async function POST(request: Request, context: RouteContext) {
           classroom_id: classroomId,
           student_id: user.id,
           language,
+          project_name: projectName,
+          active_file: activeFile,
+          workspace_files: workspaceFiles,
           entry_filename: entryFilename,
-          code,
+          code: primaryCode,
           stdin,
           last_run_status: result.status,
           last_run_output: result.stdout,

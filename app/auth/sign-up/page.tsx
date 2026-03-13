@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AppShell } from '@/components/app-shell'
+import { AuthShowcase } from '@/components/auth/auth-showcase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -106,33 +107,24 @@ export default function SignUp() {
 
   return (
     <AppShell className="flex bg-background text-foreground">
-      <div className="relative z-10 flex flex-1 items-center justify-center p-8">
+      <div className="relative z-10 flex flex-1 items-center justify-center p-8 lg:p-12">
         <div className="w-full max-w-md space-y-8">
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Link href="/" className="inline-flex items-center gap-2 group">
               <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Create Account</h1>
-              <p className="mt-2 text-muted-foreground">
-                Build your workspace and start learning in minutes.
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Get started</p>
+              <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Create your account</h1>
+              <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+                Set up your workspace, choose your role, and move straight into lessons and class projects.
               </p>
             </div>
           </div>
 
           <div className="site-panel relative overflow-hidden p-6">
             <div className="space-y-5">
-              <div className="rounded-lg border border-primary/20 bg-primary/8 p-4">
-                <p className="text-sm font-medium text-foreground">Your account includes</p>
-                <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Guided coding lessons</div>
-                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Saved classroom progress</div>
-                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Instant assignment access</div>
-                  <div className="rounded-md border border-border/60 bg-background/55 px-3 py-2">Teacher onboarding tools</div>
-                </div>
-              </div>
-
               <form onSubmit={handleSignUp} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="fullName" className="text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -327,36 +319,12 @@ export default function SignUp() {
         </div>
       </div>
 
-      <div className="relative z-10 hidden flex-1 items-center justify-center border-l border-border/70 bg-background/35 lg:flex">
-        <div className="absolute inset-0 bg-gradient-to-br from-background/10 via-transparent to-background/30" />
-        <div className="relative z-10 max-w-md space-y-6 p-12">
-          <div className="space-y-4">
-            <h2 className="text-4xl font-bold tracking-tight">
-              <span className="text-gradient-premium">
-                Start Strong From Day One.
-              </span>
-            </h2>
-            <p className="text-lg leading-relaxed text-foreground/80">
-              Sign up with the same polished workflow students and teachers use every day, then move straight into
-              classes, assignments, and guided coding.
-            </p>
-          </div>
-          <div className="space-y-3 pt-4">
-            {[
-              'Professional classroom-ready experience',
-              'Fast onboarding for students and teachers',
-              'Progress, coding, and assignments in one place',
-            ].map((item, idx) => (
-              <div key={idx} className="flex items-center gap-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
-                  <div className="h-2 w-2 rounded-full bg-primary" />
-                </div>
-                <span className="text-sm text-foreground/75">{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <AuthShowcase
+        eyebrow="Code. Learn. Excel."
+        title="The same refined entry point, built for both students and teachers."
+        description="Sign-up now mirrors login with the stronger center line, a richer visual pattern, and a more intentional workspace preview instead of extra clutter under the form."
+        points={['Guided onboarding for every role', 'Saved classroom and sandbox progress', 'Assignments, feedback, and grading in one flow', 'A calmer first-run experience']}
+      />
     </AppShell>
   )
 }

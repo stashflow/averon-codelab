@@ -7,11 +7,15 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { SiteBackdrop } from '@/components/site-backdrop'
+import { LiveRuntimePanel } from '@/components/code/live-runtime-panel'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Send, Play, CheckCircle2, XCircle, Code2, Braces, AlertCircle } from 'lucide-react'
-import { getAssignmentAvailability, parseQuizQuestions, parseQuizSubmission } from '@/lib/assignment-workflow'
+import { buildJudgeFeedback, getAssignmentAvailability, parseQuizQuestions, parseQuizSubmission } from '@/lib/assignment-workflow'
+import { judgeBrowserPythonCode, shouldUseBrowserPythonFallback } from '@/lib/client/browser-python'
+import { usePythonLiveRuntime } from '@/lib/client/use-python-live-runtime'
+import { normalizeTestCases } from '@/lib/judge/shared'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
 import type { editor } from 'monaco-editor'
 
@@ -166,6 +170,7 @@ export default function AssignmentPage() {
   const [draftSaving, setDraftSaving] = useState(false)
   const [lastDraftSavedAt, setLastDraftSavedAt] = useState<string | null>(null)
   const [lastAutosavedPayload, setLastAutosavedPayload] = useState('')
+  const liveRuntime = usePythonLiveRuntime()
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
@@ -348,10 +353,46 @@ export default function AssignmentPage() {
         results: resultList,
       })
     } catch (err: any) {
-      alert(err?.message || 'Unable to run tests')
+      const message = err?.message || 'Unable to run tests'
+
+      if (editorLanguage === 'python' && shouldUseBrowserPythonFallback(message) && assignment) {
+        try {
+          const tests = normalizeTestCases(assignment.test_cases)
+          const judged = await judgeBrowserPythonCode({ code, tests })
+          const visibleResults = judged.results.filter((result) => {
+            const source = tests.find((test) => test.id === result.id)
+            return !source?.hidden
+          })
+          const results = visibleResults.length > 0 ? visibleResults : judged.results
+          const passed = judged.results.length > 0 && judged.results.every((result) => result.passed)
+          const score = judged.results.length > 0 ? Math.round((judged.results.filter((result) => result.passed).length / judged.results.length) * 100) : 0
+
+          setTestResults({
+            passed,
+            score,
+            results,
+          })
+          return
+        } catch (browserError: any) {
+          alert(browserError?.message || message)
+          return
+        }
+      }
+
+      alert(message)
     } finally {
       setTestingCode(false)
     }
+  }
+
+  async function handleRunCode() {
+    if (editorLanguage !== 'python' || !code.trim()) return
+
+    await liveRuntime.runProgram({
+      code,
+      entryFilename: editorFileName(),
+      files: [{ path: editorFileName(), content: code }],
+    })
   }
 
   async function handleSubmit() {
@@ -396,7 +437,60 @@ export default function AssignmentPage() {
         alert('Submission successful. Your teacher can now review it.')
       }
     } catch (err: any) {
-      alert('Error submitting: ' + (err.message || 'Unknown error'))
+      const message = err?.message || 'Unknown error'
+
+      if (editorLanguage === 'python' && shouldUseBrowserPythonFallback(message) && assignment) {
+        try {
+          const supabase = createClient()
+          const tests = normalizeTestCases(assignment.test_cases)
+          const judged = await judgeBrowserPythonCode({ code, tests })
+          const visibleResults = judged.results.filter((result) => {
+            const source = tests.find((test) => test.id === result.id)
+            return !source?.hidden
+          })
+          const results = visibleResults.length > 0 ? visibleResults : judged.results
+          const score = judged.results.length > 0 ? Math.round((judged.results.filter((result) => result.passed).length / judged.results.length) * 100) : 0
+          const passed = judged.results.length > 0 && judged.results.every((result) => result.passed)
+          const feedback = buildJudgeFeedback(results, score, judged.results.length)
+          const status = 'graded'
+          const now = new Date().toISOString()
+
+          const { data, error } = await supabase
+            .from('submissions')
+            .upsert(
+              {
+                assignment_id: assignmentId,
+                student_id: userId,
+                code: draftPayload,
+                status,
+                score,
+                feedback,
+                submitted_at: now,
+                graded_at: now,
+              },
+              { onConflict: 'assignment_id,student_id' },
+            )
+            .select()
+            .single()
+
+          if (error) throw error
+
+          setSubmission((data as Submission) || null)
+          setLastAutosavedPayload(draftPayload)
+          setTestResults({
+            passed,
+            score,
+            results,
+          })
+          alert(`Submission successful. Browser fallback graded this at ${score}%.`)
+          return
+        } catch (browserError: any) {
+          alert('Error submitting: ' + (browserError?.message || message))
+          return
+        }
+      }
+
+      alert('Error submitting: ' + message)
     } finally {
       setSubmitting(false)
     }
@@ -718,6 +812,17 @@ export default function AssignmentPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
+                    {editorLanguage === 'python' && (
+                      <Button
+                        onClick={handleRunCode}
+                        variant="outline"
+                        className="gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                        disabled={liveRuntime.running || !code.trim()}
+                      >
+                        <Code2 className="w-4 h-4" />
+                        {liveRuntime.running ? 'Running Code...' : 'Run Code'}
+                      </Button>
+                    )}
                     <Button
                       onClick={handleRunTests}
                       variant="outline"
@@ -736,6 +841,19 @@ export default function AssignmentPage() {
                       {submitting ? 'Submitting...' : 'Submit Solution'}
                     </Button>
                   </div>
+
+                  {editorLanguage === 'python' && (
+                    <LiveRuntimePanel
+                      output={liveRuntime.terminalOutput}
+                      error={liveRuntime.runtimeError}
+                      runtime={liveRuntime.lastResult?.runtime || 'browser-python-live'}
+                      status={liveRuntime.lastResult?.status}
+                      running={liveRuntime.running}
+                      title="Python Terminal"
+                      subtitle="`input()` prompts appear while the program runs, and the transcript stays here."
+                      onClear={liveRuntime.clearTerminal}
+                    />
+                  )}
 
                   {testResults && (
                     <div className={`rounded-xl border p-4 ${testResults.passed ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-orange-500/40 bg-orange-500/10'}`}>

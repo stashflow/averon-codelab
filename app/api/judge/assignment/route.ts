@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ensureValidCsrf } from '@/lib/security/csrf'
-import { normalizeTestCases, runSandboxJudge } from '@/lib/judge/service'
+import { runSandboxJudge } from '@/lib/judge/service'
+import { normalizeTestCases } from '@/lib/judge/shared'
 import { canUserAccessClassroom } from '@/lib/security/role-scope'
 
 export async function POST(request: Request) {

@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AppShell } from '@/components/app-shell'
+import { AuthShowcase } from '@/components/auth/auth-showcase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -80,17 +81,19 @@ export default function Login() {
 
   return (
     <AppShell className="flex bg-background text-foreground">
-      {/* Left Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="relative z-10 flex flex-1 items-center justify-center p-8 lg:p-12">
         <div className="w-full max-w-md space-y-8">
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Link href="/" className="inline-flex items-center gap-2 group">
               <Image src="/ACL.png" alt="ACL Logo" width={48} height={48} className="w-12 h-12 logo-theme-filter" />
               <span className="font-bold text-2xl">Averon CodeLab</span>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Welcome Back</h1>
-              <p className="text-slate-600 dark:text-slate-300 mt-2">Sign in to continue your learning journey</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Welcome back</p>
+              <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Sign in to your workspace</h1>
+              <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+                Pick up where you left off with classes, lessons, and your saved coding progress.
+              </p>
             </div>
           </div>
 
@@ -209,32 +212,12 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right Side - Visual */}
-      <div className="hidden lg:flex flex-1 items-center justify-center p-12 border-l border-border/70 bg-background/30">
-        <div className="max-w-md space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-4xl font-bold tracking-tight">
-              <span className="text-gradient-premium">
-                Code. Learn. Excel.
-              </span>
-            </h2>
-            <p className="text-lg text-slate-700 dark:text-slate-300 leading-relaxed">
-              Join thousands of students and teachers using Averon CodeLab to master programming skills and achieve
-              their goals.
-            </p>
-          </div>
-          <div className="space-y-3 pt-4">
-            {['Interactive coding environment', 'Real-time feedback', 'Track your progress'].map((item, idx) => (
-              <div key={idx} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                </div>
-                <span className="text-sm text-slate-600 dark:text-slate-300">{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <AuthShowcase
+        eyebrow="Code. Learn. Excel."
+        title="A polished coding classroom that feels ready the moment you arrive."
+        description="The right side now carries the visual weight again: a clean divider, a stronger pattern, and a calmer workspace preview that matches the rest of the product."
+        points={['Interactive coding lessons', 'Instant feedback and grading', 'Progress that stays in sync', 'A cleaner, more focused workspace']}
+      />
     </AppShell>
   )
 }

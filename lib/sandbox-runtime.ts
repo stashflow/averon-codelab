@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process'
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
 
 import { normalizeSandboxLanguage, type SandboxLanguage } from '@/lib/classroom-sandbox'
 
@@ -6,6 +9,8 @@ type SandboxExecutionRequest = {
   language: SandboxLanguage
   code: string
   stdin?: string
+  entryFilename?: string
+  files?: Array<{ path: string; content: string }>
 }
 
 export type SandboxExecutionResult = {
@@ -47,6 +52,8 @@ async function runRemoteSandboxExecution(
       language: input.language,
       code: input.code,
       stdin: input.stdin || '',
+      entryFilename: input.entryFilename || 'main.py',
+      files: input.files || [],
     }),
     cache: 'no-store',
   })
@@ -73,8 +80,8 @@ async function runRemoteSandboxExecution(
 }
 
 async function runLocalSandboxExecution(input: SandboxExecutionRequest): Promise<SandboxExecutionResult> {
-  const language = normalizeSandboxLanguage(input.language)
-  return runLocalProcess('python3', ['-c', input.code], input.stdin || '', 'local-python')
+  normalizeSandboxLanguage(input.language)
+  return runLocalPythonWorkspace(input)
 }
 
 function runLocalProcess(
@@ -82,11 +89,13 @@ function runLocalProcess(
   args: string[],
   stdin: string,
   runtime: string,
+  cwd?: string,
 ): Promise<SandboxExecutionResult> {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now()
     const child = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
+      cwd,
     })
 
     let stdout = ''
@@ -138,4 +147,47 @@ function runLocalProcess(
     }
     child.stdin.end()
   })
+}
+
+async function runLocalPythonWorkspace(input: SandboxExecutionRequest): Promise<SandboxExecutionResult> {
+  const workspaceDir = await mkdtemp(join(tmpdir(), 'averon-sandbox-'))
+  const entryFilename = normalizeEntryFilename(input.entryFilename)
+  const files = normalizeWorkspaceFiles(input.files, input.code, entryFilename)
+
+  try {
+    for (const file of files) {
+      const targetPath = join(workspaceDir, file.path)
+      await mkdir(dirname(targetPath), { recursive: true })
+      await writeFile(targetPath, file.content, 'utf8')
+    }
+
+    return await runLocalProcess('python3', [entryFilename], input.stdin || '', 'local-python', workspaceDir)
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true })
+  }
+}
+
+function normalizeEntryFilename(entryFilename?: string): string {
+  return String(entryFilename || 'main.py').trim().replace(/^\/+/, '') || 'main.py'
+}
+
+function normalizeWorkspaceFiles(
+  files: Array<{ path: string; content: string }> | undefined,
+  code: string,
+  entryFilename: string,
+) {
+  const normalized = Array.isArray(files)
+    ? files
+        .map((file) => ({
+          path: normalizeEntryFilename(file.path),
+          content: String(file.content || ''),
+        }))
+        .filter((file) => file.path.endsWith('.py'))
+    : []
+
+  if (!normalized.some((file) => file.path === entryFilename)) {
+    normalized.push({ path: entryFilename, content: code })
+  }
+
+  return normalized
 }

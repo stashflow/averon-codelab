@@ -7,6 +7,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { LiveRuntimePanel } from '@/components/code/live-runtime-panel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -30,6 +31,13 @@ import {
   X,
 } from 'lucide-react'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
+import {
+  judgeBrowserPythonCode,
+  shouldUseBrowserPythonFallback,
+  type BrowserJudgeResultCase,
+} from '@/lib/client/browser-python'
+import { usePythonLiveRuntime } from '@/lib/client/use-python-live-runtime'
+import { normalizeTestCases } from '@/lib/judge/shared'
 import type { editor } from 'monaco-editor'
 
 const MonacoEditor = nextDynamic(() => import('@monaco-editor/react'), { ssr: false })
@@ -44,6 +52,7 @@ type Checkpoint = {
   title: string
   problem_description: string
   starter_code: string
+  test_cases?: unknown
   points: number
   order_index: number
   checkpoint_type?: string | null
@@ -1252,6 +1261,7 @@ export default function LessonViewer() {
   const [selectedTemplate, setSelectedTemplate] = useState<StarterTemplateKey>('standard')
   const [helloWorldPreview, setHelloWorldPreview] = useState<{ expected: string; actual: string; matches: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
+  const liveRuntime = usePythonLiveRuntime()
 
   const [activeSectionIndex, setActiveSectionIndex] = useState(0)
   const [questionResponses, setQuestionResponses] = useState<Record<string, string>>({})
@@ -1656,7 +1666,7 @@ export default function LessonViewer() {
 
       const { data: checkpointsData, error: checkpointsError } = await supabase
         .from('checkpoints')
-        .select('id, title, problem_description, starter_code, points, order_index, checkpoint_type, starter_templates, required_function_name, required_signature')
+        .select('id, title, problem_description, starter_code, test_cases, points, order_index, checkpoint_type, starter_templates, required_function_name, required_signature')
         .eq('lesson_id', lessonId)
         .order('order_index', { ascending: true })
 
@@ -1843,11 +1853,71 @@ export default function LessonViewer() {
         })
       }
     } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'unknown'
+
+      if (editorLanguage === 'python' && shouldUseBrowserPythonFallback(message)) {
+        try {
+          const tests = normalizeTestCases(currentCheckpoint.test_cases)
+          const judged = await judgeBrowserPythonCode({
+            code,
+            tests,
+          })
+          const visibleResults = judged.results.filter((result) => {
+            const source = tests.find((test) => test.id === result.id)
+            return !source?.hidden
+          })
+          const results = visibleResults.length > 0 ? visibleResults : judged.results
+          const allPassed = judged.results.length > 0 && judged.results.every((result) => result.passed)
+          const score = judged.results.length > 0 ? Math.round((judged.results.filter((result) => result.passed).length / judged.results.length) * 100) : 0
+
+          setTestResults({ passed: allPassed, score, results: results as BrowserJudgeResultCase[] })
+
+          const supabase = createClient()
+          await supabase.from('checkpoint_submissions').insert({
+            checkpoint_id: currentCheckpoint.id,
+            student_id: user?.id,
+            code,
+            is_correct: allPassed,
+            score,
+            test_results: results,
+          })
+
+          if (lesson && user?.id) {
+            await supabase.from('student_lesson_progress').upsert({
+              lesson_id: lesson.id,
+              student_id: user.id,
+              status: allPassed ? 'in_progress' : 'not_started',
+              last_accessed: new Date().toISOString(),
+              score,
+            })
+          }
+
+          trackLessonEvent('run_tests_browser_fallback', {
+            checkpointId: currentCheckpoint.id,
+            passed: allPassed,
+            score,
+          })
+          return
+        } catch (browserError) {
+          console.error('[v0] Browser lesson judge fallback failed:', browserError)
+        }
+      }
+
       console.error('[v0] Error running tests:', err)
-      trackLessonEvent('run_tests_error', { checkpointId: currentCheckpoint.id, message: err instanceof Error ? err.message : 'unknown' })
+      trackLessonEvent('run_tests_error', { checkpointId: currentCheckpoint.id, message })
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleRunCode() {
+    if (editorLanguage !== 'python' || !code.trim()) return
+
+    await liveRuntime.runProgram({
+      code,
+      entryFilename: checkpointFileName(),
+      files: [{ path: checkpointFileName(), content: code }],
+    })
   }
 
   async function handleCompleteLesson() {
@@ -2787,6 +2857,18 @@ export default function LessonViewer() {
                             Run Hello World
                           </Button>
                         )}
+                        {editorLanguage === 'python' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void handleRunCode()}
+                            disabled={liveRuntime.running}
+                            className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                          >
+                            <Code2 className="mr-2 h-4 w-4" />
+                            {liveRuntime.running ? 'Running Code...' : 'Run Code'}
+                          </Button>
+                        )}
                         <Button
                           onClick={() => void handleRunTests()}
                           disabled={submitting}
@@ -2806,6 +2888,20 @@ export default function LessonViewer() {
                         <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${helloWorldPreview.matches ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100' : 'border-amber-500/30 bg-amber-500/10 text-amber-100'}`}>
                           Expected: <span className="font-mono">{helloWorldPreview.expected}</span> | Detected output:{' '}
                           <span className="font-mono">{helloWorldPreview.actual}</span>
+                        </div>
+                      )}
+                      {editorLanguage === 'python' && (
+                        <div className="mt-4">
+                          <LiveRuntimePanel
+                            output={liveRuntime.terminalOutput}
+                            error={liveRuntime.runtimeError}
+                            runtime={liveRuntime.lastResult?.runtime || 'browser-python-live'}
+                            status={liveRuntime.lastResult?.status}
+                            running={liveRuntime.running}
+                            title="Python Terminal"
+                            subtitle="`input()` prompts appear while the checkpoint runs, and the transcript stays here."
+                            onClear={liveRuntime.clearTerminal}
+                          />
                         </div>
                       )}
                     </div>
