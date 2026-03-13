@@ -3,10 +3,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { LoadingScreen } from '@/components/loading-screen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  getClientAuthContext,
+  resolveAuthenticatedAppPath,
+} from '@/lib/auth/client-auth'
 import { withCsrfHeaders } from '@/lib/security/csrf-client'
 
 export const dynamic = 'force-dynamic'
@@ -29,53 +34,27 @@ export default function TeacherOnboarding() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient()
       try {
         const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser()
+          supabase,
+          user,
+          profile,
+          missingSchoolIdColumn,
+        } = await getClientAuthContext<{ role?: string | null; school_id?: string | null }>({
+          profileSelect: 'role, school_id',
+        })
 
-        if (userError || !user) {
+        if (!user) {
           router.push('/auth/login')
           return
         }
 
-        let missingSchoolIdColumn = false
-        let profile: { role?: string; school_id?: string | null } | null = null
-        const profileWithSchool = await supabase
-          .from('profiles')
-          .select('role, school_id')
-          .eq('id', user.id)
-          .single()
+        const destination = await resolveAuthenticatedAppPath(supabase, user.id, profile, {
+          missingSchoolIdColumn,
+        })
 
-        if (profileWithSchool.error && profileWithSchool.error.message?.toLowerCase().includes('school_id')) {
-          missingSchoolIdColumn = true
-          const profileWithoutSchool = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-          profile = profileWithoutSchool.data ? { ...profileWithoutSchool.data, school_id: null } : null
-        } else if (profileWithSchool.error) {
-          throw profileWithSchool.error
-        } else {
-          profile = profileWithSchool.data
-        }
-
-        if (profile?.role && ['full_admin', 'district_admin', 'school_admin'].includes(profile.role)) {
-          router.push('/protected')
-          return
-        }
-
-        if (missingSchoolIdColumn && profile?.role === 'teacher') {
-          router.push('/protected/teacher')
-          return
-        }
-
-        if (profile?.role === 'teacher' && profile?.school_id) {
-          router.push('/protected/teacher')
+        if (destination !== '/onboarding/teacher') {
+          router.push(destination)
           return
         }
 
@@ -166,11 +145,7 @@ export default function TeacherOnboarding() {
   }
 
   if (loadingData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center">
-        <p className="text-slate-300">Loading onboarding...</p>
-      </div>
-    )
+    return <LoadingScreen message="Loading onboarding..." />
   }
 
   return (

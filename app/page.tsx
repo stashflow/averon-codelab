@@ -4,9 +4,13 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { LoadingScreen } from '@/components/loading-screen'
 import { Reveal } from '@/components/reveal'
 import { SiteBackdrop } from '@/components/site-backdrop'
-import { createClient } from '@/lib/supabase/client'
+import {
+  getClientAuthContext,
+  resolveAuthenticatedAppPath,
+} from '@/lib/auth/client-auth'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { releasePlan } from '@/lib/version-changelog'
@@ -77,35 +81,30 @@ const TOOLKIT = [
 ]
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
     async function checkAuth() {
-      const supabase = createClient()
-      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const {
+        supabase,
+        user,
+        profile,
+        missingSchoolIdColumn,
+      } = await getClientAuthContext<{ role?: string | null; school_id?: string | null }>({
+        profileSelect: 'role, school_id',
+      })
 
-      if (authUser) {
-        let profile: { role?: string; school_id?: string | null } | null = null
-        const profileWithSchool = await supabase.from('profiles').select('role, school_id').eq('id', authUser.id).single()
-        if (profileWithSchool.error && profileWithSchool.error.message?.toLowerCase().includes('school_id')) {
-          const profileWithoutSchool = await supabase.from('profiles').select('role').eq('id', authUser.id).single()
-          profile = profileWithoutSchool.data ? { ...profileWithoutSchool.data, school_id: null } : null
-        } else {
-          profile = profileWithSchool.data
-        }
-
-        if (profile?.role === 'teacher' && !profile.school_id) {
-          router.push('/onboarding/teacher')
-        } else if (profile?.role === 'teacher') {
-          router.push('/protected/teacher')
-        } else {
-          router.push('/protected')
-        }
+      if (user) {
+        const destination = await resolveAuthenticatedAppPath(
+          supabase,
+          user.id,
+          profile,
+          { missingSchoolIdColumn },
+        )
+        router.push(destination)
       }
 
-      setUser(authUser)
       setLoading(false)
     }
 
@@ -113,11 +112,7 @@ export default function Home() {
   }, [router])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="w-10 h-10 border-2 border-border border-t-primary rounded-full animate-spin" />
-      </div>
-    )
+    return <LoadingScreen message="Loading workspace..." />
   }
 
   return (

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { SiteBackdrop } from '@/components/site-backdrop'
+import { AppHeader, AppMain, AppShell, PageIntro } from '@/components/app-shell'
+import { LoadingScreen } from '@/components/loading-screen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -528,19 +529,12 @@ export default function StudentDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading dashboard...</p>
-      </div>
-    )
+    return <LoadingScreen message="Loading dashboard..." />
   }
 
   return (
-    <div className="min-h-screen warm-aurora">
-      <SiteBackdrop />
-
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <AppShell>
+      <AppHeader containerClassName="px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-3">
               <Image src="/ACL.png" alt="ACL Logo" width={40} height={40} className="w-10 h-10 logo-theme-filter" />
@@ -563,21 +557,20 @@ export default function StudentDashboard() {
               </Button>
             </div>
           </div>
-        </div>
-      </header>
+      </AppHeader>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <AppMain containerClassName="px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[1.5fr_0.95fr]">
-          <div>
-            <p className="site-kicker mb-3">
-              <span className="w-4 h-px bg-primary" />
-              Student Dashboard
-            </p>
-            <h1 className="site-title text-3xl sm:text-5xl">Welcome back, {profile?.full_name || 'Student'}.</h1>
-            <p className="site-subtitle mt-3 max-w-2xl">
+          <PageIntro
+            kicker="Student Dashboard"
+            title={`Welcome back, ${profile?.full_name || 'Student'}.`}
+            titleClassName="text-3xl sm:text-5xl"
+            description={
+              <>
               Track your progress, join classes, and move between assignments and private class sandboxes without losing momentum.
-            </p>
-          </div>
+              </>
+            }
+          />
           <div className="site-panel p-6">
             <h3 className="text-lg font-semibold text-foreground">Daily Coding Flow</h3>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -894,7 +887,7 @@ export default function StudentDashboard() {
             </Button>
           </div>
         </div>
-      </main>
-    </div>
+      </AppMain>
+    </AppShell>
   )
 }

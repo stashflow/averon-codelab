@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
+import { AppHeader, AppMain, AppShell } from '@/components/app-shell'
+import { LoadingScreen } from '@/components/loading-screen'
 import { Reveal } from '@/components/reveal'
-import { SiteBackdrop } from '@/components/site-backdrop'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -32,6 +33,7 @@ import {
   mergePreferences,
   type UserFeaturePreferences,
 } from '@/lib/user-preferences'
+import { getClientAuthContext } from '@/lib/auth/client-auth'
 import { CheckCircle2, KeyRound, LogOut, Mail, RotateCcw, Save, Settings2, Shield, UserCircle2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -72,30 +74,30 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient()
-      const [userRes, sessionRes] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()])
+      const { user, session, profile: currentProfile } = await getClientAuthContext<{
+        id?: string
+        role?: string | null
+        full_name?: string | null
+        email?: string | null
+        school_id?: string | null
+      }>({
+        profileSelect: 'id, role, full_name, email, school_id',
+      })
 
-      if (!userRes.data.user) {
+      if (!user) {
         router.push('/auth/login')
         return
       }
 
-      const user = userRes.data.user
       setAuthUser(user)
-      setSessionInfo(sessionRes.data.session)
+      setSessionInfo(session)
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, role, full_name, email, school_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!data?.role) {
+      if (!currentProfile?.role || !currentProfile.id) {
         router.push('/onboarding/role')
         return
       }
 
-      const nextPrefsStorageKey = getUserPreferencesStorageKey(data.id)
+      const nextPrefsStorageKey = getUserPreferencesStorageKey(currentProfile.id)
       const rawPreferences = localStorage.getItem(nextPrefsStorageKey)
       let resolvedPreferences = defaultUserFeaturePreferences
       if (rawPreferences) {
@@ -106,9 +108,9 @@ export default function SettingsPage() {
         }
       }
 
-      setProfile(data)
-      const effectiveEmail = data?.email || user.email || ''
-      setForm({ full_name: data?.full_name || '', email: effectiveEmail })
+      setProfile(currentProfile)
+      const effectiveEmail = currentProfile.email || user.email || ''
+      setForm({ full_name: currentProfile.full_name || '', email: effectiveEmail })
       setNewEmail(effectiveEmail)
       setPreferences(resolvedPreferences)
       setCustomColors(getStoredCustomThemeColors())
@@ -241,18 +243,12 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading settings...</p>
-      </div>
-    )
+    return <LoadingScreen message="Loading settings..." />
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <SiteBackdrop />
-      <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <AppShell className="bg-background text-foreground">
+      <AppHeader width="6xl" className="border-border bg-background/85" containerClassName="px-4 py-4">
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2"><Settings2 className="w-5 h-5 text-primary" /> Settings</h1>
             <p className="text-sm text-muted-foreground">Control your account, security, and classroom experience.</p>
@@ -267,10 +263,9 @@ export default function SettingsPage() {
               Sign Out
             </Button>
           </div>
-        </div>
-      </header>
+      </AppHeader>
 
-      <main className="relative z-10 max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+      <AppMain width="6xl" containerClassName="p-4 md:p-6 space-y-6">
         <Reveal className="site-panel p-6 md:p-8">
           <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
             <div>
@@ -539,7 +534,7 @@ export default function SettingsPage() {
             {savingPrefs ? 'Saving...' : 'Save Learn Feature Settings'}
           </Button>
         </div>
-      </main>
-    </div>
+      </AppMain>
+    </AppShell>
   )
 }

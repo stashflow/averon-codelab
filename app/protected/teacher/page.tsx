@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { LoadingScreen } from '@/components/loading-screen'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import {
   mergePreferences,
   type UserFeaturePreferences,
 } from '@/lib/user-preferences'
+import { getClientAuthContext } from '@/lib/auth/client-auth'
 import { Plus, LogOut, BookOpen, Settings, Users, GraduationCap, ClipboardCheck, Clock3, Sparkles } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -168,41 +170,22 @@ export default function TeacherDashboard() {
   }, [classViewKey, preferences.saved_filters_and_sort, classroomSearch, classroomSort])
 
   async function loadData() {
-    const supabase = createClient()
     try {
       const {
-        data: { user: authUser },
-        error: userError,
-      } = await supabase.auth.getUser()
+        supabase,
+        user: authUser,
+        profile: profileData,
+        missingSchoolIdColumn,
+      } = await getClientAuthContext<{ id?: string; role?: string | null; school_id?: string | null }>({
+        profileSelect: 'id, role, school_id',
+      })
 
-      if (userError || !authUser) {
+      if (!authUser) {
         router.push('/auth/login')
         return
       }
 
       setUser(authUser)
-
-      let missingSchoolIdColumn = false
-      let profileData: { role?: string; school_id?: string | null } | null = null
-      const profileWithSchool = await supabase
-        .from('profiles')
-        .select('role, school_id')
-        .eq('id', authUser.id)
-        .single()
-
-      if (profileWithSchool.error && profileWithSchool.error.message?.toLowerCase().includes('school_id')) {
-        missingSchoolIdColumn = true
-        const profileWithoutSchool = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', authUser.id)
-          .single()
-
-        profileData = profileWithoutSchool.data ? { ...profileWithoutSchool.data, school_id: null } : null
-      } else {
-        profileData = profileWithSchool.data
-      }
-
       setProfile(profileData)
 
       if (profileData?.role !== 'teacher') {
@@ -360,11 +343,7 @@ export default function TeacherDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    )
+    return <LoadingScreen message="Loading..." />
   }
 
   return (

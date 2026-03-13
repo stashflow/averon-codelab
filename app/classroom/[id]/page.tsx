@@ -4,7 +4,8 @@ import { useState, useEffect, useEffectEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { SiteBackdrop } from '@/components/site-backdrop'
+import { AppHeader, AppMain, AppShell, PageIntro } from '@/components/app-shell'
+import { LoadingScreen } from '@/components/loading-screen'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -105,11 +106,7 @@ export default function ClassroomPage() {
   }, [classroomId])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
-        <p className="text-slate-300">Loading...</p>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   const getSubmissionStatus = (assignmentId: string) => {
@@ -117,11 +114,8 @@ export default function ClassroomPage() {
   }
 
   return (
-    <div className="min-h-screen warm-aurora text-foreground">
-      <SiteBackdrop />
-
-      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/78 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+    <AppShell>
+      <AppHeader containerClassName="gap-4 px-4 py-4">
           <div className="flex items-center gap-4 min-w-0">
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="w-4 h-4" />
@@ -141,23 +135,26 @@ export default function ClassroomPage() {
               Open Sandbox
             </Button>
           </Link>
-        </div>
-      </header>
+      </AppHeader>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 py-8 space-y-8">
+      <AppMain>
         <section className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
-          <div className="space-y-4">
-            <h2 className="site-title text-3xl sm:text-4xl">Assignments and practice, all in one place.</h2>
-            <p className="site-subtitle max-w-2xl">
+          <PageIntro
+            title="Assignments and practice, all in one place."
+            description={
+              <>
               Keep up with active work, review submission status, and jump into your class sandbox whenever you need a clean place to test ideas.
-            </p>
-            <div className="flex flex-wrap gap-3">
+              </>
+            }
+            actions={
+              <>
               <Badge className="border-primary/30 bg-primary/10 text-primary">Student Workspace</Badge>
               <Badge variant="outline" className="border-border/70 bg-background/70">
                 {assignments.length} assignment{assignments.length === 1 ? '' : 's'}
               </Badge>
-            </div>
-          </div>
+              </>
+            }
+          />
 
           <Card className="site-panel">
             <CardHeader>
@@ -222,7 +219,7 @@ export default function ClassroomPage() {
             </div>
           )}
         </section>
-      </main>
-    </div>
+      </AppMain>
+    </AppShell>
   )
 }

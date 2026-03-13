@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { SiteBackdrop } from '@/components/site-backdrop'
+import { AppHeader, AppMain, AppShell, PageIntro } from '@/components/app-shell'
+import { LoadingScreen } from '@/components/loading-screen'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -617,45 +618,42 @@ export default function TeacherClassroomPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950">
-        <p className="text-slate-300">Loading...</p>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   const selectedLessonCount = Object.values(selectedLessonIds).filter(Boolean).length
 
   return (
-    <div className="min-h-screen warm-aurora">
-      <SiteBackdrop />
-
-      <header className="border-b border-border/70 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <p className="site-kicker mb-2">
-              <span className="w-4 h-px bg-primary" />
-              Teacher Classroom
-            </p>
-            <h1 className="text-2xl font-bold text-foreground">{classroom?.name}</h1>
-            <p className="text-sm text-muted-foreground">Class Code: {classroom?.code}</p>
-          </div>
+    <AppShell>
+      <AppHeader className="border-border/70 bg-background/80" containerClassName="justify-start gap-4 px-4 py-4">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <p className="site-kicker mb-2">
+            <span className="w-4 h-px bg-primary" />
+            Teacher Classroom
+          </p>
+          <h1 className="text-2xl font-bold text-foreground">{classroom?.name}</h1>
+          <p className="text-sm text-muted-foreground">Class Code: {classroom?.code}</p>
         </div>
-      </header>
+      </AppHeader>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 py-8 space-y-8">
+      <AppMain>
         <div className="site-panel p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-2xl">
-              <h2 className="text-xl font-semibold text-foreground">Landing-page classroom control center</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <PageIntro
+              className="max-w-2xl"
+              title="Landing-page classroom control center"
+              titleClassName="text-xl"
+              descriptionClassName="mt-2 max-w-none text-sm leading-6"
+              description={
+                <>
                 Every enrolled student now has a private sandbox mode attached to this class. Students can experiment safely,
                 save work to Supabase, and move into graded assignments when ready.
-              </p>
-            </div>
+                </>
+              }
+            />
             <Badge className="gap-2 border-primary/30 bg-primary/10 px-3 py-1.5 text-primary">
               <Code2 className="h-4 w-4" />
               Sandbox Enabled for Enrolled Students
@@ -1302,7 +1300,7 @@ export default function TeacherClassroomPage() {
             </div>
           )}
         </div>
-      </main>
-    </div>
+      </AppMain>
+    </AppShell>
   )
 }

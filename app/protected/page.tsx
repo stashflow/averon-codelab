@@ -2,7 +2,12 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+
+import { LoadingScreen } from '@/components/loading-screen'
+import {
+  getClientAuthContext,
+  resolveAuthenticatedAppPath,
+} from '@/lib/auth/client-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,74 +16,25 @@ export default function ProtectedRoute() {
 
   useEffect(() => {
     async function checkRoleAndRedirect() {
-      const supabase = createClient()
-
       try {
         const {
-          data: { user: authUser },
-          error: userError,
-        } = await supabase.auth.getUser()
+          supabase,
+          user,
+          profile,
+          missingSchoolIdColumn,
+        } = await getClientAuthContext<{ role?: string | null; school_id?: string | null }>({
+          profileSelect: 'role, school_id',
+        })
 
-        if (userError || !authUser) {
+        if (!user) {
           router.push('/auth/login')
           return
         }
 
-        let profile: { role?: string; school_id?: string | null } | null = null
-        const profileWithSchool = await supabase
-          .from('profiles')
-          .select('role, school_id')
-          .eq('id', authUser.id)
-          .single()
-
-        if (profileWithSchool.error && profileWithSchool.error.message?.toLowerCase().includes('school_id')) {
-          const profileWithoutSchool = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', authUser.id)
-            .single()
-
-          profile = profileWithoutSchool.data ? { ...profileWithoutSchool.data, school_id: null } : null
-        } else {
-          profile = profileWithSchool.data
-        }
-
-        const validRoles = new Set(['full_admin', 'district_admin', 'school_admin', 'teacher', 'student'])
-        if (!profile?.role || !validRoles.has(profile.role)) {
-          router.push('/onboarding/role')
-          return
-        }
-
-        if (profile?.role === 'full_admin') {
-          router.push('/admin/panel')
-          return
-        }
-
-        const [{ data: districtAdmin }, { data: schoolAdmin }] = await Promise.all([
-          supabase.from('district_admins').select('id').eq('admin_id', authUser.id).maybeSingle(),
-          supabase.from('school_admins').select('id').eq('admin_id', authUser.id).maybeSingle(),
-        ])
-
-        if (profile?.role === 'district_admin' || districtAdmin) {
-          router.push('/district/admin')
-          return
-        }
-
-        if (profile?.role === 'school_admin' || schoolAdmin) {
-          router.push('/school/admin')
-          return
-        }
-
-        if (profile?.role === 'teacher') {
-          if (!profile.school_id) {
-            router.push('/onboarding/teacher')
-            return
-          }
-          router.push('/protected/teacher')
-          return
-        }
-
-        router.push('/student/dashboard')
+        const destination = await resolveAuthenticatedAppPath(supabase, user.id, profile, {
+          missingSchoolIdColumn,
+        })
+        router.push(destination)
       } catch (err: any) {
         console.error('[v0] Error checking role:', err)
         router.push('/auth/login')
@@ -88,12 +44,5 @@ export default function ProtectedRoute() {
     checkRoleAndRedirect()
   }, [router])
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950/30 to-slate-950 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-white text-base">Redirecting to your dashboard...</p>
-      </div>
-    </div>
-  )
+  return <LoadingScreen message="Redirecting to your dashboard..." />
 }
