@@ -15,6 +15,12 @@ type LiveRuntimePanelProps = {
   subtitle?: string
   onClear?: () => void
   className?: string
+  pendingPrompt?: string | null
+  pendingValue?: string
+  waitingForInput?: boolean
+  onPendingValueChange?: (value: string) => void
+  onSubmitInput?: () => void
+  onCancelInput?: () => void
 }
 
 export function LiveRuntimePanel({
@@ -27,6 +33,12 @@ export function LiveRuntimePanel({
   subtitle = 'Programs can request input while they run.',
   onClear,
   className = '',
+  pendingPrompt,
+  pendingValue = '',
+  waitingForInput = false,
+  onPendingValueChange,
+  onSubmitInput,
+  onCancelInput,
 }: LiveRuntimePanelProps) {
   return (
     <div className={`overflow-hidden rounded-lg border border-slate-700 bg-[#0b1020] ${className}`}>
@@ -71,6 +83,28 @@ export function LiveRuntimePanel({
         <pre className="max-h-[320px] overflow-auto whitespace-pre-wrap break-words font-mono text-[13px] leading-6 text-slate-100">
           {output || 'Run your code to see live output here.'}
         </pre>
+        {waitingForInput && (
+          <div className="mt-4 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3">
+            <p className="mb-2 font-mono text-sm text-cyan-100">{pendingPrompt || 'Input required'}</p>
+            <div className="flex gap-2">
+              <input
+                value={pendingValue}
+                onChange={(event) => onPendingValueChange?.(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') onSubmitInput?.()
+                }}
+                className="flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none"
+                placeholder="Type input and press Enter"
+              />
+              <Button type="button" size="sm" onClick={onSubmitInput}>
+                Send
+              </Button>
+              <Button type="button" size="sm" variant="outline" className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800" onClick={onCancelInput}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

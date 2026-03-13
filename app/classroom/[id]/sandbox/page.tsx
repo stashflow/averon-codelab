@@ -8,23 +8,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import {
   ArrowLeft,
-  CheckCircle2,
+  FileCode2,
   FilePlus2,
-  FolderKanban,
   LayoutPanelLeft,
-  LayoutTemplate,
   Loader2,
   Play,
   RotateCcw,
   Save,
-  TerminalSquare,
+  Trash2,
 } from 'lucide-react'
 
+import { LiveRuntimePanel } from '@/components/code/live-runtime-panel'
 import { SiteBackdrop } from '@/components/site-backdrop'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
-import { Switch } from '@/components/ui/switch'
 import {
   SANDBOX_LANGUAGE_OPTIONS,
   getDefaultSandboxFiles,
@@ -78,8 +76,6 @@ export default function ClassroomSandboxPage() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [runResult, setRunResult] = useState<SandboxRunResult | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
-  const [easyMode, setEasyMode] = useState(true)
-  const [terminalOpen, setTerminalOpen] = useState(true)
   const [readyToPersist, setReadyToPersist] = useState(false)
   const [editorLoadFailed, setEditorLoadFailed] = useState(false)
   const saveTimerRef = useRef<number | null>(null)
@@ -111,10 +107,10 @@ export default function ClassroomSandboxPage() {
           normalizedFiles.find((file) => file.path === resolvedEntry) ||
           normalizedFiles[0]
 
-        setProjectName(loadedSandbox.project_name || 'Class Sandbox Project')
+        setProjectName(activeFileRecord?.path || loadedSandbox.project_name || 'main.py')
         setWorkspaceFiles(normalizedFiles)
         setActiveFile(activeFileRecord?.path || resolvedActiveFile)
-        setEntryFilename(resolvedEntry)
+        setEntryFilename(activeFileRecord?.path || resolvedEntry)
         setCode(activeFileRecord?.content || loadedSandbox.code || getSandboxStarterCode('python', loadedClassroom?.name))
         setLastSavedAt(loadedSandbox.updated_at || null)
         if (loadedSandbox.last_run_at) {
@@ -279,28 +275,56 @@ export default function ClassroomSandboxPage() {
     setEntryFilename(getSandboxEntryFilename('python'))
     setWorkspaceFiles(defaultFiles)
     setActiveFile(defaultFiles[0]?.path || 'main.py')
+    setProjectName(defaultFiles[0]?.path || 'main.py')
     setCode(defaultFiles[0]?.content || getSandboxStarterCode('python', classroom?.name))
     setRunResult(null)
+    liveRuntime.clearTerminal()
   }
 
   function handleSelectFile(path: string) {
     setActiveFile(path)
+    setEntryFilename(path)
+    setProjectName(path)
   }
 
   function handleCreateFile() {
-    const existing = new Set(workspaceFiles.map((file) => file.path))
-    let index = workspaceFiles.length + 1
-    let nextPath = `module-${index}.py`
+    const rawName = window.prompt('New project file name', `project-${workspaceFiles.length + 1}.py`)
+    if (!rawName) return
 
-    while (existing.has(nextPath)) {
-      index += 1
-      nextPath = `module-${index}.py`
+    const trimmed = rawName.trim()
+    const normalized = trimmed.endsWith('.py') ? trimmed : `${trimmed}.py`
+    if (!normalized || workspaceFiles.some((file) => file.path === normalized)) {
+      setRuntimeError('Choose a unique Python file name.')
+      return
     }
 
-    const nextFiles = [...workspaceFiles, { path: nextPath, content: '# New helper module\n' }]
+    const starter = 'print("Hello from your new project")\n'
+    const nextFiles = [...workspaceFiles, { path: normalized, content: starter }]
     setWorkspaceFiles(nextFiles)
-    setActiveFile(nextPath)
-    setCode('# New helper module\n')
+    setActiveFile(normalized)
+    setEntryFilename(normalized)
+    setProjectName(normalized)
+    setCode(starter)
+    setRunResult(null)
+    liveRuntime.clearTerminal()
+  }
+
+  function handleDeleteFile(path: string) {
+    if (workspaceFiles.length <= 1) {
+      setRuntimeError('Keep at least one Python file in the sandbox.')
+      return
+    }
+    if (!window.confirm(`Delete ${path}?`)) return
+
+    const nextFiles = workspaceFiles.filter((file) => file.path !== path)
+    const fallback = nextFiles[0]
+    setWorkspaceFiles(nextFiles)
+    if (activeFile === path || entryFilename === path) {
+      setActiveFile(fallback.path)
+      setEntryFilename(fallback.path)
+      setProjectName(fallback.path)
+      setCode(fallback.content)
+    }
   }
 
   if (loading) {
@@ -322,7 +346,7 @@ export default function ClassroomSandboxPage() {
       <SiteBackdrop />
 
       <header className="sticky top-0 z-50 border-b border-border/70 bg-background/78 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4" />
@@ -357,52 +381,8 @@ export default function ClassroomSandboxPage() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <div className="space-y-5">
-            <div className="site-kicker">
-              <span className="h-px w-5 bg-primary" />
-              Sandbox Mode
-            </div>
-            <div className="space-y-3">
-              <h1 className="site-title">
-                Private coding playground for {classroom?.name || 'your class'}.
-              </h1>
-              <p className="site-subtitle max-w-2xl">
-                Every enrolled student gets a personal sandbox for each class. Code is persisted to Supabase, and runs can
-                execute in a live in-browser Python runtime with real prompts and streamed output.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Badge className="border-primary/30 bg-primary/10 text-primary">Class Code: {classroom?.code || 'N/A'}</Badge>
-              <Badge variant="outline" className="border-border/70 bg-background/70">
-                Python
-              </Badge>
-              <Badge variant="outline" className="border-border/70 bg-background/70">
-                {saveLabel}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="site-panel p-5">
-            <div className="flex items-start gap-4">
-              <div className="rounded-2xl bg-primary/10 p-3 text-primary">
-                <TerminalSquare className="h-5 w-5" />
-              </div>
-              <div className="space-y-3">
-                <h2 className="text-lg font-semibold">Sandbox guarantees</h2>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>Each class gets its own saved workspace and run history.</li>
-                  <li>Runs save the latest output, runtime, and status back to Supabase.</li>
-                  <li>Python starter code and a live Python runtime keep each classroom experience consistent.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-6">
-          <div className="site-panel overflow-hidden border-border/80 bg-[#11151c]/95 text-slate-100 shadow-[0_32px_120px_-60px_rgba(15,23,42,0.85)]">
+      <main className="relative z-10 h-[calc(100vh-4rem)] px-4 py-4 sm:px-6 lg:px-8">
+        <div className="h-full overflow-hidden rounded-[28px] border border-border/80 bg-[#11151c]/95 text-slate-100 shadow-[0_32px_120px_-60px_rgba(15,23,42,0.85)]">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#161b22] px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -411,47 +391,27 @@ export default function ClassroomSandboxPage() {
                   <span className="h-3 w-3 rounded-full bg-[#28c840]" />
                 </div>
                 <div>
-                  <input
-                    value={projectName}
-                    onChange={(event) => setProjectName(event.target.value)}
-                    className="w-full max-w-sm border-0 bg-transparent p-0 text-sm font-semibold text-slate-100 outline-none"
-                    placeholder="Project name"
-                  />
-                  <p className="text-xs text-slate-400">{selectedLanguageMeta?.description}</p>
+                  <p className="text-sm font-semibold text-slate-100">{projectName || activeFile}</p>
+                  <p className="text-xs text-slate-400">{classroom?.name || 'Class Sandbox'} • {saveLabel}</p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">
-                  <LayoutTemplate className="h-3.5 w-3.5" />
-                  <span>Easy Mode</span>
-                  <Switch checked={!easyMode} onCheckedChange={(checked) => setEasyMode(!checked)} />
-                  <span>Advanced</span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTerminalOpen((open) => !open)}
-                  className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
-                >
-                  <TerminalSquare className="h-4 w-4" />
-                  {terminalOpen ? 'Hide Terminal' : 'Show Terminal'}
-                </Button>
                 <Badge className="border-sky-400/20 bg-sky-400/10 text-sky-200">Python Only</Badge>
                 <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-300">
-                  {workspaceFiles.length} files
+                  {workspaceFiles.length} project{workspaceFiles.length === 1 ? '' : 's'}
                 </Badge>
               </div>
             </div>
 
-            <ResizablePanelGroup direction="horizontal" className="min-h-[760px] bg-[#0d1117]">
-              <ResizablePanel defaultSize={easyMode ? 22 : 18} minSize={14} maxSize={28}>
+            <ResizablePanelGroup direction="horizontal" className="h-[calc(100%-61px)] bg-[#0d1117]">
+              <ResizablePanel defaultSize={20} minSize={14} maxSize={28}>
                 <aside className="flex h-full flex-col border-r border-white/10 bg-[#11161d]">
                   <div className="border-b border-white/10 px-4 py-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Explorer</p>
-                        <p className="mt-1 text-sm font-medium text-slate-100">Sandbox Project</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Projects</p>
+                        <p className="mt-1 text-sm font-medium text-slate-100">Python Files</p>
                       </div>
                       <Button
                         variant="outline"
@@ -460,49 +420,40 @@ export default function ClassroomSandboxPage() {
                         className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
                       >
                         <FilePlus2 className="h-4 w-4" />
-                        Add
+                        New
                       </Button>
                     </div>
-
-                    {easyMode && (
-                      <div className="mt-4 rounded-2xl border border-sky-400/15 bg-sky-400/8 p-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-sky-100">
-                          <FolderKanban className="h-4 w-4" />
-                          Easy Mode Guide
-                        </div>
-                        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-300">
-                          <li>Open `main.py` to write the code that runs.</li>
-                          <li>Add helper files when your project gets bigger.</li>
-                          <li>Use the terminal panel to review output and errors.</li>
-                        </ul>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex-1 space-y-2 overflow-auto px-3 py-4">
                     {workspaceFiles.map((file) => (
-                      <button
+                      <div
                         key={file.path}
-                        type="button"
-                        onClick={() => handleSelectFile(file.path)}
                         className={`w-full rounded-xl border px-3 py-3 text-left transition ${
                           activeFile === file.path
                             ? 'border-sky-400/30 bg-sky-400/12 text-white'
                             : 'border-white/8 bg-white/[0.03] text-slate-300 hover:border-sky-400/20 hover:bg-white/[0.05] hover:text-white'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">{file.path}</p>
-                          {file.path === entryFilename && (
-                            <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
-                              Run
-                            </span>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => handleSelectFile(file.path)} className="flex flex-1 items-center gap-3 text-left">
+                            <FileCode2 className="h-4 w-4" />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{file.path}</p>
+                              <p className="mt-1 text-xs text-slate-500">Open and run this project</p>
+                            </div>
+                          </button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-slate-400 hover:bg-white/10 hover:text-white"
+                            onClick={() => handleDeleteFile(file.path)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {file.path === entryFilename ? 'Entry file for program runs' : 'Helper module for imports'}
-                        </p>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </aside>
@@ -512,32 +463,15 @@ export default function ClassroomSandboxPage() {
 
               <ResizablePanel defaultSize={78} minSize={50}>
                 <ResizablePanelGroup direction="vertical">
-                  <ResizablePanel defaultSize={terminalOpen ? 72 : 100} minSize={50}>
+                  <ResizablePanel defaultSize={68} minSize={45}>
                     <div className="flex h-full flex-col bg-[#0d1117]">
                       <div className="flex items-center justify-between border-b border-white/10 bg-[#161b22] px-4 py-2.5 text-xs text-slate-400">
                         <div className="flex items-center gap-2">
                           <LayoutPanelLeft className="h-4 w-4" />
                           <span className="font-medium text-slate-200">{activeFile}</span>
                         </div>
-                        <span>{activeFile === entryFilename ? 'Executed on Run' : 'Imported into main.py'}</span>
+                        <span>{selectedLanguageMeta?.description}</span>
                       </div>
-
-                      {easyMode && (
-                        <div className="grid gap-3 border-b border-white/10 bg-[#11161d] px-4 py-3 text-xs text-slate-400 md:grid-cols-3">
-                          <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                            <span className="block text-[10px] uppercase tracking-[0.18em] text-slate-500">Step 1</span>
-                            Open a file and write Python.
-                          </div>
-                          <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                            <span className="block text-[10px] uppercase tracking-[0.18em] text-slate-500">Step 2</span>
-                            Press Run to execute your project.
-                          </div>
-                          <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
-                            <span className="block text-[10px] uppercase tracking-[0.18em] text-slate-500">Step 3</span>
-                            Read output in the terminal below.
-                          </div>
-                        </div>
-                      )}
 
                       <div className="flex-1">
                         {editorLoadFailed ? (
@@ -561,15 +495,15 @@ export default function ClassroomSandboxPage() {
                             }
                             theme={editorTheme === 'light' ? 'vs' : 'vs-dark'}
                             options={{
-                              minimap: { enabled: !easyMode },
-                              fontSize: easyMode ? 15 : 14,
+                              minimap: { enabled: true },
+                              fontSize: 15,
                               automaticLayout: true,
-                              wordWrap: easyMode ? 'on' : 'off',
+                              wordWrap: 'on',
                               smoothScrolling: true,
                               tabSize: 2,
                               padding: { top: 16 },
-                              glyphMargin: !easyMode,
-                              lineNumbersMinChars: easyMode ? 3 : 4,
+                              glyphMargin: false,
+                              lineNumbersMinChars: 4,
                             }}
                           />
                         )}
@@ -577,87 +511,28 @@ export default function ClassroomSandboxPage() {
                     </div>
                   </ResizablePanel>
 
-                  {terminalOpen && (
-                    <>
-                      <ResizableHandle withHandle />
-                      <ResizablePanel defaultSize={28} minSize={18}>
-                        <div className="flex h-full flex-col bg-[#0b0f14]">
-                          <div className="flex items-center justify-between border-b border-white/10 bg-[#11161d] px-4 py-2.5">
-                            <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
-                              <span className="text-slate-100">Terminal</span>
-                              <span>Input</span>
-                              <span>Output</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                              <span>{runResult?.runtime || sandbox?.last_run_runtime || 'pending'}</span>
-                              <span className="rounded-full border border-white/10 px-2 py-0.5 text-slate-300">
-                                {runResult?.status || sandbox?.last_run_status || 'idle'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className={`grid flex-1 ${easyMode ? 'lg:grid-cols-[0.95fr_1.05fr]' : 'lg:grid-cols-[0.75fr_1.25fr]'}`}>
-                            <div className="border-b border-white/10 p-4 lg:border-b-0 lg:border-r">
-                              <h2 className="text-sm font-semibold text-slate-100">Interactive Input</h2>
-                              <p className="mb-3 mt-2 text-xs leading-relaxed text-slate-500">
-                                The sandbox no longer uses a separate stdin box. When your Python program calls
-                                {' '}<span className="font-mono text-slate-300">input()</span>, you&apos;ll be prompted in real time and the full exchange will appear in the terminal transcript.
-                              </p>
-                              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-slate-300">
-                                Use <span className="font-mono text-slate-100">Run</span> to start the program, then respond to prompts as they appear.
-                              </div>
-                            </div>
-
-                            <div className="p-4">
-                              <div className="mb-3 flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2">
-                                  <Play className="h-4 w-4 text-sky-300" />
-                                  <h2 className="text-sm font-semibold text-slate-100">Last Run</h2>
-                                </div>
-                                {runResult?.status === 'success' && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
-                              </div>
-
-                              {runtimeError && (
-                                <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">
-                                  {runtimeError}
-                                </div>
-                              )}
-
-                              {liveRuntime.runtimeError && (
-                                <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">
-                                  {liveRuntime.runtimeError}
-                                </div>
-                              )}
-
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Status</p>
-                                  <p className="mt-2 text-sm font-semibold capitalize text-slate-100">
-                                    {runResult?.status || liveRuntime.lastResult?.status || sandbox?.last_run_status || 'Not run yet'}
-                                  </p>
-                                </div>
-                                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Runtime</p>
-                                  <p className="mt-2 text-sm font-semibold text-slate-100">
-                                    {runResult?.runtime || liveRuntime.lastResult?.runtime || sandbox?.last_run_runtime || 'Pending'}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 rounded-xl border border-white/10 bg-[#05080c] p-4 text-sm text-slate-100">
-                                <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">Output</p>
-                                <pre className="max-h-[220px] overflow-auto whitespace-pre-wrap break-words font-mono text-[13px]">
-                                  {liveRuntime.terminalOutput || runResult?.stdout || sandbox?.last_run_output || 'No stdout yet.'}
-                                  {(runResult?.stderr || liveRuntime.lastResult?.stderr || sandbox?.last_run_error) &&
-                                    `\n\n${runResult?.stderr || liveRuntime.lastResult?.stderr || sandbox?.last_run_error}`}
-                                </pre>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </ResizablePanel>
-                    </>
-                  )}
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={32} minSize={20}>
+                    <div className="h-full bg-[#0b0f14] p-3">
+                      <LiveRuntimePanel
+                        output={liveRuntime.terminalOutput || runResult?.stdout || sandbox?.last_run_output || ''}
+                        error={liveRuntime.runtimeError || runtimeError || runResult?.stderr || sandbox?.last_run_error || null}
+                        runtime={runResult?.runtime || liveRuntime.lastResult?.runtime || sandbox?.last_run_runtime || 'browser-python-live'}
+                        status={runResult?.status || liveRuntime.lastResult?.status || sandbox?.last_run_status || 'idle'}
+                        running={liveRuntime.running}
+                        title="Terminal"
+                        subtitle="Input and output stay together here."
+                        onClear={liveRuntime.clearTerminal}
+                        pendingPrompt={liveRuntime.pendingInputPrompt}
+                        pendingValue={liveRuntime.pendingInputValue}
+                        waitingForInput={liveRuntime.waitingForInput}
+                        onPendingValueChange={liveRuntime.setPendingInputValue}
+                        onSubmitInput={liveRuntime.submitInput}
+                        onCancelInput={liveRuntime.cancelInput}
+                        className="h-full"
+                      />
+                    </div>
+                  </ResizablePanel>
                 </ResizablePanelGroup>
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -667,8 +542,7 @@ export default function ClassroomSandboxPage() {
                 Monaco is unavailable in this session, so a plain text editor is being used instead.
               </div>
             )}
-          </div>
-        </section>
+        </div>
       </main>
     </div>
   )

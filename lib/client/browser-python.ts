@@ -38,7 +38,7 @@ export type BrowserJudgeResponse = {
 export type BrowserPythonInteractiveCallbacks = {
   onStdout?: (chunk: string) => void
   onStderr?: (chunk: string) => void
-  onInput?: (prompt: string) => string | null
+  onInput?: (prompt: string) => string | null | Promise<string | null>
 }
 
 type PyodideInstance = {
@@ -186,7 +186,7 @@ export async function runInteractiveBrowserPythonProgram(
     },
   }
 
-  const inputBridge = (prompt: unknown) => input.onInput?.(String(prompt ?? '')) ?? ''
+  const inputBridge = async (prompt: unknown) => input.onInput?.(String(prompt ?? '')) ?? ''
 
   resetWorkspace(pyodide)
   writeWorkspaceFiles(pyodide, files)
@@ -199,11 +199,12 @@ export async function runInteractiveBrowserPythonProgram(
   await pyodide.runPythonAsync(`
 import builtins
 import os
+from pyodide.ffi import run_sync
 import runpy
 import sys
 import traceback
 
-from js import __averon_input_bridge, __averon_stderr_bridge, __averon_stdout_bridge
+import js
 
 class _AveronStream:
     def __init__(self, bridge):
@@ -218,11 +219,14 @@ class _AveronStream:
     def flush(self):
         return None
 
-def _averon_input(prompt=""):
-    response = __averon_input_bridge(str(prompt or ""))
+async def _averon_input_async(prompt=""):
+    response = await js.__averon_input_bridge(str(prompt or ""))
     if response is None:
         raise EOFError("Input cancelled.")
     return str(response)
+
+def _averon_input(prompt=""):
+    return run_sync(_averon_input_async(prompt))
 
 _original_stdout = sys.stdout
 _original_stderr = sys.stderr
@@ -231,8 +235,8 @@ _original_cwd = os.getcwd()
 _entry_dir = os.path.dirname(__averon_entry_filename)
 _status = "success"
 
-sys.stdout = _AveronStream(__averon_stdout_bridge)
-sys.stderr = _AveronStream(__averon_stderr_bridge)
+sys.stdout = _AveronStream(js.__averon_stdout_bridge)
+sys.stderr = _AveronStream(js.__averon_stderr_bridge)
 builtins.input = _averon_input
 sys.path.insert(0, _entry_dir)
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import {
   runInteractiveBrowserPythonProgram,
@@ -19,11 +19,18 @@ export function usePythonLiveRuntime() {
   const [terminalOutput, setTerminalOutput] = useState('')
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<BrowserPythonRunResult | null>(null)
+  const [pendingInputPrompt, setPendingInputPrompt] = useState<string | null>(null)
+  const [pendingInputValue, setPendingInputValue] = useState('')
+  const [waitingForInput, setWaitingForInput] = useState(false)
+  const pendingResolverRef = useRef<((value: string | null) => void) | null>(null)
 
   async function runProgram(input: RunProgramInput): Promise<BrowserPythonRunResult | null> {
     setRunning(true)
     setRuntimeError(null)
     setTerminalOutput('')
+    setPendingInputPrompt(null)
+    setPendingInputValue('')
+    setWaitingForInput(false)
 
     try {
       const result = await runInteractiveBrowserPythonProgram({
@@ -34,16 +41,19 @@ export function usePythonLiveRuntime() {
         onStderr: (chunk) => {
           setTerminalOutput((current) => current + chunk)
         },
-        onInput: (prompt) => {
-          const message = prompt?.trim() ? prompt : 'Program input'
-          const value = window.prompt(message, '')
-          if (value === null) {
-            setTerminalOutput((current) => current + `${prompt || ''}[input cancelled]\n`)
-            return null
-          }
-          setTerminalOutput((current) => current + `${prompt || ''}${value}\n`)
-          return value
-        },
+        onInput: (prompt) =>
+          new Promise<string | null>((resolve) => {
+            setPendingInputPrompt(prompt || '')
+            setPendingInputValue('')
+            setWaitingForInput(true)
+            pendingResolverRef.current = (value) => {
+              setWaitingForInput(false)
+              setPendingInputPrompt(null)
+              setPendingInputValue('')
+              setTerminalOutput((current) => current + `${prompt || ''}${value ?? '[input cancelled]'}\n`)
+              resolve(value)
+            }
+          }),
       })
 
       setLastResult(result)
@@ -61,14 +71,33 @@ export function usePythonLiveRuntime() {
       })
       return null
     } finally {
+      pendingResolverRef.current = null
+      setWaitingForInput(false)
       setRunning(false)
     }
+  }
+
+  function submitInput() {
+    const resolver = pendingResolverRef.current
+    if (!resolver) return
+    pendingResolverRef.current = null
+    resolver(pendingInputValue)
+  }
+
+  function cancelInput() {
+    const resolver = pendingResolverRef.current
+    if (!resolver) return
+    pendingResolverRef.current = null
+    resolver(null)
   }
 
   function clearTerminal() {
     setTerminalOutput('')
     setRuntimeError(null)
     setLastResult(null)
+    setPendingInputPrompt(null)
+    setPendingInputValue('')
+    setWaitingForInput(false)
   }
 
   return {
@@ -76,7 +105,13 @@ export function usePythonLiveRuntime() {
     terminalOutput,
     runtimeError,
     lastResult,
+    pendingInputPrompt,
+    pendingInputValue,
+    waitingForInput,
     runProgram,
     clearTerminal,
+    submitInput,
+    cancelInput,
+    setPendingInputValue,
   }
 }
